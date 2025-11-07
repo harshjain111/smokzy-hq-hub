@@ -104,65 +104,36 @@ const EmployeeManagement = () => {
 
     try {
       if (editingEmployee) {
-        // Update existing employee
-        const { error: profileError } = await supabase
-          .from("profiles")
-          .update({
-            full_name: fullName,
+        // Update existing employee via edge function
+        const { data, error } = await supabase.functions.invoke('update-user', {
+          body: {
+            userId: editingEmployee.id,
+            fullName,
             phone,
-          })
-          .eq("id", editingEmployee.id);
-
-        if (profileError) throw profileError;
-
-        const { error: roleError } = await supabase
-          .from("user_roles")
-          .update({
+            password: password || undefined,
             role,
-            venue_id: role === "employee" ? venueId : null,
-          })
-          .eq("user_id", editingEmployee.id);
-
-        if (roleError) throw roleError;
-
-        toast.success("Employee updated successfully");
-      } else {
-        // Create new employee
-        const email = `${phone}@smokzy.com`;
-        
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/`,
-            data: {
-              full_name: fullName,
-            },
+            venueId: role === "employee" ? venueId : null,
           },
         });
 
-        if (authError) throw authError;
-        if (!authData.user) throw new Error("User creation failed");
+        if (error) throw error;
+        if (data.error) throw new Error(data.error);
 
-        const { error: profileError } = await supabase
-          .from("profiles")
-          .insert({
-            id: authData.user.id,
-            full_name: fullName,
+        toast.success("Employee updated successfully");
+      } else {
+        // Create new employee via edge function
+        const { data, error } = await supabase.functions.invoke('create-user', {
+          body: {
+            fullName,
             phone,
-          });
-
-        if (profileError) throw profileError;
-
-        const { error: roleError } = await supabase
-          .from("user_roles")
-          .insert({
-            user_id: authData.user.id,
+            password,
             role,
-            venue_id: role === "employee" ? venueId : null,
-          });
+            venueId: role === "employee" ? venueId : null,
+          },
+        });
 
-        if (roleError) throw roleError;
+        if (error) throw error;
+        if (data.error) throw new Error(data.error);
 
         toast.success("Employee created successfully");
       }
@@ -176,6 +147,7 @@ const EmployeeManagement = () => {
       setOpen(false);
       fetchData();
     } catch (error: any) {
+      console.error('Submit error:', error);
       toast.error(error.message || `Failed to ${editingEmployee ? 'update' : 'create'} employee`);
     }
   };
@@ -197,13 +169,19 @@ const EmployeeManagement = () => {
   };
 
   const handleDelete = async (employeeId: string) => {
-    const { error } = await supabase.auth.admin.deleteUser(employeeId);
+    try {
+      const { data, error } = await supabase.functions.invoke('delete-user', {
+        body: { userId: employeeId },
+      });
 
-    if (error) {
-      toast.error("Failed to delete employee");
-    } else {
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
+
       toast.success("Employee deleted successfully");
       fetchData();
+    } catch (error: any) {
+      console.error('Delete error:', error);
+      toast.error(error.message || "Failed to delete employee");
     }
   };
 
