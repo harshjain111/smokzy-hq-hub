@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building2, Users, Package, TrendingUp, AlertTriangle, BarChart3 } from "lucide-react";
+import { Building2, Users, Package, TrendingUp, AlertTriangle, BarChart3, Activity } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import VenueManagement from "./admin/VenueManagement";
 import EmployeeManagement from "./admin/EmployeeManagement";
@@ -12,6 +12,7 @@ import StockOverview from "./admin/StockOverview";
 import SalesReports from "./admin/SalesReports";
 import AttendanceOverview from "./admin/AttendanceOverview";
 import HookahCategoryManagement from "./admin/HookahCategoryManagement";
+import EmployeeActivityReport from "./admin/EmployeeActivityReport";
 
 interface AdminDashboardProps {
   user: User;
@@ -285,6 +286,7 @@ const AdminDashboard = ({ user }: AdminDashboardProps) => {
               <TabsTrigger value="venues">Manage Venues</TabsTrigger>
               <TabsTrigger value="employees">Manage Employees</TabsTrigger>
               <TabsTrigger value="categories">Hookah Categories</TabsTrigger>
+              <TabsTrigger value="activity">Employee Activity</TabsTrigger>
             </TabsList>
 
             <TabsContent value="venues" className="space-y-4">
@@ -297,6 +299,10 @@ const AdminDashboard = ({ user }: AdminDashboardProps) => {
 
             <TabsContent value="categories" className="space-y-4">
               <HookahCategoryManagement />
+            </TabsContent>
+
+            <TabsContent value="activity" className="space-y-4">
+              <EmployeeActivityReport />
             </TabsContent>
           </Tabs>
         </>
@@ -350,13 +356,12 @@ const AdminDashboard = ({ user }: AdminDashboardProps) => {
           </div>
 
           <Tabs defaultValue="stock" className="space-y-4">
-            <TabsList>
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="stock">Stock</TabsTrigger>
               <TabsTrigger value="sales">Sales</TabsTrigger>
               <TabsTrigger value="attendance">Attendance</TabsTrigger>
-              <TabsTrigger value="venues">All Venues</TabsTrigger>
-              <TabsTrigger value="employees">All Employees</TabsTrigger>
-              <TabsTrigger value="categories">Hookah Categories</TabsTrigger>
+              <TabsTrigger value="activity">Employee Activity</TabsTrigger>
+              <TabsTrigger value="manage">Manage</TabsTrigger>
             </TabsList>
 
             <TabsContent value="stock" className="space-y-4">
@@ -371,16 +376,27 @@ const AdminDashboard = ({ user }: AdminDashboardProps) => {
               <AttendanceOverview venueId={selectedVenueId} venueName={selectedVenue?.name || ""} />
             </TabsContent>
 
-            <TabsContent value="venues" className="space-y-4">
-              <VenueManagement />
+            <TabsContent value="activity" className="space-y-4">
+              <EmployeeActivityReport venueId={selectedVenueId} />
             </TabsContent>
 
-            <TabsContent value="employees" className="space-y-4">
-              <EmployeeManagement />
-            </TabsContent>
-
-            <TabsContent value="categories" className="space-y-4">
-              <HookahCategoryManagement />
+            <TabsContent value="manage" className="space-y-4">
+              <Tabs defaultValue="venues">
+                <TabsList>
+                  <TabsTrigger value="venues">Venues</TabsTrigger>
+                  <TabsTrigger value="employees">Employees</TabsTrigger>
+                  <TabsTrigger value="categories">Categories</TabsTrigger>
+                </TabsList>
+                <TabsContent value="venues">
+                  <VenueManagement />
+                </TabsContent>
+                <TabsContent value="employees">
+                  <EmployeeManagement />
+                </TabsContent>
+                <TabsContent value="categories">
+                  <HookahCategoryManagement />
+                </TabsContent>
+              </Tabs>
             </TabsContent>
           </Tabs>
         </>
