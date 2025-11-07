@@ -6,8 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Package, Plus, AlertTriangle } from "lucide-react";
+import { Package, Plus, AlertTriangle, Save } from "lucide-react";
 
 interface StockWidgetProps {
   venueId: string;
@@ -30,8 +31,7 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
   const [itemName, setItemName] = useState("");
   const [category, setCategory] = useState<'flavour' | 'hookah_pots' | 'accessories'>('flavour');
   const [unit, setUnit] = useState("kg");
-  const [selectedItemId, setSelectedItemId] = useState("");
-  const [updateQuantity, setUpdateQuantity] = useState("");
+  const [stockUpdates, setStockUpdates] = useState<Record<string, string>>({});
   const [breakageItem, setBreakageItem] = useState("");
   const [breakageQuantity, setBreakageQuantity] = useState("");
   const [breakageCause, setBreakageCause] = useState("");
@@ -75,33 +75,36 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
     }
   };
 
-  const handleUpdateStock = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!selectedItemId) {
-      toast.error("Please select an item");
+  const handleUpdateStock = async () => {
+    const updates = Object.entries(stockUpdates).filter(([_, qty]) => qty && parseInt(qty) > 0);
+    
+    if (updates.length === 0) {
+      toast.error("Please enter at least one quantity");
       return;
     }
 
-    const selectedItem = stock.find(item => item.id === selectedItemId);
-    if (!selectedItem) return;
+    try {
+      for (const [itemId, addedQty] of updates) {
+        const item = stock.find(s => s.id === itemId);
+        if (!item) continue;
 
-    const { error } = await supabase
-      .from("stock")
-      .update({
-        quantity: selectedItem.quantity + parseInt(updateQuantity),
-      })
-      .eq("id", selectedItemId);
+        const { error } = await supabase
+          .from("stock")
+          .update({
+            quantity: item.quantity + parseInt(addedQty),
+          })
+          .eq("id", itemId);
 
-    if (error) {
-      toast.error("Failed to update stock quantity");
-      console.error(error);
-    } else {
-      toast.success("Stock quantity updated successfully");
-      setSelectedItemId("");
-      setUpdateQuantity("");
+        if (error) throw error;
+      }
+
+      toast.success(`Updated ${updates.length} item(s) successfully`);
+      setStockUpdates({});
       setUpdateStockOpen(false);
       fetchStock();
+    } catch (error) {
+      toast.error("Failed to update stock");
+      console.error(error);
     }
   };
 
@@ -204,48 +207,173 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
               Update Stock
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Update Stock Quantity</DialogTitle>
-              <DialogDescription>Add stock quantity for an existing item</DialogDescription>
+              <DialogTitle>Update Stock Quantities</DialogTitle>
+              <DialogDescription>Enter quantities to add for each item (current stock will be updated)</DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleUpdateStock} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="selectItem">Select Item</Label>
-                <select
-                  id="selectItem"
-                  value={selectedItemId}
-                  onChange={(e) => setSelectedItemId(e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  required
-                >
-                  <option value="">Choose an item...</option>
-                  {stock.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.item_name} ({item.category.replace('_', ' ')}) - Current: {item.quantity} {item.unit}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="updateQuantity">Quantity to Add</Label>
-                <Input
-                  id="updateQuantity"
-                  type="number"
-                  min="0"
-                  value={updateQuantity}
-                  onChange={(e) => setUpdateQuantity(e.target.value)}
-                  placeholder="Enter quantity to add"
-                  required
-                />
-                {selectedItemId && (
-                  <p className="text-xs text-muted-foreground">
-                    New total will be: {stock.find(i => i.id === selectedItemId)?.quantity || 0} + {updateQuantity || 0} = {(stock.find(i => i.id === selectedItemId)?.quantity || 0) + parseInt(updateQuantity || "0")} {stock.find(i => i.id === selectedItemId)?.unit}
-                  </p>
-                )}
-              </div>
-              <Button type="submit" className="w-full">Update Quantity</Button>
-            </form>
+            
+            <div className="space-y-6">
+              {/* Flavours Section */}
+              {stock.filter(item => item.category === 'flavour').length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="text-lg font-semibold">Flavours</h3>
+                  <div className="border rounded-lg overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50">
+                          <TableHead className="w-[40%]">Item Name</TableHead>
+                          <TableHead className="w-[20%]">Current Stock</TableHead>
+                          <TableHead className="w-[20%]">Add Quantity</TableHead>
+                          <TableHead className="w-[20%]">New Total</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {stock.filter(item => item.category === 'flavour').map((item) => {
+                          const addedQty = parseInt(stockUpdates[item.id] || "0");
+                          return (
+                            <TableRow key={item.id}>
+                              <TableCell className="font-medium">{item.item_name}</TableCell>
+                              <TableCell>{item.quantity} {item.unit}</TableCell>
+                              <TableCell>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  placeholder="0"
+                                  value={stockUpdates[item.id] || ""}
+                                  onChange={(e) => setStockUpdates(prev => ({
+                                    ...prev,
+                                    [item.id]: e.target.value
+                                  }))}
+                                  className="w-full"
+                                />
+                              </TableCell>
+                              <TableCell className="font-semibold">
+                                {item.quantity + addedQty} {item.unit}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+
+              {/* Hookah Pots Section */}
+              {stock.filter(item => item.category === 'hookah_pots').length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="text-lg font-semibold">Hookah Pots</h3>
+                  <div className="border rounded-lg overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50">
+                          <TableHead className="w-[40%]">Item Name</TableHead>
+                          <TableHead className="w-[20%]">Current Stock</TableHead>
+                          <TableHead className="w-[20%]">Add Quantity</TableHead>
+                          <TableHead className="w-[20%]">New Total</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {stock.filter(item => item.category === 'hookah_pots').map((item) => {
+                          const addedQty = parseInt(stockUpdates[item.id] || "0");
+                          return (
+                            <TableRow key={item.id}>
+                              <TableCell className="font-medium">{item.item_name}</TableCell>
+                              <TableCell>{item.quantity} {item.unit}</TableCell>
+                              <TableCell>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  placeholder="0"
+                                  value={stockUpdates[item.id] || ""}
+                                  onChange={(e) => setStockUpdates(prev => ({
+                                    ...prev,
+                                    [item.id]: e.target.value
+                                  }))}
+                                  className="w-full"
+                                />
+                              </TableCell>
+                              <TableCell className="font-semibold">
+                                {item.quantity + addedQty} {item.unit}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+
+              {/* Accessories Section */}
+              {stock.filter(item => item.category === 'accessories').length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="text-lg font-semibold">Accessories</h3>
+                  <div className="border rounded-lg overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50">
+                          <TableHead className="w-[40%]">Item Name</TableHead>
+                          <TableHead className="w-[20%]">Current Stock</TableHead>
+                          <TableHead className="w-[20%]">Add Quantity</TableHead>
+                          <TableHead className="w-[20%]">New Total</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {stock.filter(item => item.category === 'accessories').map((item) => {
+                          const addedQty = parseInt(stockUpdates[item.id] || "0");
+                          return (
+                            <TableRow key={item.id}>
+                              <TableCell className="font-medium">{item.item_name}</TableCell>
+                              <TableCell>{item.quantity} {item.unit}</TableCell>
+                              <TableCell>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  placeholder="0"
+                                  value={stockUpdates[item.id] || ""}
+                                  onChange={(e) => setStockUpdates(prev => ({
+                                    ...prev,
+                                    [item.id]: e.target.value
+                                  }))}
+                                  className="w-full"
+                                />
+                              </TableCell>
+                              <TableCell className="font-semibold">
+                                {item.quantity + addedQty} {item.unit}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+
+              {stock.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  No items registered yet. Please register items first.
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2 pt-4 border-t">
+              <Button onClick={handleUpdateStock} className="flex-1">
+                <Save className="mr-2 h-4 w-4" />
+                Save All Updates
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setStockUpdates({});
+                  setUpdateStockOpen(false);
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
 
