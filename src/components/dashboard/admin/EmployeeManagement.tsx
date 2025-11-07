@@ -5,9 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, UserCircle } from "lucide-react";
+import { Plus, UserCircle, Edit, Trash2 } from "lucide-react";
 
 interface Employee {
   id: string;
@@ -27,6 +28,7 @@ const EmployeeManagement = () => {
   const [venues, setVenues] = useState<Venue[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
@@ -101,53 +103,118 @@ const EmployeeManagement = () => {
     }
 
     try {
-      const email = `${phone}@smokzy.com`;
-      
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/`,
-          data: {
+      if (editingEmployee) {
+        // Update existing employee
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .update({
             full_name: fullName,
+            phone,
+          })
+          .eq("id", editingEmployee.id);
+
+        if (profileError) throw profileError;
+
+        const { error: roleError } = await supabase
+          .from("user_roles")
+          .update({
+            role,
+            venue_id: role === "employee" ? venueId : null,
+          })
+          .eq("user_id", editingEmployee.id);
+
+        if (roleError) throw roleError;
+
+        toast.success("Employee updated successfully");
+      } else {
+        // Create new employee
+        const email = `${phone}@smokzy.com`;
+        
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/`,
+            data: {
+              full_name: fullName,
+            },
           },
-        },
-      });
-
-      if (authError) throw authError;
-      if (!authData.user) throw new Error("User creation failed");
-
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .insert({
-          id: authData.user.id,
-          full_name: fullName,
-          phone,
         });
 
-      if (profileError) throw profileError;
+        if (authError) throw authError;
+        if (!authData.user) throw new Error("User creation failed");
 
-      const { error: roleError } = await supabase
-        .from("user_roles")
-        .insert({
-          user_id: authData.user.id,
-          role,
-          venue_id: role === "employee" ? venueId : null,
-        });
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .insert({
+            id: authData.user.id,
+            full_name: fullName,
+            phone,
+          });
 
-      if (roleError) throw roleError;
+        if (profileError) throw profileError;
 
-      toast.success("Employee created successfully");
+        const { error: roleError } = await supabase
+          .from("user_roles")
+          .insert({
+            user_id: authData.user.id,
+            role,
+            venue_id: role === "employee" ? venueId : null,
+          });
+
+        if (roleError) throw roleError;
+
+        toast.success("Employee created successfully");
+      }
+
       setFullName("");
       setPhone("");
       setPassword("");
       setRole("employee");
       setVenueId("");
+      setEditingEmployee(null);
       setOpen(false);
       fetchData();
     } catch (error: any) {
-      toast.error(error.message || "Failed to create employee");
+      toast.error(error.message || `Failed to ${editingEmployee ? 'update' : 'create'} employee`);
     }
+  };
+
+  const handleEdit = async (employee: Employee) => {
+    setEditingEmployee(employee);
+    setFullName(employee.full_name);
+    setPhone(employee.phone || "");
+    setRole(employee.role as "admin" | "employee");
+    
+    const { data: roleData } = await supabase
+      .from("user_roles")
+      .select("venue_id")
+      .eq("user_id", employee.id)
+      .single();
+    
+    setVenueId(roleData?.venue_id || "");
+    setOpen(true);
+  };
+
+  const handleDelete = async (employeeId: string) => {
+    const { error } = await supabase.auth.admin.deleteUser(employeeId);
+
+    if (error) {
+      toast.error("Failed to delete employee");
+    } else {
+      toast.success("Employee deleted successfully");
+      fetchData();
+    }
+  };
+
+  const handleCloseDialog = () => {
+    setOpen(false);
+    setEditingEmployee(null);
+    setFullName("");
+    setPhone("");
+    setPassword("");
+    setRole("employee");
+    setVenueId("");
   };
 
   if (loading) {
@@ -158,7 +225,7 @@ const EmployeeManagement = () => {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Employee Management</h2>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={(isOpen) => !isOpen && handleCloseDialog()}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
@@ -167,9 +234,9 @@ const EmployeeManagement = () => {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add New Employee</DialogTitle>
+              <DialogTitle>{editingEmployee ? "Edit Employee" : "Add New Employee"}</DialogTitle>
               <DialogDescription>
-                Create a new employee account
+                {editingEmployee ? "Update employee information" : "Create a new employee account"}
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -194,14 +261,14 @@ const EmployeeManagement = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">Password {editingEmployee && "(leave blank to keep current)"}</Label>
                 <Input
                   id="password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Minimum 6 characters"
-                  required
+                  required={!editingEmployee}
                   minLength={6}
                 />
               </div>
@@ -234,7 +301,7 @@ const EmployeeManagement = () => {
                   </Select>
                 </div>
               )}
-              <Button type="submit" className="w-full">Create Employee</Button>
+              <Button type="submit" className="w-full">{editingEmployee ? "Update Employee" : "Create Employee"}</Button>
             </form>
           </DialogContent>
         </Dialog>
@@ -244,17 +311,47 @@ const EmployeeManagement = () => {
         {employees.map((employee) => (
           <Card key={employee.id}>
             <CardHeader>
-              <div className="flex items-center gap-2">
-                <UserCircle className="h-5 w-5 text-muted-foreground" />
-                <CardTitle className="text-lg">{employee.full_name}</CardTitle>
-              </div>
-              <CardDescription>
-                <div className="space-y-1 text-sm">
-                  <div>Phone: {employee.phone || "N/A"}</div>
-                  <div className="capitalize">Role: {employee.role}</div>
-                  {employee.venue_name && <div>Venue: {employee.venue_name}</div>}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 flex-1">
+                  <UserCircle className="h-5 w-5 text-muted-foreground" />
+                  <div className="flex-1">
+                    <CardTitle className="text-lg">{employee.full_name}</CardTitle>
+                    <CardDescription>
+                      <div className="space-y-1 text-sm mt-1">
+                        <div>Phone: {employee.phone || "N/A"}</div>
+                        <div className="capitalize">Role: {employee.role}</div>
+                        {employee.venue_name && <div>Venue: {employee.venue_name}</div>}
+                      </div>
+                    </CardDescription>
+                  </div>
                 </div>
-              </CardDescription>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="icon" onClick={() => handleEdit(employee)}>
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="outline" size="icon">
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Employee</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to delete "{employee.full_name}"? This will permanently delete their account and all associated data.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleDelete(employee.id)}>
+                          Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </div>
             </CardHeader>
           </Card>
         ))}
