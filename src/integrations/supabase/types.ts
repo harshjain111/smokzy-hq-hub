@@ -342,6 +342,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      bootstrap_admin: { Args: never; Returns: boolean }
       get_user_venue: { Args: { user_id: string }; Returns: string }
       is_admin: { Args: { user_id: string }; Returns: boolean }
     }

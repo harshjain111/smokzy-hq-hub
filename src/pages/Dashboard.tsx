@@ -32,6 +32,20 @@ const Dashboard = () => {
     navigate("/auth");
   };
 
+  const handleBootstrapAdmin = async () => {
+    const { data, error } = await supabase.rpc('bootstrap_admin');
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    if (data === true) {
+      toast.success('Admin access granted. Reloading...');
+      window.location.reload();
+    } else {
+      toast.info('Setup already completed. Please contact an administrator.');
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -49,12 +63,17 @@ const Dashboard = () => {
         <div className="text-center max-w-md p-8">
           <h2 className="text-2xl font-bold mb-4">Access Pending</h2>
           <p className="text-muted-foreground mb-6">
-            Your account hasn't been assigned a role yet. Please contact your administrator.
+            Your account hasn't been assigned a role yet. If this is the first time setup, you can grant yourself admin access.
           </p>
-          <Button onClick={handleLogout} variant="outline">
-            <LogOut className="mr-2 h-4 w-4" />
-            Sign Out
-          </Button>
+          <div className="flex items-center justify-center gap-3">
+            <Button onClick={handleBootstrapAdmin}>
+              Grant Admin Access
+            </Button>
+            <Button onClick={handleLogout} variant="outline">
+              <LogOut className="mr-2 h-4 w-4" />
+              Sign Out
+            </Button>
+          </div>
         </div>
       </div>
     );
