@@ -1,25 +1,30 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TrendingUp, Calendar } from "lucide-react";
-import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 
-interface SalesData {
-  venue_id: string;
-  hookah_category: string;
-  total_quantity: number;
-  venue_name: string;
+interface SalesReportsProps {
+  venueId: string;
+  venueName: string;
 }
 
-const SalesReports = () => {
+interface SalesData {
+  hookah_category: string;
+  report_date: string;
+  quantity_sold: number;
+}
+
+const SalesReports = ({ venueId, venueName }: SalesReportsProps) => {
   const [sales, setSales] = useState<SalesData[]>([]);
   const [period, setPeriod] = useState<"today" | "week" | "month">("today");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchSales();
-  }, [period]);
+  }, [period, venueId]);
 
   const getDateRange = () => {
     const today = new Date();
@@ -45,50 +50,35 @@ const SalesReports = () => {
     const { data: salesData, error } = await supabase
       .from("sales_reports")
       .select("*")
+      .eq("venue_id", venueId)
       .gte("report_date", start)
-      .lte("report_date", end);
+      .lte("report_date", end)
+      .order("report_date", { ascending: false });
 
     if (!error && salesData) {
-      const aggregated: Record<string, SalesData> = {};
-
-      for (const sale of salesData) {
-        const key = `${sale.venue_id}-${sale.hookah_category}`;
-        
-        if (!aggregated[key]) {
-          const { data: venueData } = await supabase
-            .from("venues")
-            .select("name")
-            .eq("id", sale.venue_id)
-            .single();
-
-          aggregated[key] = {
-            venue_id: sale.venue_id,
-            hookah_category: sale.hookah_category,
-            total_quantity: sale.quantity_sold,
-            venue_name: venueData?.name || "Unknown",
-          };
-        } else {
-          aggregated[key].total_quantity += sale.quantity_sold;
-        }
-      }
-
-      setSales(Object.values(aggregated));
+      setSales(salesData);
     }
     setLoading(false);
   };
 
-  const totalSales = sales.reduce((sum, item) => sum + item.total_quantity, 0);
+  const totalSales = sales.reduce((sum, sale) => sum + sale.quantity_sold, 0);
+  const salesByCategory = sales.reduce((acc, sale) => {
+    acc[sale.hookah_category] = (acc[sale.hookah_category] || 0) + sale.quantity_sold;
+    return acc;
+  }, {} as Record<string, number>);
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Sales Reports</h2>
-        <Select value={period} onValueChange={(value: any) => setPeriod(value)}>
-          <SelectTrigger className="w-[180px]">
-            <Calendar className="mr-2 h-4 w-4" />
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold">Sales Reports - {venueName}</h2>
+          <p className="text-sm text-muted-foreground">Hookah sales analytics</p>
+        </div>
+        <Select value={period} onValueChange={(val: any) => setPeriod(val)}>
+          <SelectTrigger className="w-40">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="bg-background z-50">
             <SelectItem value="today">Today</SelectItem>
             <SelectItem value="week">This Week</SelectItem>
             <SelectItem value="month">This Month</SelectItem>
@@ -98,42 +88,89 @@ const SalesReports = () => {
 
       <Card className="bg-gradient-to-br from-success/10 to-success/5 border-success/20">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-success">
-            <TrendingUp className="h-5 w-5" />
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-success" />
             Total Sales
           </CardTitle>
           <CardDescription>
-            {period === "today" ? "Today's" : period === "week" ? "This week's" : "This month's"} performance
+            {period === "today" ? "Today" : period === "week" ? "This Week" : "This Month"}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-4xl font-bold">{totalSales}</p>
-          <p className="text-sm text-muted-foreground">Hookahs sold</p>
+          <p className="text-4xl font-bold text-success">{totalSales}</p>
+          <p className="text-sm text-muted-foreground mt-1">Hookahs sold</p>
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {sales.map((item, index) => (
-          <Card key={index}>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">{item.venue_name}</CardTitle>
-              <CardDescription className="capitalize">{item.hookah_category} Category</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold text-success">{item.total_quantity}</p>
-              <p className="text-sm text-muted-foreground">Units sold</p>
-            </CardContent>
-          </Card>
-        ))}
-        {sales.length === 0 && !loading && (
-          <Card className="col-span-full">
-            <CardContent className="flex flex-col items-center justify-center py-10">
-              <TrendingUp className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">No sales data for this period</p>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Sales by Category</CardTitle>
+          <CardDescription>Breakdown by hookah type</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Category</TableHead>
+                <TableHead className="text-right">Quantity Sold</TableHead>
+                <TableHead className="text-right">% of Total</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {Object.entries(salesByCategory).map(([category, quantity]) => (
+                <TableRow key={category}>
+                  <TableCell className="font-medium capitalize">{category.replace('_', ' ')}</TableCell>
+                  <TableCell className="text-right font-bold">{quantity}</TableCell>
+                  <TableCell className="text-right text-muted-foreground">
+                    {totalSales > 0 ? ((quantity / totalSales) * 100).toFixed(1) : 0}%
+                  </TableCell>
+                </TableRow>
+              ))}
+              {Object.keys(salesByCategory).length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={3} className="text-center text-muted-foreground">
+                    No sales data for this period
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Sales</CardTitle>
+          <CardDescription>Daily sales records</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Category</TableHead>
+                <TableHead className="text-right">Quantity</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sales.slice(0, 10).map((sale, idx) => (
+                <TableRow key={idx}>
+                  <TableCell>{format(new Date(sale.report_date), "MMM dd, yyyy")}</TableCell>
+                  <TableCell className="capitalize">{sale.hookah_category.replace('_', ' ')}</TableCell>
+                  <TableCell className="text-right font-semibold">{sale.quantity_sold}</TableCell>
+                </TableRow>
+              ))}
+              {sales.length === 0 && !loading && (
+                <TableRow>
+                  <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
+                    No sales records found for this period
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 };

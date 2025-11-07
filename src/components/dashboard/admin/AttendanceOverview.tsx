@@ -1,28 +1,32 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Clock, CheckCircle, XCircle } from "lucide-react";
 import { format } from "date-fns";
 
+interface AttendanceOverviewProps {
+  venueId: string;
+  venueName: string;
+}
+
 interface AttendanceRecord {
   id: string;
   user_id: string;
-  venue_id: string;
   check_in_time: string;
   check_out_time: string | null;
   tasks_completed: boolean;
   full_name: string;
-  venue_name: string;
 }
 
-const AttendanceOverview = () => {
+const AttendanceOverview = ({ venueId, venueName }: AttendanceOverviewProps) => {
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchAttendance();
-  }, []);
+  }, [venueId]);
 
   const fetchAttendance = async () => {
     const today = format(new Date(), "yyyy-MM-dd");
@@ -30,104 +34,173 @@ const AttendanceOverview = () => {
     const { data: attendanceData, error } = await supabase
       .from("attendance")
       .select("*")
+      .eq("venue_id", venueId)
       .gte("check_in_time", today)
       .order("check_in_time", { ascending: false });
 
     if (!error && attendanceData) {
       const enrichedData = await Promise.all(
         attendanceData.map(async (record) => {
-          const [profileResult, venueResult] = await Promise.all([
-            supabase.from("profiles").select("full_name").eq("id", record.user_id).single(),
-            supabase.from("venues").select("name").eq("id", record.venue_id).single(),
-          ]);
+          const { data: profileData } = await supabase
+            .from("profiles")
+            .select("full_name")
+            .eq("id", record.user_id)
+            .single();
 
           return {
             ...record,
-            full_name: profileResult.data?.full_name || "Unknown",
-            venue_name: venueResult.data?.name || "Unknown",
+            full_name: profileData?.full_name || "Unknown",
           };
         })
       );
+
       setAttendance(enrichedData);
     }
     setLoading(false);
   };
 
-  const activeEmployees = attendance.filter(a => !a.check_out_time).length;
+  const activeEmployees = attendance.filter(record => !record.check_out_time);
+  const completedShifts = attendance.filter(record => record.check_out_time);
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-4">
-        <h2 className="text-2xl font-bold">Today's Attendance</h2>
-        <Badge variant="secondary" className="gap-1">
-          <Clock className="h-3 w-3" />
-          {activeEmployees} Active
-        </Badge>
+      <div>
+        <h2 className="text-2xl font-bold">Attendance - {venueName}</h2>
+        <p className="text-sm text-muted-foreground">Today's employee attendance</p>
       </div>
 
-      <div className="grid gap-4">
-        {attendance.map((record) => (
-          <Card key={record.id}>
-            <CardHeader className="pb-3">
-              <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle className="text-base">{record.full_name}</CardTitle>
-                  <CardDescription>{record.venue_name}</CardDescription>
-                </div>
-                {record.check_out_time ? (
-                  <Badge variant="outline" className="gap-1">
-                    <CheckCircle className="h-3 w-3" />
-                    Completed
-                  </Badge>
-                ) : (
-                  <Badge variant="secondary" className="gap-1">
-                    <Clock className="h-3 w-3" />
-                    On Duty
-                  </Badge>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-muted-foreground">Check In</p>
-                  <p className="font-medium">{format(new Date(record.check_in_time), "hh:mm a")}</p>
-                </div>
-                {record.check_out_time && (
-                  <div>
-                    <p className="text-muted-foreground">Check Out</p>
-                    <p className="font-medium">{format(new Date(record.check_out_time), "hh:mm a")}</p>
-                  </div>
-                )}
-                <div className="col-span-2">
-                  <p className="text-muted-foreground">Tasks Status</p>
-                  <div className="flex items-center gap-1 mt-1">
-                    {record.tasks_completed ? (
-                      <>
-                        <CheckCircle className="h-4 w-4 text-success" />
-                        <span className="text-success font-medium">All tasks completed</span>
-                      </>
-                    ) : (
-                      <>
-                        <XCircle className="h-4 w-4 text-warning" />
-                        <span className="text-warning font-medium">Tasks pending</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-        {attendance.length === 0 && !loading && (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-10">
-              <Clock className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">No attendance records for today</p>
-            </CardContent>
-          </Card>
-        )}
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-success">Active Now</CardTitle>
+            <CardDescription>{activeEmployees.length} employee{activeEmployees.length !== 1 ? 's' : ''} on duty</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-4xl font-bold text-success">{activeEmployees.length}</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Completed Shifts</CardTitle>
+            <CardDescription>{completedShifts.length} shift{completedShifts.length !== 1 ? 's' : ''} today</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-4xl font-bold">{completedShifts.length}</p>
+          </CardContent>
+        </Card>
       </div>
+
+      {activeEmployees.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-success" />
+              Currently Active
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Employee</TableHead>
+                  <TableHead>Check-in Time</TableHead>
+                  <TableHead>Duration</TableHead>
+                  <TableHead className="text-right">Tasks Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {activeEmployees.map((record) => {
+                  const checkInTime = new Date(record.check_in_time);
+                  const duration = Math.floor((new Date().getTime() - checkInTime.getTime()) / (1000 * 60 * 60));
+                  
+                  return (
+                    <TableRow key={record.id}>
+                      <TableCell className="font-medium">{record.full_name}</TableCell>
+                      <TableCell>{format(checkInTime, "hh:mm a")}</TableCell>
+                      <TableCell>{duration}h {Math.floor(((new Date().getTime() - checkInTime.getTime()) / (1000 * 60)) % 60)}m</TableCell>
+                      <TableCell className="text-right">
+                        {record.tasks_completed ? (
+                          <Badge variant="outline" className="text-success border-success">
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Complete
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-muted-foreground">
+                            <Clock className="h-3 w-3 mr-1" />
+                            Pending
+                          </Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {completedShifts.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Completed Shifts Today</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Employee</TableHead>
+                  <TableHead>Check-in</TableHead>
+                  <TableHead>Check-out</TableHead>
+                  <TableHead>Duration</TableHead>
+                  <TableHead className="text-right">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {completedShifts.map((record) => {
+                  const checkInTime = new Date(record.check_in_time);
+                  const checkOutTime = record.check_out_time ? new Date(record.check_out_time) : null;
+                  const duration = checkOutTime 
+                    ? Math.floor((checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60 * 60))
+                    : 0;
+                  
+                  return (
+                    <TableRow key={record.id}>
+                      <TableCell className="font-medium">{record.full_name}</TableCell>
+                      <TableCell>{format(checkInTime, "hh:mm a")}</TableCell>
+                      <TableCell>{checkOutTime ? format(checkOutTime, "hh:mm a") : "-"}</TableCell>
+                      <TableCell>{duration}h {checkOutTime ? Math.floor(((checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60)) % 60) : 0}m</TableCell>
+                      <TableCell className="text-right">
+                        {record.tasks_completed ? (
+                          <Badge variant="outline" className="text-success border-success">
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Complete
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-destructive border-destructive">
+                            <XCircle className="h-3 w-3 mr-1" />
+                            Incomplete
+                          </Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {attendance.length === 0 && !loading && (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-10">
+            <Clock className="h-12 w-12 text-muted-foreground mb-4" />
+            <p className="text-muted-foreground">No attendance records for today</p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
