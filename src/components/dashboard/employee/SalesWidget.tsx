@@ -19,14 +19,31 @@ interface SalesWidgetProps {
 const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
   const [open, setOpen] = useState(false);
   const [photoOpen, setPhotoOpen] = useState(false);
-  const [category, setCategory] = useState<"premium" | "standard" | "budget">("standard");
+  const [category, setCategory] = useState("");
   const [quantity, setQuantity] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [todaySales, setTodaySales] = useState<any[]>([]);
+  const [hookahCategories, setHookahCategories] = useState<string[]>([]);
 
   useEffect(() => {
+    fetchHookahCategories();
     fetchTodaySales();
   }, [venueId]);
+
+  const fetchHookahCategories = async () => {
+    const { data } = await supabase
+      .from("venue_hookah_categories")
+      .select("category_name")
+      .eq("venue_id", venueId)
+      .order("category_name");
+
+    if (data) {
+      setHookahCategories(data.map(cat => cat.category_name));
+      if (data.length > 0 && !category) {
+        setCategory(data[0].category_name);
+      }
+    }
+  };
 
   const fetchTodaySales = async () => {
     const today = format(new Date(), "yyyy-MM-dd");
@@ -42,21 +59,24 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
   const handleSubmitSales = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!category) {
+      toast.error("Please select a category");
+      return;
+    }
+
     const today = format(new Date(), "yyyy-MM-dd");
 
-    const { error } = await supabase.from("sales_reports").upsert(
-      {
-        venue_id: venueId,
-        reported_by: user.id,
-        report_date: today,
-        hookah_category: category,
-        quantity_sold: parseInt(quantity),
-      },
-      { onConflict: "venue_id,report_date,hookah_category" }
-    );
+    const { error } = await supabase.from("sales_reports").insert({
+      venue_id: venueId,
+      reported_by: user.id,
+      report_date: today,
+      hookah_category: category as any,
+      quantity_sold: parseInt(quantity),
+    });
 
     if (error) {
       toast.error("Failed to submit sales");
+      console.error(error);
     } else {
       toast.success("Sales reported successfully");
       setQuantity("");
@@ -136,16 +156,24 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
             <form onSubmit={handleSubmitSales} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="category">Hookah Category</Label>
-                <Select value={category} onValueChange={(val: any) => setCategory(val)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="premium">Premium</SelectItem>
-                    <SelectItem value="standard">Standard</SelectItem>
-                    <SelectItem value="budget">Budget</SelectItem>
-                  </SelectContent>
-                </Select>
+                {hookahCategories.length > 0 ? (
+                  <Select value={category} onValueChange={setCategory}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-background z-50">
+                      {hookahCategories.map((cat) => (
+                        <SelectItem key={cat} value={cat}>
+                          {cat}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="text-sm text-muted-foreground p-3 bg-muted rounded-md">
+                    No hookah categories configured for this venue. Please contact admin.
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="qty">Quantity Sold</Label>
@@ -157,7 +185,9 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
                   required
                 />
               </div>
-              <Button type="submit" className="w-full">Submit Sales</Button>
+              <Button type="submit" className="w-full" disabled={hookahCategories.length === 0}>
+                Submit Sales
+              </Button>
             </form>
           </DialogContent>
         </Dialog>

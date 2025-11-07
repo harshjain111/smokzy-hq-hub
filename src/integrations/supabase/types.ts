@@ -316,6 +316,38 @@ export type Database = {
           },
         ]
       }
+      venue_hookah_categories: {
+        Row: {
+          category_name: string
+          created_at: string
+          id: string
+          updated_at: string
+          venue_id: string
+        }
+        Insert: {
+          category_name: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          venue_id: string
+        }
+        Update: {
+          category_name?: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          venue_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venue_hookah_categories_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       venues: {
         Row: {
           created_at: string
