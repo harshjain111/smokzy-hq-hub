@@ -62,7 +62,13 @@ const Auth = () => {
         });
 
         if (signUpError) {
-          toast.error(signUpError.message);
+          const msg = signUpError.message.toLowerCase();
+          if (msg.includes("already") || msg.includes("registered") || msg.includes("exists")) {
+            toast.info("Account already exists. Please sign in or reset your password.");
+            setIsSignup(false);
+          } else {
+            toast.error(signUpError.message);
+          }
         } else if (data.user) {
           const { error: profileError } = await supabase
             .from("profiles")
@@ -116,6 +122,23 @@ const Auth = () => {
       toast.error("An unexpected error occurred");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!email) {
+      toast.info('Enter your email above to reset your password');
+      return;
+    }
+    setLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth`
+    });
+    setLoading(false);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success('Password reset link sent to your email');
     }
   };
 
@@ -206,6 +229,17 @@ const Auth = () => {
               {isSignup ? "Back to sign in" : "Create new account"}
             </button>
           </div>
+          {!isSignup && (
+            <div className="mt-2 text-center text-xs">
+              <button
+                type="button"
+                onClick={handleResetPassword}
+                className="text-primary hover:underline"
+              >
+                Forgot password? Send reset link
+              </button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
