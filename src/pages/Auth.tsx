@@ -15,8 +15,11 @@ const authSchema = z.object({
 
 const Auth = () => {
   const navigate = useNavigate();
+  const [isSignup, setIsSignup] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -45,19 +48,67 @@ const Auth = () => {
         return;
       }
 
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      if (isSignup) {
+        const { data, error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/`,
+            data: {
+              full_name: fullName,
+            },
+          },
+        });
 
-      if (error) {
-        if (error.message.includes("Invalid login credentials")) {
-          toast.error("Invalid email or password");
-        } else {
-          toast.error(error.message);
+        if (signUpError) {
+          toast.error(signUpError.message);
+        } else if (data.user) {
+          const { error: profileError } = await supabase
+            .from("profiles")
+            .insert({
+              id: data.user.id,
+              full_name: fullName,
+              phone,
+            });
+
+          if (profileError) {
+            console.error("Profile error:", profileError);
+          }
+
+          const { error: roleError } = await supabase
+            .from("user_roles")
+            .insert({
+              user_id: data.user.id,
+              role: "admin",
+              venue_id: null,
+            });
+
+          if (roleError) {
+            console.error("Role error:", roleError);
+          }
+
+          toast.success("Admin account created! Please sign in.");
+          setIsSignup(false);
+          setEmail("");
+          setPassword("");
+          setFullName("");
+          setPhone("");
         }
       } else {
-        toast.success("Logged in successfully");
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (error) {
+          if (error.message.includes("Invalid login credentials")) {
+            toast.error("Invalid email or password");
+          } else {
+            toast.error(error.message);
+          }
+        } else {
+          toast.success("Logged in successfully");
+        }
       }
     } catch (error: any) {
       toast.error("An unexpected error occurred");
@@ -74,11 +125,37 @@ const Auth = () => {
             Smokzy Operations
           </CardTitle>
           <CardDescription className="text-center">
-            Sign in to your account
+            {isSignup ? "Create admin account" : "Sign in to your account"}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {isSignup && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="fullName">Full Name</Label>
+                  <Input
+                    id="fullName"
+                    type="text"
+                    placeholder="Your full name"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    required={isSignup}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="8811040799"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    required={isSignup}
+                  />
+                </div>
+              </>
+            )}
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -102,9 +179,18 @@ const Auth = () => {
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Processing..." : "Sign In"}
+              {loading ? "Processing..." : isSignup ? "Create Admin Account" : "Sign In"}
             </Button>
           </form>
+          <div className="mt-4 text-center text-sm">
+            <button
+              type="button"
+              onClick={() => setIsSignup(!isSignup)}
+              className="text-primary hover:underline"
+            >
+              {isSignup ? "Back to sign in" : "First time? Create admin account"}
+            </button>
+          </div>
         </CardContent>
       </Card>
     </div>
