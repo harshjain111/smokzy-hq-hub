@@ -4,7 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building2, Users, Package, TrendingUp, AlertTriangle } from "lucide-react";
+import { Building2, Users, Package, TrendingUp, AlertTriangle, BarChart3 } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import VenueManagement from "./admin/VenueManagement";
 import EmployeeManagement from "./admin/EmployeeManagement";
 import StockOverview from "./admin/StockOverview";
@@ -21,9 +22,23 @@ interface Venue {
   name: string;
 }
 
+interface VenueSalesData {
+  venue_name: string;
+  total_sales: number;
+  active_staff: number;
+  low_stock: number;
+}
+
 const AdminDashboard = ({ user }: AdminDashboardProps) => {
   const [venues, setVenues] = useState<Venue[]>([]);
-  const [selectedVenueId, setSelectedVenueId] = useState<string>("");
+  const [selectedVenueId, setSelectedVenueId] = useState<string>("all");
+  const [venueSalesData, setVenueSalesData] = useState<VenueSalesData[]>([]);
+  const [overallStats, setOverallStats] = useState({
+    totalVenues: 0,
+    totalEmployees: 0,
+    totalLowStock: 0,
+    totalSales: 0,
+  });
   const [stats, setStats] = useState({
     totalEmployees: 0,
     lowStockCount: 0,
@@ -36,10 +51,12 @@ const AdminDashboard = ({ user }: AdminDashboardProps) => {
   }, []);
 
   useEffect(() => {
-    if (selectedVenueId) {
+    if (selectedVenueId === "all") {
+      fetchOverallStats();
+    } else if (selectedVenueId) {
       fetchVenueStats();
     }
-  }, [selectedVenueId]);
+  }, [selectedVenueId, venues]);
 
   const fetchVenues = async () => {
     const { data } = await supabase
@@ -49,11 +66,69 @@ const AdminDashboard = ({ user }: AdminDashboardProps) => {
 
     if (data && data.length > 0) {
       setVenues(data);
-      // Auto-select first venue
-      if (!selectedVenueId) {
-        setSelectedVenueId(data[0].id);
-      }
     }
+  };
+
+  const fetchOverallStats = async () => {
+    const today = new Date().toISOString().split('T')[0];
+
+    // Fetch sales data for all venues with venue names
+    const salesByVenue: VenueSalesData[] = [];
+    
+    for (const venue of venues) {
+      const [employeesRes, stockRes, salesRes, attendanceRes] = await Promise.all([
+        supabase
+          .from("user_roles")
+          .select("id")
+          .eq("venue_id", venue.id)
+          .eq("role", "employee"),
+        supabase
+          .from("stock")
+          .select("id, quantity, low_stock_threshold")
+          .eq("venue_id", venue.id),
+        supabase
+          .from("sales_reports")
+          .select("quantity_sold")
+          .eq("venue_id", venue.id)
+          .eq("report_date", today),
+        supabase
+          .from("attendance")
+          .select("id")
+          .eq("venue_id", venue.id)
+          .gte("check_in_time", `${today}T00:00:00`)
+          .is("check_out_time", null),
+      ]);
+
+      const lowStock = stockRes.data?.filter(
+        item => item.quantity <= item.low_stock_threshold
+      ).length || 0;
+
+      const totalSales = salesRes.data?.reduce(
+        (sum, sale) => sum + sale.quantity_sold, 0
+      ) || 0;
+
+      salesByVenue.push({
+        venue_name: venue.name,
+        total_sales: totalSales,
+        active_staff: attendanceRes.data?.length || 0,
+        low_stock: lowStock,
+      });
+    }
+
+    setVenueSalesData(salesByVenue);
+
+    // Calculate overall totals
+    const totalEmployees = await supabase
+      .from("user_roles")
+      .select("id", { count: "exact" })
+      .eq("role", "employee");
+
+    setOverallStats({
+      totalVenues: venues.length,
+      totalEmployees: totalEmployees.count || 0,
+      totalLowStock: salesByVenue.reduce((sum, v) => sum + v.low_stock, 0),
+      totalSales: salesByVenue.reduce((sum, v) => sum + v.total_sales, 0),
+    });
   };
 
   const fetchVenueStats = async () => {
@@ -105,28 +180,128 @@ const AdminDashboard = ({ user }: AdminDashboardProps) => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Admin Dashboard</h2>
-          <p className="text-muted-foreground">Manage your hookah bar operations</p>
+          <p className="text-muted-foreground">
+            {selectedVenueId === "all" ? "Overview of all venues" : "Manage your hookah bar operations"}
+          </p>
         </div>
         
-        {venues.length > 0 && (
-          <div className="w-64">
-            <Select value={selectedVenueId} onValueChange={setSelectedVenueId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select venue" />
-              </SelectTrigger>
-              <SelectContent className="bg-background z-50">
-                {venues.map((venue) => (
-                  <SelectItem key={venue.id} value={venue.id}>
-                    {venue.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
+        <div className="w-64">
+          <Select value={selectedVenueId} onValueChange={setSelectedVenueId}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select venue" />
+            </SelectTrigger>
+            <SelectContent className="bg-background z-50">
+              <SelectItem value="all">All Venues - Overview</SelectItem>
+              {venues.map((venue) => (
+                <SelectItem key={venue.id} value={venue.id}>
+                  {venue.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      {selectedVenueId && (
+      {selectedVenueId === "all" ? (
+        // Overall Summary View
+        <>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Total Venues</CardTitle>
+                <Building2 className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{overallStats.totalVenues}</div>
+                <p className="text-xs text-muted-foreground">Active locations</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Total Employees</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{overallStats.totalEmployees}</div>
+                <p className="text-xs text-muted-foreground">Across all venues</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Low Stock Items</CardTitle>
+                <AlertTriangle className="h-4 w-4 text-warning" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-warning">{overallStats.totalLowStock}</div>
+                <p className="text-xs text-muted-foreground">Need restocking</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Today's Total Sales</CardTitle>
+                <TrendingUp className="h-4 w-4 text-success" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-success">{overallStats.totalSales}</div>
+                <p className="text-xs text-muted-foreground">Hookahs sold</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" />
+                Sales Overview by Venue
+              </CardTitle>
+              <CardDescription>Today's sales performance across all locations</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={350}>
+                <BarChart data={venueSalesData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    dataKey="venue_name" 
+                    angle={-45}
+                    textAnchor="end"
+                    height={100}
+                  />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="total_sales" fill="hsl(var(--success))" name="Total Sales" />
+                  <Bar dataKey="active_staff" fill="hsl(var(--primary))" name="Active Staff" />
+                  <Bar dataKey="low_stock" fill="hsl(var(--warning))" name="Low Stock Items" />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          <Tabs defaultValue="venues" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="venues">Manage Venues</TabsTrigger>
+              <TabsTrigger value="employees">Manage Employees</TabsTrigger>
+              <TabsTrigger value="categories">Hookah Categories</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="venues" className="space-y-4">
+              <VenueManagement />
+            </TabsContent>
+
+            <TabsContent value="employees" className="space-y-4">
+              <EmployeeManagement />
+            </TabsContent>
+
+            <TabsContent value="categories" className="space-y-4">
+              <HookahCategoryManagement />
+            </TabsContent>
+          </Tabs>
+        </>
+      ) : selectedVenueId ? (
+        // Detailed Venue View
         <>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
@@ -209,7 +384,7 @@ const AdminDashboard = ({ user }: AdminDashboardProps) => {
             </TabsContent>
           </Tabs>
         </>
-      )}
+      ) : null}
 
       {venues.length === 0 && (
         <Card>
