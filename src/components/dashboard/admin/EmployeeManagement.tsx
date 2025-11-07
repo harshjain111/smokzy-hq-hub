@@ -203,11 +203,14 @@ const EmployeeManagement = () => {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Employee Management</h2>
-        <Dialog open={open} onOpenChange={(isOpen) => !isOpen && handleCloseDialog()}>
+        <Dialog open={open} onOpenChange={(isOpen) => {
+          setOpen(isOpen);
+          if (!isOpen) handleCloseDialog();
+        }}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
-              Add Employee
+              {editingEmployee ? 'Edit Employee' : 'Add Employee'}
             </Button>
           </DialogTrigger>
           <DialogContent>
@@ -294,13 +297,11 @@ const EmployeeManagement = () => {
                   <UserCircle className="h-5 w-5 text-muted-foreground" />
                   <div className="flex-1">
                     <CardTitle className="text-lg">{employee.full_name}</CardTitle>
-                    <CardDescription>
-                      <div className="space-y-1 text-sm mt-1">
-                        <div>Phone: {employee.phone || "N/A"}</div>
-                        <div className="capitalize">Role: {employee.role}</div>
-                        {employee.venue_name && <div>Venue: {employee.venue_name}</div>}
-                      </div>
-                    </CardDescription>
+                    <div className="text-sm text-muted-foreground mt-1 space-y-1">
+                      <div>Phone: {employee.phone || "N/A"}</div>
+                      <div className="capitalize">Role: {employee.role}</div>
+                      {employee.venue_name && <div>Venue: {employee.venue_name}</div>}
+                    </div>
                   </div>
                 </div>
                 <div className="flex gap-2">

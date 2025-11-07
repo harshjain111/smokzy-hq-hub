@@ -113,7 +113,10 @@ const VenueManagement = () => {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Venue Management</h2>
-        <Dialog open={open} onOpenChange={(isOpen) => !isOpen && handleCloseDialog()}>
+        <Dialog open={open} onOpenChange={(isOpen) => {
+          setOpen(isOpen);
+          if (!isOpen) handleCloseDialog();
+        }}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
