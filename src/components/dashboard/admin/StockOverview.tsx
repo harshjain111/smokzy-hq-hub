@@ -7,7 +7,8 @@ import { AlertTriangle, Package } from "lucide-react";
 interface StockItem {
   id: string;
   venue_id: string;
-  flavour_name: string;
+  item_name: string;
+  category: 'flavour' | 'hookah_pots' | 'accessories';
   quantity: number;
   low_stock_threshold: number;
   unit: string;
@@ -80,8 +81,8 @@ const StockOverview = () => {
               {lowStockItems.map((item) => (
                 <div key={item.id} className="flex justify-between items-center p-3 bg-warning/10 rounded-lg">
                   <div>
-                    <p className="font-medium">{item.flavour_name}</p>
-                    <p className="text-sm text-muted-foreground">{item.venue_name}</p>
+                    <p className="font-medium">{item.item_name}</p>
+                    <p className="text-sm text-muted-foreground capitalize">{item.category.replace('_', ' ')} • {item.venue_name}</p>
                   </div>
                   <div className="text-right">
                     <p className="font-bold text-warning">{item.quantity} {item.unit}</p>
@@ -100,8 +101,8 @@ const StockOverview = () => {
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
                 <div>
-                  <CardTitle className="text-base">{item.flavour_name}</CardTitle>
-                  <CardDescription>{item.venue_name}</CardDescription>
+                  <CardTitle className="text-base">{item.item_name}</CardTitle>
+                  <CardDescription className="capitalize">{item.category.replace('_', ' ')} • {item.venue_name}</CardDescription>
                 </div>
                 <Package className="h-4 w-4 text-muted-foreground" />
               </div>

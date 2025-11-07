@@ -242,9 +242,10 @@ export type Database = {
       }
       stock: {
         Row: {
+          category: Database["public"]["Enums"]["stock_category"]
           created_at: string
-          flavour_name: string
           id: string
+          item_name: string
           low_stock_threshold: number
           quantity: number
           unit: string
@@ -252,9 +253,10 @@ export type Database = {
           venue_id: string
         }
         Insert: {
+          category?: Database["public"]["Enums"]["stock_category"]
           created_at?: string
-          flavour_name: string
           id?: string
+          item_name: string
           low_stock_threshold?: number
           quantity?: number
           unit?: string
@@ -262,9 +264,10 @@ export type Database = {
           venue_id: string
         }
         Update: {
+          category?: Database["public"]["Enums"]["stock_category"]
           created_at?: string
-          flavour_name?: string
           id?: string
+          item_name?: string
           low_stock_threshold?: number
           quantity?: number
           unit?: string
@@ -349,6 +352,7 @@ export type Database = {
     Enums: {
       app_role: "admin" | "employee"
       hookah_category: "premium" | "standard" | "budget"
+      stock_category: "flavour" | "hookah_pots" | "accessories"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -478,6 +482,7 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "employee"],
       hookah_category: ["premium", "standard", "budget"],
+      stock_category: ["flavour", "hookah_pots", "accessories"],
     },
   },
 } as const

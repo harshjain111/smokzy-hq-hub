@@ -15,7 +15,8 @@ interface StockWidgetProps {
 
 interface StockItem {
   id: string;
-  flavour_name: string;
+  item_name: string;
+  category: 'flavour' | 'hookah_pots' | 'accessories';
   quantity: number;
   low_stock_threshold: number;
   unit: string;
@@ -25,8 +26,10 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
   const [stock, setStock] = useState<StockItem[]>([]);
   const [open, setOpen] = useState(false);
   const [breakageOpen, setBreakageOpen] = useState(false);
-  const [flavourName, setFlavourName] = useState("");
+  const [itemName, setItemName] = useState("");
+  const [category, setCategory] = useState<'flavour' | 'hookah_pots' | 'accessories'>('flavour');
   const [quantity, setQuantity] = useState("");
+  const [unit, setUnit] = useState("kg");
   const [breakageItem, setBreakageItem] = useState("");
   const [breakageQuantity, setBreakageQuantity] = useState("");
   const [breakageCause, setBreakageCause] = useState("");
@@ -40,7 +43,8 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
       .from("stock")
       .select("*")
       .eq("venue_id", venueId)
-      .order("flavour_name");
+      .order("category")
+      .order("item_name");
 
     setStock(data || []);
   };
@@ -48,21 +52,23 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
   const handleAddStock = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const { error } = await supabase.from("stock").upsert(
-      {
-        venue_id: venueId,
-        flavour_name: flavourName,
-        quantity: parseInt(quantity),
-      },
-      { onConflict: "venue_id,flavour_name" }
-    );
+    const { error } = await supabase.from("stock").insert({
+      venue_id: venueId,
+      item_name: itemName,
+      category: category,
+      quantity: parseInt(quantity),
+      unit: unit,
+    });
 
     if (error) {
-      toast.error("Failed to update stock");
+      toast.error("Failed to add stock item");
+      console.error(error);
     } else {
-      toast.success("Stock updated successfully");
-      setFlavourName("");
+      toast.success("Stock item added successfully");
+      setItemName("");
+      setCategory('flavour');
       setQuantity("");
+      setUnit("kg");
       setOpen(false);
       fetchStock();
     }
@@ -100,21 +106,45 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
           <DialogTrigger asChild>
             <Button className="flex-1">
               <Plus className="mr-2 h-4 w-4" />
-              Update Stock
+              Add Stock Item
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Update Stock</DialogTitle>
-              <DialogDescription>Add or update flavour stock</DialogDescription>
+              <DialogTitle>Add Stock Item</DialogTitle>
+              <DialogDescription>Add a new stock item to track</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleAddStock} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="flavour">Flavour Name</Label>
+                <Label htmlFor="category">Category</Label>
+                <select
+                  id="category"
+                  value={category}
+                  onChange={(e) => {
+                    const newCategory = e.target.value as 'flavour' | 'hookah_pots' | 'accessories';
+                    setCategory(newCategory);
+                    // Auto-set unit based on category
+                    if (newCategory === 'flavour') {
+                      setUnit('kg');
+                    } else {
+                      setUnit('pieces');
+                    }
+                  }}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  required
+                >
+                  <option value="flavour">Flavour</option>
+                  <option value="hookah_pots">Hookah Pots</option>
+                  <option value="accessories">Accessories</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="itemName">Item Name</Label>
                 <Input
-                  id="flavour"
-                  value={flavourName}
-                  onChange={(e) => setFlavourName(e.target.value)}
+                  id="itemName"
+                  value={itemName}
+                  onChange={(e) => setItemName(e.target.value)}
+                  placeholder={category === 'flavour' ? 'e.g., Mint, Double Apple' : 'e.g., Glass, Hose'}
                   required
                 />
               </div>
@@ -128,7 +158,21 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
                   required
                 />
               </div>
-              <Button type="submit" className="w-full">Update Stock</Button>
+              {category === 'flavour' && (
+                <div className="space-y-2">
+                  <Label htmlFor="unit">Unit</Label>
+                  <select
+                    id="unit"
+                    value={unit}
+                    onChange={(e) => setUnit(e.target.value)}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
+                    <option value="kg">Kilograms (kg)</option>
+                    <option value="grams">Grams (g)</option>
+                  </select>
+                </div>
+              )}
+              <Button type="submit" className="w-full">Add Stock Item</Button>
             </form>
           </DialogContent>
         </Dialog>
@@ -186,7 +230,10 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
           <Card key={item.id} className={item.quantity <= item.low_stock_threshold ? "border-warning" : ""}>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base">{item.flavour_name}</CardTitle>
+                <div className="flex-1">
+                  <CardTitle className="text-base">{item.item_name}</CardTitle>
+                  <p className="text-xs text-muted-foreground capitalize mt-1">{item.category.replace('_', ' ')}</p>
+                </div>
                 <Package className="h-4 w-4 text-muted-foreground" />
               </div>
             </CardHeader>
