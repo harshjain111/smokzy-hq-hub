@@ -20,6 +20,7 @@ const Auth = () => {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
+  const [role, setRole] = useState<"admin" | "employee">("employee");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -79,7 +80,7 @@ const Auth = () => {
             .from("user_roles")
             .insert({
               user_id: data.user.id,
-              role: "admin",
+              role: role,
               venue_id: null,
             });
 
@@ -87,12 +88,13 @@ const Auth = () => {
             console.error("Role error:", roleError);
           }
 
-          toast.success("Admin account created! Please sign in.");
+          toast.success(`${role === "admin" ? "Admin" : "Employee"} account created! Please sign in.`);
           setIsSignup(false);
           setEmail("");
           setPassword("");
           setFullName("");
           setPhone("");
+          setRole("employee");
         }
       } else {
         const { error } = await supabase.auth.signInWithPassword({
@@ -125,7 +127,7 @@ const Auth = () => {
             Smokzy Operations
           </CardTitle>
           <CardDescription className="text-center">
-            {isSignup ? "Create admin account" : "Sign in to your account"}
+            {isSignup ? "Create new account" : "Sign in to your account"}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -154,6 +156,19 @@ const Auth = () => {
                     required={isSignup}
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="role">Role</Label>
+                  <select
+                    id="role"
+                    value={role}
+                    onChange={(e) => setRole(e.target.value as "admin" | "employee")}
+                    className="w-full px-3 py-2 border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
+                    required={isSignup}
+                  >
+                    <option value="employee">Employee</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
               </>
             )}
             <div className="space-y-2">
@@ -179,7 +194,7 @@ const Auth = () => {
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Processing..." : isSignup ? "Create Admin Account" : "Sign In"}
+              {loading ? "Processing..." : isSignup ? "Create Account" : "Sign In"}
             </Button>
           </form>
           <div className="mt-4 text-center text-sm">
@@ -188,7 +203,7 @@ const Auth = () => {
               onClick={() => setIsSignup(!isSignup)}
               className="text-primary hover:underline"
             >
-              {isSignup ? "Back to sign in" : "First time? Create admin account"}
+              {isSignup ? "Back to sign in" : "Create new account"}
             </button>
           </div>
         </CardContent>
