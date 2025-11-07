@@ -63,7 +63,7 @@ const EmployeeManagement = () => {
             .from("user_roles")
             .select("role, venue_id")
             .eq("user_id", emp.id)
-            .single();
+            .maybeSingle();
 
           let venueName = null;
           if (roleData?.venue_id) {
@@ -71,7 +71,7 @@ const EmployeeManagement = () => {
               .from("venues")
               .select("name")
               .eq("id", roleData.venue_id)
-              .single();
+              .maybeSingle();
             venueName = venueData?.name || null;
           }
 
@@ -162,7 +162,7 @@ const EmployeeManagement = () => {
       .from("user_roles")
       .select("venue_id")
       .eq("user_id", employee.id)
-      .single();
+      .maybeSingle();
     
     setVenueId(roleData?.venue_id || "");
     setOpen(true);
