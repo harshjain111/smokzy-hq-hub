@@ -9,14 +9,13 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 const authSchema = z.object({
-  email: z.string().email("Invalid email address"),
+  phone: z.string().regex(/^\d{10}$/, "Phone number must be 10 digits"),
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
 const Auth = () => {
   const navigate = useNavigate();
   const [isSignup, setIsSignup] = useState(false);
-  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
@@ -39,7 +38,7 @@ const Auth = () => {
 
     try {
       const validation = authSchema.safeParse({
-        email,
+        phone,
         password,
       });
 
@@ -50,13 +49,17 @@ const Auth = () => {
       }
 
       if (isSignup) {
+        // Create a synthetic email for phone-based accounts
+        const syntheticEmail = `${phone}@smokzy.com`;
+        
         const { data, error: signUpError } = await supabase.auth.signUp({
-          email,
+          email: syntheticEmail,
           password,
           options: {
             emailRedirectTo: `${window.location.origin}/`,
             data: {
               full_name: fullName,
+              phone: phone,
             },
           },
         });
@@ -96,21 +99,23 @@ const Auth = () => {
 
           toast.success(`${role === "admin" ? "Admin" : "Employee"} account created! Please sign in.`);
           setIsSignup(false);
-          setEmail("");
           setPassword("");
           setFullName("");
           setPhone("");
           setRole("employee");
         }
       } else {
+        // Sign in using synthetic email format
+        const syntheticEmail = `${phone}@smokzy.com`;
+        
         const { error } = await supabase.auth.signInWithPassword({
-          email,
+          email: syntheticEmail,
           password,
         });
 
         if (error) {
           if (error.message.includes("Invalid login credentials")) {
-            toast.error("Invalid email or password");
+            toast.error("Invalid mobile number or password");
           } else {
             toast.error(error.message);
           }
@@ -126,19 +131,20 @@ const Auth = () => {
   };
 
   const handleResetPassword = async () => {
-    if (!email) {
-      toast.info('Enter your email above to reset your password');
+    if (!phone) {
+      toast.info('Enter your mobile number above to reset your password');
       return;
     }
     setLoading(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    const syntheticEmail = `${phone}@smokzy.com`;
+    const { error } = await supabase.auth.resetPasswordForEmail(syntheticEmail, {
       redirectTo: `${window.location.origin}/auth`
     });
     setLoading(false);
     if (error) {
       toast.error(error.message);
     } else {
-      toast.success('Password reset link sent to your email');
+      toast.success('Password reset link sent (check your registered email if any)');
     }
   };
 
@@ -155,6 +161,17 @@ const Auth = () => {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="phone">Mobile Number</Label>
+              <Input
+                id="phone"
+                type="tel"
+                placeholder="9876543210"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                required
+              />
+            </div>
             {isSignup && (
               <>
                 <div className="space-y-2">
@@ -165,17 +182,6 @@ const Auth = () => {
                     placeholder="Your full name"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    required={isSignup}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number</Label>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="8811040799"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
                     required={isSignup}
                   />
                 </div>
@@ -194,17 +200,6 @@ const Auth = () => {
                 </div>
               </>
             )}
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <Input
