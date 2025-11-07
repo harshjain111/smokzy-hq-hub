@@ -18,27 +18,31 @@ export const useUserRole = (user: User | null) => {
       return;
     }
 
+    setLoading(true);
+    
     const fetchUserRole = async () => {
       const { data, error } = await supabase
         .from("user_roles")
         .select("role, venue_id")
         .eq("user_id", user.id)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error("Error fetching user role:", error);
         setUserRole(null);
-      } else {
+      } else if (data) {
         setUserRole({
           role: data.role as "admin" | "employee",
           venueId: data.venue_id,
         });
+      } else {
+        setUserRole(null);
       }
       setLoading(false);
     };
 
     fetchUserRole();
-  }, [user]);
+  }, [user?.id]);
 
   return { userRole, loading };
 };

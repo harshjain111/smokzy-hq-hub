@@ -12,11 +12,14 @@ import EmployeeDashboard from "@/components/dashboard/EmployeeDashboard";
 const Dashboard = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
+  const [initializing, setInitializing] = useState(true);
   const { userRole, loading } = useUserRole(user);
 
   useEffect(() => {
+    // Check session first before rendering anything
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
+      setInitializing(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
@@ -46,7 +49,8 @@ const Dashboard = () => {
     }
   };
 
-  if (loading) {
+  // Show loading while initializing or fetching role
+  if (initializing || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
