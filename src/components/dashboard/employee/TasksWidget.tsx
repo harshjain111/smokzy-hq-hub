@@ -24,7 +24,28 @@ const TasksWidget = ({ user, venueId }: TasksWidgetProps) => {
 
   useEffect(() => {
     checkTaskStatus();
-  }, []);
+    
+    // Set up realtime subscription to refresh when stock is updated
+    const channel = supabase
+      .channel('stock-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'stock',
+          filter: `venue_id=eq.${venueId}`
+        },
+        () => {
+          checkTaskStatus();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [venueId]);
 
   const checkTaskStatus = async () => {
     const today = format(new Date(), "yyyy-MM-dd");
@@ -33,7 +54,7 @@ const TasksWidget = ({ user, venueId }: TasksWidgetProps) => {
       // Check if ALL stock items have been updated today
       supabase
         .from("stock")
-        .select("id, quantity, updated_at")
+        .select("id, quantity, created_at, updated_at")
         .eq("venue_id", venueId),
       supabase
         .from("sales_reports")
@@ -52,11 +73,15 @@ const TasksWidget = ({ user, venueId }: TasksWidgetProps) => {
     // Stock is only considered reported if ALL items have been updated today
     let stockReported = false;
     if (stockCheck.data && stockCheck.data.length > 0) {
-      // Check if all items were updated today (comparing just the date part)
       const todayDate = format(new Date(), "yyyy-MM-dd");
+      
       stockReported = stockCheck.data.every(item => {
         const itemUpdateDate = format(new Date(item.updated_at), "yyyy-MM-dd");
-        return itemUpdateDate === todayDate;
+        const itemCreateDate = format(new Date(item.created_at), "yyyy-MM-dd");
+        
+        // Item must be updated today AND the update must be different from creation
+        // (meaning it was actually updated, not just created today)
+        return itemUpdateDate === todayDate && item.updated_at !== item.created_at;
       });
     }
 
