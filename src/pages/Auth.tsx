@@ -11,15 +11,12 @@ import { z } from "zod";
 const authSchema = z.object({
   email: z.string().email("Invalid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
-  fullName: z.string().min(2, "Full name required").optional(),
 });
 
 const Auth = () => {
   const navigate = useNavigate();
-  const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -40,7 +37,6 @@ const Auth = () => {
       const validation = authSchema.safeParse({
         email,
         password,
-        fullName: !isLogin ? fullName : undefined,
       });
 
       if (!validation.success) {
@@ -49,53 +45,19 @@ const Auth = () => {
         return;
       }
 
-      if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-        if (error) {
-          if (error.message.includes("Invalid login credentials")) {
-            toast.error("Invalid email or password");
-          } else {
-            toast.error(error.message);
-          }
+      if (error) {
+        if (error.message.includes("Invalid login credentials")) {
+          toast.error("Invalid email or password");
         } else {
-          toast.success("Logged in successfully");
+          toast.error(error.message);
         }
       } else {
-        const { error: signUpError, data } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/`,
-            data: {
-              full_name: fullName,
-            },
-          },
-        });
-
-        if (signUpError) {
-          if (signUpError.message.includes("already registered")) {
-            toast.error("This email is already registered");
-          } else {
-            toast.error(signUpError.message);
-          }
-        } else if (data.user) {
-          const { error: profileError } = await supabase
-            .from("profiles")
-            .insert({
-              id: data.user.id,
-              full_name: fullName,
-            });
-
-          if (profileError) {
-            console.error("Profile creation error:", profileError);
-          }
-
-          toast.success("Account created successfully");
-        }
+        toast.success("Logged in successfully");
       }
     } catch (error: any) {
       toast.error("An unexpected error occurred");
@@ -112,24 +74,11 @@ const Auth = () => {
             Smokzy Operations
           </CardTitle>
           <CardDescription className="text-center">
-            {isLogin ? "Sign in to your account" : "Create a new account"}
+            Sign in to your account
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            {!isLogin && (
-              <div className="space-y-2">
-                <Label htmlFor="fullName">Full Name</Label>
-                <Input
-                  id="fullName"
-                  type="text"
-                  placeholder="John Doe"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  required={!isLogin}
-                />
-              </div>
-            )}
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -153,20 +102,9 @@ const Auth = () => {
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Processing..." : isLogin ? "Sign In" : "Sign Up"}
+              {loading ? "Processing..." : "Sign In"}
             </Button>
           </form>
-          <div className="mt-4 text-center text-sm">
-            <button
-              type="button"
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-primary hover:underline"
-            >
-              {isLogin
-                ? "Don't have an account? Sign up"
-                : "Already have an account? Sign in"}
-            </button>
-          </div>
         </CardContent>
       </Card>
     </div>

@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Building2, Users, Package, TrendingUp, AlertTriangle } from "lucide-react";
 import VenueManagement from "./admin/VenueManagement";
+import EmployeeManagement from "./admin/EmployeeManagement";
 import StockOverview from "./admin/StockOverview";
 import SalesReports from "./admin/SalesReports";
 import AttendanceOverview from "./admin/AttendanceOverview";
@@ -63,6 +64,7 @@ const AdminDashboard = ({ user }: AdminDashboardProps) => {
       <Tabs defaultValue="venues" className="space-y-4">
         <TabsList>
           <TabsTrigger value="venues">Venues</TabsTrigger>
+          <TabsTrigger value="employees">Employees</TabsTrigger>
           <TabsTrigger value="attendance">Attendance</TabsTrigger>
           <TabsTrigger value="stock">Stock</TabsTrigger>
           <TabsTrigger value="sales">Sales</TabsTrigger>
@@ -70,6 +72,10 @@ const AdminDashboard = ({ user }: AdminDashboardProps) => {
 
         <TabsContent value="venues" className="space-y-4">
           <VenueManagement />
+        </TabsContent>
+
+        <TabsContent value="employees" className="space-y-4">
+          <EmployeeManagement />
         </TabsContent>
 
         <TabsContent value="attendance" className="space-y-4">
