@@ -24,12 +24,14 @@ interface StockItem {
 
 const StockWidget = ({ venueId }: StockWidgetProps) => {
   const [stock, setStock] = useState<StockItem[]>([]);
-  const [open, setOpen] = useState(false);
+  const [addItemOpen, setAddItemOpen] = useState(false);
+  const [updateStockOpen, setUpdateStockOpen] = useState(false);
   const [breakageOpen, setBreakageOpen] = useState(false);
   const [itemName, setItemName] = useState("");
   const [category, setCategory] = useState<'flavour' | 'hookah_pots' | 'accessories'>('flavour');
-  const [quantity, setQuantity] = useState("");
   const [unit, setUnit] = useState("kg");
+  const [selectedItemId, setSelectedItemId] = useState("");
+  const [updateQuantity, setUpdateQuantity] = useState("");
   const [breakageItem, setBreakageItem] = useState("");
   const [breakageQuantity, setBreakageQuantity] = useState("");
   const [breakageCause, setBreakageCause] = useState("");
@@ -49,14 +51,14 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
     setStock(data || []);
   };
 
-  const handleAddStock = async (e: React.FormEvent) => {
+  const handleAddStockItem = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const { error } = await supabase.from("stock").insert({
       venue_id: venueId,
       item_name: itemName,
       category: category,
-      quantity: parseInt(quantity),
+      quantity: 0,
       unit: unit,
     });
 
@@ -64,12 +66,41 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
       toast.error("Failed to add stock item");
       console.error(error);
     } else {
-      toast.success("Stock item added successfully");
+      toast.success("Stock item registered successfully");
       setItemName("");
       setCategory('flavour');
-      setQuantity("");
       setUnit("kg");
-      setOpen(false);
+      setAddItemOpen(false);
+      fetchStock();
+    }
+  };
+
+  const handleUpdateStock = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!selectedItemId) {
+      toast.error("Please select an item");
+      return;
+    }
+
+    const selectedItem = stock.find(item => item.id === selectedItemId);
+    if (!selectedItem) return;
+
+    const { error } = await supabase
+      .from("stock")
+      .update({
+        quantity: selectedItem.quantity + parseInt(updateQuantity),
+      })
+      .eq("id", selectedItemId);
+
+    if (error) {
+      toast.error("Failed to update stock quantity");
+      console.error(error);
+    } else {
+      toast.success("Stock quantity updated successfully");
+      setSelectedItemId("");
+      setUpdateQuantity("");
+      setUpdateStockOpen(false);
       fetchStock();
     }
   };
@@ -102,19 +133,19 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
   return (
     <div className="space-y-4">
       <div className="flex gap-2">
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={addItemOpen} onOpenChange={setAddItemOpen}>
           <DialogTrigger asChild>
             <Button className="flex-1">
               <Plus className="mr-2 h-4 w-4" />
-              Add Stock Item
+              Register New Item
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add Stock Item</DialogTitle>
-              <DialogDescription>Add a new stock item to track</DialogDescription>
+              <DialogTitle>Register Stock Item</DialogTitle>
+              <DialogDescription>Add a new item to track in your inventory</DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleAddStock} className="space-y-4">
+            <form onSubmit={handleAddStockItem} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="category">Category</Label>
                 <select
@@ -123,7 +154,6 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
                   onChange={(e) => {
                     const newCategory = e.target.value as 'flavour' | 'hookah_pots' | 'accessories';
                     setCategory(newCategory);
-                    // Auto-set unit based on category
                     if (newCategory === 'flavour') {
                       setUnit('kg');
                     } else {
@@ -148,16 +178,6 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="quantity">Quantity</Label>
-                <Input
-                  id="quantity"
-                  type="number"
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
-                  required
-                />
-              </div>
               {category === 'flavour' && (
                 <div className="space-y-2">
                   <Label htmlFor="unit">Unit</Label>
@@ -172,7 +192,59 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
                   </select>
                 </div>
               )}
-              <Button type="submit" className="w-full">Add Stock Item</Button>
+              <Button type="submit" className="w-full">Register Item</Button>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={updateStockOpen} onOpenChange={setUpdateStockOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline" className="flex-1">
+              <Package className="mr-2 h-4 w-4" />
+              Update Stock
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Update Stock Quantity</DialogTitle>
+              <DialogDescription>Add stock quantity for an existing item</DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleUpdateStock} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="selectItem">Select Item</Label>
+                <select
+                  id="selectItem"
+                  value={selectedItemId}
+                  onChange={(e) => setSelectedItemId(e.target.value)}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  required
+                >
+                  <option value="">Choose an item...</option>
+                  {stock.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.item_name} ({item.category.replace('_', ' ')}) - Current: {item.quantity} {item.unit}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="updateQuantity">Quantity to Add</Label>
+                <Input
+                  id="updateQuantity"
+                  type="number"
+                  min="0"
+                  value={updateQuantity}
+                  onChange={(e) => setUpdateQuantity(e.target.value)}
+                  placeholder="Enter quantity to add"
+                  required
+                />
+                {selectedItemId && (
+                  <p className="text-xs text-muted-foreground">
+                    New total will be: {stock.find(i => i.id === selectedItemId)?.quantity || 0} + {updateQuantity || 0} = {(stock.find(i => i.id === selectedItemId)?.quantity || 0) + parseInt(updateQuantity || "0")} {stock.find(i => i.id === selectedItemId)?.unit}
+                  </p>
+                )}
+              </div>
+              <Button type="submit" className="w-full">Update Quantity</Button>
             </form>
           </DialogContent>
         </Dialog>
