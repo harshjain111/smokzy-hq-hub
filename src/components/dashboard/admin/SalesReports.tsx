@@ -12,9 +12,12 @@ interface SalesReportsProps {
 }
 
 interface SalesData {
-  hookah_category: string;
+  category_id: string;
   report_date: string;
   quantity_sold: number;
+  venue_hookah_categories?: {
+    category_name: string;
+  };
 }
 
 const SalesReports = ({ venueId, venueName }: SalesReportsProps) => {
@@ -49,7 +52,7 @@ const SalesReports = ({ venueId, venueName }: SalesReportsProps) => {
     
     const { data: salesData, error } = await supabase
       .from("sales_reports")
-      .select("*")
+      .select("*, venue_hookah_categories(category_name)")
       .eq("venue_id", venueId)
       .gte("report_date", start)
       .lte("report_date", end)
@@ -63,7 +66,8 @@ const SalesReports = ({ venueId, venueName }: SalesReportsProps) => {
 
   const totalSales = sales.reduce((sum, sale) => sum + sale.quantity_sold, 0);
   const salesByCategory = sales.reduce((acc, sale) => {
-    acc[sale.hookah_category] = (acc[sale.hookah_category] || 0) + sale.quantity_sold;
+    const categoryName = sale.venue_hookah_categories?.category_name || 'Unknown';
+    acc[categoryName] = (acc[categoryName] || 0) + sale.quantity_sold;
     return acc;
   }, {} as Record<string, number>);
 
@@ -119,7 +123,7 @@ const SalesReports = ({ venueId, venueName }: SalesReportsProps) => {
             <TableBody>
               {Object.entries(salesByCategory).map(([category, quantity]) => (
                 <TableRow key={category}>
-                  <TableCell className="font-medium capitalize">{category.replace('_', ' ')}</TableCell>
+                  <TableCell className="font-medium">{category}</TableCell>
                   <TableCell className="text-right font-bold">{quantity}</TableCell>
                   <TableCell className="text-right text-muted-foreground">
                     {totalSales > 0 ? ((quantity / totalSales) * 100).toFixed(1) : 0}%
@@ -156,7 +160,7 @@ const SalesReports = ({ venueId, venueName }: SalesReportsProps) => {
               {sales.slice(0, 10).map((sale, idx) => (
                 <TableRow key={idx}>
                   <TableCell>{format(new Date(sale.report_date), "MMM dd, yyyy")}</TableCell>
-                  <TableCell className="capitalize">{sale.hookah_category.replace('_', ' ')}</TableCell>
+                  <TableCell>{sale.venue_hookah_categories?.category_name || 'Unknown'}</TableCell>
                   <TableCell className="text-right font-semibold">{sale.quantity_sold}</TableCell>
                 </TableRow>
               ))}

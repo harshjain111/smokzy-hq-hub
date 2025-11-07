@@ -19,11 +19,11 @@ interface SalesWidgetProps {
 const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
   const [open, setOpen] = useState(false);
   const [photoOpen, setPhotoOpen] = useState(false);
-  const [category, setCategory] = useState("");
+  const [categoryId, setCategoryId] = useState("");
   const [quantity, setQuantity] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [todaySales, setTodaySales] = useState<any[]>([]);
-  const [hookahCategories, setHookahCategories] = useState<string[]>([]);
+  const [hookahCategories, setHookahCategories] = useState<{ id: string; name: string }[]>([]);
 
   useEffect(() => {
     fetchHookahCategories();
@@ -33,14 +33,14 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
   const fetchHookahCategories = async () => {
     const { data } = await supabase
       .from("venue_hookah_categories")
-      .select("category_name")
+      .select("id, category_name")
       .eq("venue_id", venueId)
       .order("category_name");
 
     if (data) {
-      setHookahCategories(data.map(cat => cat.category_name));
-      if (data.length > 0 && !category) {
-        setCategory(data[0].category_name);
+      setHookahCategories(data.map(cat => ({ id: cat.id, name: cat.category_name })));
+      if (data.length > 0 && !categoryId) {
+        setCategoryId(data[0].id);
       }
     }
   };
@@ -49,7 +49,7 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
     const today = format(new Date(), "yyyy-MM-dd");
     const { data } = await supabase
       .from("sales_reports")
-      .select("*")
+      .select("*, venue_hookah_categories(category_name)")
       .eq("venue_id", venueId)
       .eq("report_date", today);
 
@@ -59,7 +59,7 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
   const handleSubmitSales = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!category) {
+    if (!categoryId) {
       toast.error("Please select a category");
       return;
     }
@@ -70,7 +70,7 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
       venue_id: venueId,
       reported_by: user.id,
       report_date: today,
-      hookah_category: category as any,
+      category_id: categoryId,
       quantity_sold: parseInt(quantity),
     });
 
@@ -157,14 +157,14 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
               <div className="space-y-2">
                 <Label htmlFor="category">Hookah Category</Label>
                 {hookahCategories.length > 0 ? (
-                  <Select value={category} onValueChange={setCategory}>
+                  <Select value={categoryId} onValueChange={setCategoryId}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent className="bg-background z-50">
                       {hookahCategories.map((cat) => (
-                        <SelectItem key={cat} value={cat}>
-                          {cat}
+                        <SelectItem key={cat.id} value={cat.id}>
+                          {cat.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -228,7 +228,7 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
             <Card key={sale.id}>
               <CardContent className="py-3">
                 <div className="flex justify-between items-center">
-                  <span className="capitalize">{sale.hookah_category}</span>
+                  <span className="capitalize">{sale.venue_hookah_categories?.category_name || 'Unknown'}</span>
                   <span className="font-bold">{sale.quantity_sold} units</span>
                 </div>
               </CardContent>

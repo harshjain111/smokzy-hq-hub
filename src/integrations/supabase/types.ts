@@ -204,8 +204,8 @@ export type Database = {
       }
       sales_reports: {
         Row: {
+          category_id: string
           created_at: string
-          hookah_category: Database["public"]["Enums"]["hookah_category"]
           id: string
           quantity_sold: number
           report_date: string
@@ -213,8 +213,8 @@ export type Database = {
           venue_id: string
         }
         Insert: {
+          category_id: string
           created_at?: string
-          hookah_category: Database["public"]["Enums"]["hookah_category"]
           id?: string
           quantity_sold: number
           report_date?: string
@@ -222,8 +222,8 @@ export type Database = {
           venue_id: string
         }
         Update: {
+          category_id?: string
           created_at?: string
-          hookah_category?: Database["public"]["Enums"]["hookah_category"]
           id?: string
           quantity_sold?: number
           report_date?: string
@@ -231,6 +231,13 @@ export type Database = {
           venue_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "sales_reports_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "venue_hookah_categories"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "sales_reports_venue_id_fkey"
             columns: ["venue_id"]
