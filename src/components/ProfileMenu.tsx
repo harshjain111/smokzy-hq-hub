@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { User as UserIcon, Calendar, LogOut, FileText } from "lucide-react";
 
 interface ProfileMenuProps {
@@ -59,6 +59,9 @@ const ProfileMenu = ({ user, role }: ProfileMenuProps) => {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-10 w-10 rounded-full">
           <Avatar className="h-10 w-10">
+            {profileName && (
+              <AvatarImage src={`https://fqtfmhlevdhaitkyoyzr.supabase.co/storage/v1/object/public/avatars/${user.id}/avatar.jpg`} alt={profileName} />
+            )}
             <AvatarFallback className="bg-primary text-primary-foreground">
               {getInitials()}
             </AvatarFallback>
@@ -73,7 +76,7 @@ const ProfileMenu = ({ user, role }: ProfileMenuProps) => {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem className="cursor-pointer">
+        <DropdownMenuItem className="cursor-pointer" onClick={() => navigate("/my-profile")}>
           <UserIcon className="mr-2 h-4 w-4" />
           <span>My Profile</span>
         </DropdownMenuItem>
