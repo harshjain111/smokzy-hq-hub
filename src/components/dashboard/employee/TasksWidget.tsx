@@ -139,49 +139,55 @@ const TasksWidget = ({ user, venueId }: TasksWidgetProps) => {
   const totalTasks = Object.keys(tasks).length;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          {completedCount} of {totalTasks} tasks completed
-        </p>
-        <div className="text-right">
-          <div className="text-2xl font-bold">{Math.round((completedCount / totalTasks) * 100)}%</div>
-          <p className="text-xs text-muted-foreground">Progress</p>
+    <div className="space-y-3">
+      {/* Compact Progress Header */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-sm font-medium">{completedCount}/{totalTasks} Complete</span>
+            <span className="text-xl font-bold text-primary">{Math.round((completedCount / totalTasks) * 100)}%</span>
+          </div>
+          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-gradient-to-r from-primary to-primary/80 transition-all duration-500"
+              style={{ width: `${(completedCount / totalTasks) * 100}%` }}
+            />
+          </div>
         </div>
       </div>
 
-      <div className="space-y-2">
+      {/* Compact Task Grid */}
+      <div className="grid grid-cols-3 gap-2">
         {taskList.map((task, index) => {
           const Icon = task.icon;
           return (
             <div
               key={index}
-              className={`flex items-center gap-3 p-3 rounded-lg ${
-                task.completed ? "bg-success/10" : "bg-muted"
+              className={`relative flex flex-col items-center gap-1.5 p-3 rounded-lg border transition-all ${
+                task.completed 
+                  ? "bg-success/10 border-success/20" 
+                  : "bg-muted/50 border-border"
               }`}
             >
               <div className={`p-2 rounded-full ${task.completed ? "bg-success/20" : "bg-background"}`}>
                 <Icon className={`h-4 w-4 ${task.completed ? "text-success" : "text-muted-foreground"}`} />
               </div>
-              <span className={`flex-1 ${task.completed ? "text-foreground" : "text-muted-foreground"}`}>
-                {task.name}
+              <span className={`text-xs text-center font-medium ${task.completed ? "text-foreground" : "text-muted-foreground"}`}>
+                {task.name.replace("Report Daily ", "").replace("Update ", "").replace("Upload ", "")}
               </span>
-              {task.completed ? (
-                <CheckCircle className="h-5 w-5 text-success" />
-              ) : (
-                <XCircle className="h-5 w-5 text-muted-foreground" />
+              {task.completed && (
+                <CheckCircle className="absolute -top-1 -right-1 h-4 w-4 text-success bg-background rounded-full" />
               )}
             </div>
           );
         })}
       </div>
 
+      {/* Compact Warning */}
       {completedCount < totalTasks && (
-        <div className="flex items-start gap-2 p-3 bg-warning/10 rounded-lg border border-warning/20">
-          <AlertTriangle className="h-4 w-4 text-warning mt-0.5" />
-          <p className="text-sm text-warning">
-            Complete all tasks to enable check-out
-          </p>
+        <div className="flex items-center gap-2 px-3 py-2 bg-warning/10 rounded-lg border border-warning/20">
+          <AlertTriangle className="h-3.5 w-3.5 text-warning flex-shrink-0" />
+          <p className="text-xs text-warning">Complete all tasks to check-out</p>
         </div>
       )}
     </div>
