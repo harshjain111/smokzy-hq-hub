@@ -30,22 +30,22 @@ const EmployeeDashboard = ({ user, venueId }: EmployeeDashboardProps) => {
 
       {/* Mobile-First Tabs with Larger Touch Targets */}
       <Tabs defaultValue="attendance" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 gap-2 h-auto p-1 bg-muted/50">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 h-auto p-1 bg-muted/50 border border-border">
           <TabsTrigger 
             value="attendance" 
-            className="h-12 md:h-10 text-sm md:text-base data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            className="h-12 md:h-10 text-sm md:text-base border-r border-border last:border-r-0 md:last:border-r-0 data-[state=active]:bg-background data-[state=active]:shadow-sm"
           >
             Attendance
           </TabsTrigger>
           <TabsTrigger 
             value="stock" 
-            className="h-12 md:h-10 text-sm md:text-base data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            className="h-12 md:h-10 text-sm md:text-base border-r md:border-r border-border md:last:border-r-0 data-[state=active]:bg-background data-[state=active]:shadow-sm"
           >
             Stock
           </TabsTrigger>
           <TabsTrigger 
             value="sales" 
-            className="h-12 md:h-10 text-sm md:text-base data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            className="h-12 md:h-10 text-sm md:text-base border-r border-border md:border-r last:border-r-0 data-[state=active]:bg-background data-[state=active]:shadow-sm"
           >
             Sales
           </TabsTrigger>
