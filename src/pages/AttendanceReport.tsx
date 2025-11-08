@@ -199,24 +199,29 @@ export default function AttendanceReport() {
     const checkIn = new Date(checkInTime);
     const hour = checkIn.getHours();
     const minute = checkIn.getMinutes();
-    // Consider late if after 10:00 AM
-    return hour > 10 || (hour === 10 && minute > 0);
+    // Consider late if after 12:00 PM (noon)
+    return hour > 12 || (hour === 12 && minute > 0);
   };
 
   const isEarlyCheckOut = (checkOutTime: string | null) => {
     if (!checkOutTime) return false;
     const checkOut = new Date(checkOutTime);
     const hour = checkOut.getHours();
-    // Consider early if before 10:00 PM (22:00)
-    return hour < 22;
+    // Consider early if before 8:00 PM (20:00)
+    return hour < 20;
   };
 
   const getDateColumns = () => {
     const range = getDateRange();
     const dates: Date[] = [];
     const current = new Date(range.from);
+    const today = new Date();
+    today.setHours(23, 59, 59, 999); // End of today
     
-    while (current <= range.to) {
+    // Only show dates up to today
+    const endDate = range.to > today ? today : range.to;
+    
+    while (current <= endDate) {
       dates.push(new Date(current));
       current.setDate(current.getDate() + 1);
     }
@@ -248,6 +253,36 @@ export default function AttendanceReport() {
     });
 
     return Array.from(employeeMap.values());
+  };
+
+  const getTotalWorkingHours = (employeeData: any) => {
+    let totalMinutes = 0;
+    employeeData.attendanceByDate.forEach((record: any) => {
+      if (record.check_out_time) {
+        const diff = new Date(record.check_out_time).getTime() - new Date(record.check_in_time).getTime();
+        totalMinutes += diff / (1000 * 60);
+      }
+    });
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = Math.floor(totalMinutes % 60);
+    return `${hours}h ${minutes}m`;
+  };
+
+  const getAverageWorkingHours = (employeeData: any) => {
+    let totalMinutes = 0;
+    let daysWithCheckout = 0;
+    employeeData.attendanceByDate.forEach((record: any) => {
+      if (record.check_out_time) {
+        const diff = new Date(record.check_out_time).getTime() - new Date(record.check_in_time).getTime();
+        totalMinutes += diff / (1000 * 60);
+        daysWithCheckout++;
+      }
+    });
+    if (daysWithCheckout === 0) return "N/A";
+    const avgMinutes = totalMinutes / daysWithCheckout;
+    const hours = Math.floor(avgMinutes / 60);
+    const minutes = Math.floor(avgMinutes % 60);
+    return `${hours}h ${minutes}m`;
   };
 
   const exportToCSV = () => {
@@ -386,34 +421,34 @@ export default function AttendanceReport() {
             <TabsTrigger value="summary" className="border-r border-border data-[state=active]:border-b-2 data-[state=active]:border-primary text-xs md:text-sm py-2">Summary</TabsTrigger>
             <TabsTrigger value="daily" className="border-r md:border-r border-border data-[state=active]:border-b-2 data-[state=active]:border-primary text-xs md:text-sm py-2">Daily Punching</TabsTrigger>
             <TabsTrigger value="images" className="border-r border-border data-[state=active]:border-b-2 data-[state=active]:border-primary text-xs md:text-sm py-2">Images</TabsTrigger>
-            <TabsTrigger value="hours" className="data-[state=active]:border-b-2 data-[state=active]:border-primary text-xs md:text-sm py-2">Hours</TabsTrigger>
+            <TabsTrigger value="hours" className="data-[state=active]:border-b-2 data-[state=active]:border-primary text-xs md:text-sm py-2">Working Hours</TabsTrigger>
           </TabsList>
 
-          {/* Summary Report */}
+          {/* Summary Report - P/A Matrix */}
           <TabsContent value="summary" className="space-y-3 md:space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
               <Card>
-                <CardHeader>
-                  <CardTitle>Total Days Present</CardTitle>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm">Total Days Present</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-4xl font-bold">{getDaysPresent()}</p>
+                  <p className="text-3xl font-bold">{getDaysPresent()}</p>
                 </CardContent>
               </Card>
               <Card>
-                <CardHeader>
-                  <CardTitle>Total Records</CardTitle>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm">Total Records</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-4xl font-bold">{attendanceData.length}</p>
+                  <p className="text-3xl font-bold">{attendanceData.length}</p>
                 </CardContent>
               </Card>
               <Card>
-                <CardHeader>
-                  <CardTitle>Tasks Completion Rate</CardTitle>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm">Tasks Completed</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-4xl font-bold">
+                  <p className="text-3xl font-bold">
                     {attendanceData.length > 0
                       ? Math.round(
                           (attendanceData.filter((r) => r.tasks_completed).length /
@@ -425,7 +460,71 @@ export default function AttendanceReport() {
                   </p>
                 </CardContent>
               </Card>
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm">Unique Employees</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold">{getEmployeeAttendanceMatrix().length}</p>
+                </CardContent>
+              </Card>
             </div>
+
+            <Card>
+              <CardContent className="p-0 overflow-hidden">
+                <div className="overflow-x-auto">
+                  {loading ? (
+                    <div className="p-8 text-center">Loading...</div>
+                  ) : attendanceData.length === 0 ? (
+                    <div className="p-8 text-center">No records found</div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="sticky left-0 bg-background z-20 text-xs md:text-sm whitespace-nowrap border-r font-semibold">ID</TableHead>
+                            <TableHead className="sticky left-[50px] md:left-[60px] bg-background z-20 text-xs md:text-sm whitespace-nowrap border-r font-semibold min-w-[120px]">Name</TableHead>
+                            {getDateColumns().map((date) => (
+                              <TableHead key={date.toISOString()} className="text-xs md:text-sm text-center border-r min-w-[80px] font-semibold">
+                                <div>{format(date, "dd-MM")}</div>
+                                <div className="text-[10px] md:text-xs text-muted-foreground font-normal">{format(date, "EEE")}</div>
+                              </TableHead>
+                            ))}
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {getEmployeeAttendanceMatrix().map((employeeData, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell className="sticky left-0 bg-background z-10 text-xs md:text-sm border-r font-medium">{idx + 1}</TableCell>
+                              <TableCell className="sticky left-[50px] md:left-[60px] bg-background z-10 text-xs md:text-sm whitespace-nowrap border-r font-medium">
+                                {employeeData.employee?.full_name || "N/A"}
+                              </TableCell>
+                              {getDateColumns().map((date) => {
+                                const dateKey = format(date, "yyyy-MM-dd");
+                                const attendance = employeeData.attendanceByDate.get(dateKey);
+                                
+                                return (
+                                  <TableCell key={dateKey} className="text-center border-r p-2">
+                                    <span className={cn(
+                                      "inline-flex items-center justify-center w-6 h-6 md:w-8 md:h-8 rounded text-xs md:text-sm font-bold",
+                                      attendance 
+                                        ? "bg-green-100 text-green-800" 
+                                        : "bg-red-100 text-red-800"
+                                    )}>
+                                      {attendance ? "P" : "A"}
+                                    </span>
+                                  </TableCell>
+                                );
+                              })}
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Daily Punching Report - Matrix Format */}
@@ -438,34 +537,34 @@ export default function AttendanceReport() {
                   ) : attendanceData.length === 0 ? (
                     <div className="p-8 text-center">No records found</div>
                   ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="sticky left-0 bg-background z-10 text-xs md:text-sm whitespace-nowrap border-r">Emp ID</TableHead>
-                          <TableHead className="sticky left-[60px] md:left-[80px] bg-background z-10 text-xs md:text-sm whitespace-nowrap border-r">Name</TableHead>
-                          <TableHead className="sticky left-[140px] md:left-[200px] bg-background z-10 text-xs md:text-sm whitespace-nowrap border-r hidden sm:table-cell">Venue</TableHead>
-                          <TableHead className="sticky left-[220px] md:left-[340px] bg-background z-10 text-xs md:text-sm whitespace-nowrap border-r hidden md:table-cell">Role</TableHead>
-                          {getDateColumns().map((date) => (
-                            <TableHead key={date.toISOString()} className="text-xs md:text-sm text-center border-r min-w-[100px] md:min-w-[120px]">
-                              <div>{format(date, "dd-MM-yyyy")}</div>
-                              <div className="text-[10px] md:text-xs text-muted-foreground">{format(date, "EEEE")}</div>
-                            </TableHead>
-                          ))}
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {getEmployeeAttendanceMatrix().map((employeeData, idx) => (
-                          <TableRow key={idx}>
-                            <TableCell className="sticky left-0 bg-background z-10 text-xs md:text-sm border-r">{idx + 1}</TableCell>
-                            <TableCell className="sticky left-[60px] md:left-[80px] bg-background z-10 text-xs md:text-sm whitespace-nowrap border-r">
-                              {employeeData.employee?.full_name || "N/A"}
-                            </TableCell>
-                            <TableCell className="sticky left-[140px] md:left-[200px] bg-background z-10 text-xs md:text-sm whitespace-nowrap border-r hidden sm:table-cell">
-                              {employeeData.venue?.name || "N/A"}
-                            </TableCell>
-                            <TableCell className="sticky left-[220px] md:left-[340px] bg-background z-10 text-xs md:text-sm whitespace-nowrap border-r hidden md:table-cell capitalize">
-                              {employeeData.role?.role || "N/A"}
-                            </TableCell>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="sticky left-0 bg-background z-20 text-xs md:text-sm whitespace-nowrap border-r font-semibold">ID</TableHead>
+                            <TableHead className="sticky left-[50px] md:left-[60px] bg-background z-20 text-xs md:text-sm whitespace-nowrap border-r font-semibold min-w-[120px]">Name</TableHead>
+                            <TableHead className="sticky left-[170px] md:left-[200px] bg-background z-20 text-xs md:text-sm whitespace-nowrap border-r font-semibold hidden sm:table-cell min-w-[100px]">Venue</TableHead>
+                            <TableHead className="sticky left-[270px] md:left-[320px] bg-background z-20 text-xs md:text-sm whitespace-nowrap border-r font-semibold hidden md:table-cell min-w-[80px]">Role</TableHead>
+                            {getDateColumns().map((date) => (
+                              <TableHead key={date.toISOString()} className="text-xs md:text-sm text-center border-r min-w-[100px] md:min-w-[120px] font-semibold">
+                                <div>{format(date, "dd-MM-yyyy")}</div>
+                                <div className="text-[10px] md:text-xs text-muted-foreground font-normal">{format(date, "EEEE")}</div>
+                              </TableHead>
+                            ))}
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {getEmployeeAttendanceMatrix().map((employeeData, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell className="sticky left-0 bg-background z-10 text-xs md:text-sm border-r font-medium">{idx + 1}</TableCell>
+                              <TableCell className="sticky left-[50px] md:left-[60px] bg-background z-10 text-xs md:text-sm whitespace-nowrap border-r font-medium">
+                                {employeeData.employee?.full_name || "N/A"}
+                              </TableCell>
+                              <TableCell className="sticky left-[170px] md:left-[200px] bg-background z-10 text-xs md:text-sm whitespace-nowrap border-r hidden sm:table-cell">
+                                {employeeData.venue?.name || "N/A"}
+                              </TableCell>
+                              <TableCell className="sticky left-[270px] md:left-[320px] bg-background z-10 text-xs md:text-sm whitespace-nowrap border-r hidden md:table-cell capitalize">
+                                {employeeData.role?.role || "N/A"}
+                              </TableCell>
                             {getDateColumns().map((date) => {
                               const dateKey = format(date, "yyyy-MM-dd");
                               const attendance = employeeData.attendanceByDate.get(dateKey);
@@ -516,11 +615,20 @@ export default function AttendanceReport() {
           <TabsContent value="images">
             <div className="grid grid-cols-1 gap-3 md:gap-4">
               {loading ? (
-                <p>Loading...</p>
+                <div className="p-8 text-center">Loading...</div>
               ) : attendanceData.length === 0 ? (
-                <p>No records found</p>
+                <div className="p-8 text-center">No records found</div>
               ) : (
-                attendanceData.map((record) => (
+                attendanceData.map((record) => {
+                  // Get signed URL for images
+                  const checkInImageUrl = record.check_in_selfie_url 
+                    ? `${supabase.storage.from('attendance-photos').getPublicUrl(record.check_in_selfie_url.split('/').pop() || '').data.publicUrl}`
+                    : null;
+                  const checkOutImageUrl = record.check_out_selfie_url
+                    ? `${supabase.storage.from('attendance-photos').getPublicUrl(record.check_out_selfie_url.split('/').pop() || '').data.publicUrl}`
+                    : null;
+
+                  return (
                   <Card key={record.id}>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-base md:text-lg">
@@ -532,11 +640,14 @@ export default function AttendanceReport() {
                         {/* Check In */}
                         <div className="space-y-1.5 md:space-y-2">
                           <p className="font-semibold text-xs md:text-sm">Check In</p>
-                          {record.check_in_selfie_url && (
+                          {checkInImageUrl && (
                             <img
-                              src={record.check_in_selfie_url}
+                              src={checkInImageUrl}
                               alt="Check in"
                               className="w-full h-32 md:h-40 object-cover rounded border"
+                              onError={(e) => {
+                                e.currentTarget.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="%23ddd"/><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="%23999">No Image</text></svg>';
+                              }}
                             />
                           )}
                           <div className="flex items-center gap-1 text-[10px] md:text-xs text-muted-foreground">
@@ -549,12 +660,15 @@ export default function AttendanceReport() {
                         {/* Check Out */}
                         <div className="space-y-1.5 md:space-y-2">
                           <p className="font-semibold text-xs md:text-sm">Check Out</p>
-                          {record.check_out_selfie_url ? (
+                          {checkOutImageUrl ? (
                             <>
                               <img
-                                src={record.check_out_selfie_url}
+                                src={checkOutImageUrl}
                                 alt="Check out"
                                 className="w-full h-32 md:h-40 object-cover rounded border"
+                                onError={(e) => {
+                                  e.currentTarget.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="%23ddd"/><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="%23999">No Image</text></svg>';
+                                }}
                               />
                               {record.check_out_lat && record.check_out_lng && (
                                 <div className="flex items-center gap-1 text-[10px] md:text-xs text-muted-foreground">
@@ -575,72 +689,78 @@ export default function AttendanceReport() {
                       </div>
                     </CardContent>
                   </Card>
-                ))
+                  );
+                })
               )}
             </div>
           </TabsContent>
 
-          {/* Working Hours Report */}
+          {/* Working Hours Report - Matrix Format */}
           <TabsContent value="hours">
             <Card>
               <CardContent className="p-0 overflow-hidden">
                 <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-xs md:text-sm whitespace-nowrap">Employee</TableHead>
-                        <TableHead className="text-xs md:text-sm whitespace-nowrap hidden sm:table-cell">Venue</TableHead>
-                        <TableHead className="text-xs md:text-sm whitespace-nowrap">Days</TableHead>
-                        <TableHead className="text-xs md:text-sm whitespace-nowrap">Total</TableHead>
-                        <TableHead className="text-xs md:text-sm whitespace-nowrap hidden md:table-cell">Avg/Day</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {loading ? (
+                  {loading ? (
+                    <div className="p-8 text-center">Loading...</div>
+                  ) : attendanceData.length === 0 ? (
+                    <div className="p-8 text-center">No records found</div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center">Loading...</TableCell>
+                          <TableHead className="sticky left-0 bg-background z-20 text-xs md:text-sm whitespace-nowrap border-r font-semibold">ID</TableHead>
+                          <TableHead className="sticky left-[50px] md:left-[60px] bg-background z-20 text-xs md:text-sm whitespace-nowrap border-r font-semibold min-w-[120px]">Name</TableHead>
+                          <TableHead className="sticky left-[170px] md:left-[200px] bg-background z-20 text-xs md:text-sm whitespace-nowrap border-r font-semibold hidden sm:table-cell min-w-[100px]">Venue</TableHead>
+                          {getDateColumns().map((date) => (
+                            <TableHead key={date.toISOString()} className="text-xs md:text-sm text-center border-r min-w-[80px] font-semibold">
+                              <div>{format(date, "dd-MM")}</div>
+                              <div className="text-[10px] md:text-xs text-muted-foreground font-normal">{format(date, "EEE")}</div>
+                            </TableHead>
+                          ))}
+                          <TableHead className="sticky right-0 bg-background z-20 text-xs md:text-sm text-center border-l font-semibold min-w-[100px]">Total</TableHead>
+                          <TableHead className="sticky right-[100px] bg-background z-20 text-xs md:text-sm text-center border-l font-semibold min-w-[100px] hidden md:table-cell">Avg/Day</TableHead>
                         </TableRow>
-                      ) : attendanceData.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={5} className="text-center">No records found</TableCell>
-                        </TableRow>
-                      ) : (
-                        (() => {
-                          const groupedData = attendanceData.reduce((acc, record) => {
-                            const key = `${record.user_id}-${record.venue_id}`;
-                            if (!acc[key]) {
-                              acc[key] = {
-                                employee: record.profiles?.full_name || "N/A",
-                                venue: record.venues?.name || "N/A",
-                                days: 0,
-                                totalMinutes: 0,
-                              };
-                            }
-                            acc[key].days += 1;
-                            if (record.check_out_time) {
-                              const diff = new Date(record.check_out_time).getTime() - new Date(record.check_in_time).getTime();
-                              acc[key].totalMinutes += diff / (1000 * 60);
-                            }
-                            return acc;
-                          }, {} as Record<string, any>);
+                      </TableHeader>
+                      <TableBody>
+                        {getEmployeeAttendanceMatrix().map((employeeData, idx) => (
+                          <TableRow key={idx}>
+                            <TableCell className="sticky left-0 bg-background z-10 text-xs md:text-sm border-r font-medium">{idx + 1}</TableCell>
+                            <TableCell className="sticky left-[50px] md:left-[60px] bg-background z-10 text-xs md:text-sm whitespace-nowrap border-r font-medium">
+                              {employeeData.employee?.full_name || "N/A"}
+                            </TableCell>
+                            <TableCell className="sticky left-[170px] md:left-[200px] bg-background z-10 text-xs md:text-sm whitespace-nowrap border-r hidden sm:table-cell">
+                              {employeeData.venue?.name || "N/A"}
+                            </TableCell>
+                            {getDateColumns().map((date) => {
+                              const dateKey = format(date, "yyyy-MM-dd");
+                              const attendance = employeeData.attendanceByDate.get(dateKey);
+                              
+                              if (!attendance || !attendance.check_out_time) {
+                                return (
+                                  <TableCell key={dateKey} className="text-center text-xs md:text-sm border-r">
+                                    -
+                                  </TableCell>
+                                );
+                              }
 
-                          return Object.values(groupedData).map((data: any, idx) => {
-                            const totalHours = Math.floor(data.totalMinutes / 60);
-                            const avgHours = (data.totalMinutes / 60 / data.days).toFixed(1);
-                            return (
-                              <TableRow key={idx}>
-                                <TableCell className="text-xs md:text-sm">{data.employee}</TableCell>
-                                <TableCell className="text-xs md:text-sm hidden sm:table-cell">{data.venue}</TableCell>
-                                <TableCell className="text-xs md:text-sm">{data.days}</TableCell>
-                                <TableCell className="text-xs md:text-sm">{totalHours}h</TableCell>
-                                <TableCell className="text-xs md:text-sm hidden md:table-cell">{avgHours}h</TableCell>
-                              </TableRow>
-                            );
-                          });
-                        })()
-                      )}
-                    </TableBody>
-                  </Table>
+                              const hours = calculateWorkingHours(attendance.check_in_time, attendance.check_out_time);
+                              return (
+                                <TableCell key={dateKey} className="text-center text-xs md:text-sm border-r">
+                                  {hours}
+                                </TableCell>
+                              );
+                            })}
+                            <TableCell className="sticky right-0 bg-background z-10 text-center text-xs md:text-sm border-l font-semibold">
+                              {getTotalWorkingHours(employeeData)}
+                            </TableCell>
+                            <TableCell className="sticky right-[100px] bg-background z-10 text-center text-xs md:text-sm border-l font-semibold hidden md:table-cell">
+                              {getAverageWorkingHours(employeeData)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
                 </div>
               </CardContent>
             </Card>
