@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -66,6 +66,26 @@ export default function AttendanceReport() {
 
   useEffect(() => {
     fetchAttendanceData();
+
+    // Setup real-time subscription
+    const channel = supabase
+      .channel('attendance-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'attendance'
+        },
+        () => {
+          fetchAttendanceData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [dateRangeType, customRange, selectedEmployee, selectedVenue]);
 
   const fetchFilters = async () => {
@@ -101,17 +121,13 @@ export default function AttendanceReport() {
     return { from: now, to: now };
   };
 
-  const fetchAttendanceData = async () => {
+  const fetchAttendanceData = useCallback(async () => {
     setLoading(true);
     try {
       const range = getDateRange();
       let query = supabase
         .from("attendance")
-        .select(`
-          *,
-          profiles(full_name),
-          venues(name)
-        `)
+        .select("*")
         .gte("check_in_time", range.from.toISOString())
         .lte("check_in_time", range.to.toISOString())
         .order("check_in_time", { ascending: false });
@@ -124,17 +140,40 @@ export default function AttendanceReport() {
         query = query.eq("venue_id", selectedVenue);
       }
 
-      const { data, error } = await query;
+      const { data: attendanceRecords, error } = await query;
 
       if (error) throw error;
-      setAttendanceData((data as any) || []);
+
+      // Manually fetch related profiles and venues
+      if (attendanceRecords && attendanceRecords.length > 0) {
+        const userIds = [...new Set(attendanceRecords.map(r => r.user_id))];
+        const venueIds = [...new Set(attendanceRecords.map(r => r.venue_id))];
+
+        const [profilesRes, venuesRes] = await Promise.all([
+          supabase.from("profiles").select("id, full_name").in("id", userIds),
+          supabase.from("venues").select("id, name").in("id", venueIds),
+        ]);
+
+        const profilesMap = new Map(profilesRes.data?.map(p => [p.id, p]) || []);
+        const venuesMap = new Map(venuesRes.data?.map(v => [v.id, v]) || []);
+
+        const enrichedData = attendanceRecords.map(record => ({
+          ...record,
+          profiles: profilesMap.get(record.user_id) || null,
+          venues: venuesMap.get(record.venue_id) || null,
+        }));
+
+        setAttendanceData(enrichedData as any);
+      } else {
+        setAttendanceData([]);
+      }
     } catch (error) {
       console.error("Error fetching attendance:", error);
       toast.error("Failed to load attendance data");
     } finally {
       setLoading(false);
     }
-  };
+  }, [dateRangeType, customRange, selectedEmployee, selectedVenue]);
 
   const calculateWorkingHours = (checkIn: string, checkOut: string | null) => {
     if (!checkOut) return "In Progress";
@@ -175,18 +214,18 @@ export default function AttendanceReport() {
   };
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="min-h-screen bg-background p-3 md:p-6">
+      <div className="max-w-7xl mx-auto space-y-4 md:space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3 md:gap-4">
             <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
-              <ArrowLeft className="h-5 w-5" />
+              <ArrowLeft className="h-4 w-4 md:h-5 md:w-5" />
             </Button>
-            <h1 className="text-3xl font-bold">Attendance Report</h1>
+            <h1 className="text-2xl md:text-3xl font-bold">Attendance Report</h1>
           </div>
-          <Button onClick={exportToCSV} variant="outline">
-            <Download className="mr-2 h-4 w-4" />
+          <Button onClick={exportToCSV} variant="outline" size="sm" className="w-full sm:w-auto">
+            <Download className="mr-2 h-3 w-3 md:h-4 md:w-4" />
             Export CSV
           </Button>
         </div>
@@ -196,10 +235,10 @@ export default function AttendanceReport() {
           <CardHeader>
             <CardTitle>Filters</CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
             {/* Date Range Type */}
             <Select value={dateRangeType} onValueChange={(v: any) => setDateRangeType(v)}>
-              <SelectTrigger>
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select period" />
               </SelectTrigger>
               <SelectContent>
@@ -216,17 +255,16 @@ export default function AttendanceReport() {
                   <Button
                     variant="outline"
                     className={cn(
-                      "justify-start text-left font-normal",
+                      "w-full justify-start text-left font-normal text-sm",
                       !customRange && "text-muted-foreground"
                     )}
                   >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    <CalendarIcon className="mr-2 h-3 w-3 md:h-4 md:w-4" />
                     {customRange?.from ? (
                       customRange.to ? (
-                        <>
-                          {format(customRange.from, "LLL dd, y")} -{" "}
-                          {format(customRange.to, "LLL dd, y")}
-                        </>
+                        <span className="truncate">
+                          {format(customRange.from, "MMM dd")} - {format(customRange.to, "MMM dd, y")}
+                        </span>
                       ) : (
                         format(customRange.from, "LLL dd, y")
                       )
@@ -254,7 +292,7 @@ export default function AttendanceReport() {
 
             {/* Employee Filter */}
             <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
-              <SelectTrigger>
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder="All Employees" />
               </SelectTrigger>
               <SelectContent>
@@ -269,7 +307,7 @@ export default function AttendanceReport() {
 
             {/* Venue Filter */}
             <Select value={selectedVenue} onValueChange={setSelectedVenue}>
-              <SelectTrigger>
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder="All Venues" />
               </SelectTrigger>
               <SelectContent>
@@ -286,16 +324,16 @@ export default function AttendanceReport() {
 
         {/* Reports Tabs */}
         <Tabs defaultValue="summary" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 border-b border-border">
-            <TabsTrigger value="summary" className="border-r border-border data-[state=active]:border-b-2 data-[state=active]:border-primary">Summary</TabsTrigger>
-            <TabsTrigger value="daily" className="border-r border-border data-[state=active]:border-b-2 data-[state=active]:border-primary">Daily Punching</TabsTrigger>
-            <TabsTrigger value="images" className="border-r border-border data-[state=active]:border-b-2 data-[state=active]:border-primary">Images & Location</TabsTrigger>
-            <TabsTrigger value="hours" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">Working Hours</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 border-b border-border h-auto">
+            <TabsTrigger value="summary" className="border-r border-border data-[state=active]:border-b-2 data-[state=active]:border-primary text-xs md:text-sm py-2">Summary</TabsTrigger>
+            <TabsTrigger value="daily" className="border-r md:border-r border-border data-[state=active]:border-b-2 data-[state=active]:border-primary text-xs md:text-sm py-2">Daily Punching</TabsTrigger>
+            <TabsTrigger value="images" className="border-r border-border data-[state=active]:border-b-2 data-[state=active]:border-primary text-xs md:text-sm py-2">Images</TabsTrigger>
+            <TabsTrigger value="hours" className="data-[state=active]:border-b-2 data-[state=active]:border-primary text-xs md:text-sm py-2">Hours</TabsTrigger>
           </TabsList>
 
           {/* Summary Report */}
-          <TabsContent value="summary" className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <TabsContent value="summary" className="space-y-3 md:space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
               <Card>
                 <CardHeader>
                   <CardTitle>Total Days Present</CardTitle>
@@ -335,18 +373,18 @@ export default function AttendanceReport() {
           {/* Daily Punching Report */}
           <TabsContent value="daily">
             <Card>
-              <CardContent className="p-0">
+              <CardContent className="p-0 overflow-hidden">
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Employee</TableHead>
-                        <TableHead>Venue</TableHead>
-                        <TableHead>Check In</TableHead>
-                        <TableHead>Check Out</TableHead>
-                        <TableHead>Working Hours</TableHead>
-                        <TableHead>Tasks</TableHead>
+                        <TableHead className="text-xs md:text-sm whitespace-nowrap">Date</TableHead>
+                        <TableHead className="text-xs md:text-sm whitespace-nowrap">Employee</TableHead>
+                        <TableHead className="text-xs md:text-sm whitespace-nowrap hidden sm:table-cell">Venue</TableHead>
+                        <TableHead className="text-xs md:text-sm whitespace-nowrap">Check In</TableHead>
+                        <TableHead className="text-xs md:text-sm whitespace-nowrap hidden md:table-cell">Check Out</TableHead>
+                        <TableHead className="text-xs md:text-sm whitespace-nowrap hidden lg:table-cell">Hours</TableHead>
+                        <TableHead className="text-xs md:text-sm whitespace-nowrap">Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -361,28 +399,28 @@ export default function AttendanceReport() {
                       ) : (
                         attendanceData.map((record) => (
                           <TableRow key={record.id}>
-                            <TableCell>{format(new Date(record.check_in_time), "MMM dd, yyyy")}</TableCell>
-                            <TableCell>{record.profiles?.full_name || "N/A"}</TableCell>
-                            <TableCell>{record.venues?.name || "N/A"}</TableCell>
-                            <TableCell>{format(new Date(record.check_in_time), "hh:mm a")}</TableCell>
-                            <TableCell>
+                            <TableCell className="text-xs md:text-sm whitespace-nowrap">{format(new Date(record.check_in_time), "MMM dd")}</TableCell>
+                            <TableCell className="text-xs md:text-sm">{record.profiles?.full_name || "N/A"}</TableCell>
+                            <TableCell className="text-xs md:text-sm hidden sm:table-cell">{record.venues?.name || "N/A"}</TableCell>
+                            <TableCell className="text-xs md:text-sm whitespace-nowrap">{format(new Date(record.check_in_time), "hh:mm a")}</TableCell>
+                            <TableCell className="text-xs md:text-sm whitespace-nowrap hidden md:table-cell">
                               {record.check_out_time
                                 ? format(new Date(record.check_out_time), "hh:mm a")
                                 : "In Progress"}
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="text-xs md:text-sm hidden lg:table-cell">
                               {calculateWorkingHours(record.check_in_time, record.check_out_time)}
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="text-xs md:text-sm">
                               <span
                                 className={cn(
-                                  "px-2 py-1 rounded text-xs",
+                                  "px-1.5 py-0.5 md:px-2 md:py-1 rounded text-[10px] md:text-xs whitespace-nowrap",
                                   record.tasks_completed
                                     ? "bg-green-100 text-green-800"
                                     : "bg-yellow-100 text-yellow-800"
                                 )}
                               >
-                                {record.tasks_completed ? "Completed" : "Pending"}
+                                {record.tasks_completed ? "Done" : "Pending"}
                               </span>
                             </TableCell>
                           </TableRow>
@@ -397,7 +435,7 @@ export default function AttendanceReport() {
 
           {/* Images & Location Report */}
           <TabsContent value="images">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-3 md:gap-4">
               {loading ? (
                 <p>Loading...</p>
               ) : attendanceData.length === 0 ? (
@@ -405,53 +443,53 @@ export default function AttendanceReport() {
               ) : (
                 attendanceData.map((record) => (
                   <Card key={record.id}>
-                    <CardHeader>
-                      <CardTitle className="text-lg">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base md:text-lg">
                         {record.profiles?.full_name || "N/A"} - {format(new Date(record.check_in_time), "MMM dd, yyyy")}
                       </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="space-y-3 md:space-y-4">
                       <div className="grid grid-cols-2 gap-4">
                         {/* Check In */}
-                        <div className="space-y-2">
-                          <p className="font-semibold text-sm">Check In</p>
+                        <div className="space-y-1.5 md:space-y-2">
+                          <p className="font-semibold text-xs md:text-sm">Check In</p>
                           {record.check_in_selfie_url && (
                             <img
                               src={record.check_in_selfie_url}
                               alt="Check in"
-                              className="w-full h-40 object-cover rounded border"
+                              className="w-full h-32 md:h-40 object-cover rounded border"
                             />
                           )}
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <MapPin className="h-3 w-3" />
-                            <span>{record.check_in_lat.toFixed(4)}, {record.check_in_lng.toFixed(4)}</span>
+                          <div className="flex items-center gap-1 text-[10px] md:text-xs text-muted-foreground">
+                            <MapPin className="h-2.5 w-2.5 md:h-3 md:w-3 flex-shrink-0" />
+                            <span className="truncate">{record.check_in_lat.toFixed(4)}, {record.check_in_lng.toFixed(4)}</span>
                           </div>
-                          <p className="text-xs">{format(new Date(record.check_in_time), "hh:mm a")}</p>
+                          <p className="text-[10px] md:text-xs">{format(new Date(record.check_in_time), "hh:mm a")}</p>
                         </div>
 
                         {/* Check Out */}
-                        <div className="space-y-2">
-                          <p className="font-semibold text-sm">Check Out</p>
+                        <div className="space-y-1.5 md:space-y-2">
+                          <p className="font-semibold text-xs md:text-sm">Check Out</p>
                           {record.check_out_selfie_url ? (
                             <>
                               <img
                                 src={record.check_out_selfie_url}
                                 alt="Check out"
-                                className="w-full h-40 object-cover rounded border"
+                                className="w-full h-32 md:h-40 object-cover rounded border"
                               />
                               {record.check_out_lat && record.check_out_lng && (
-                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                  <MapPin className="h-3 w-3" />
-                                  <span>{record.check_out_lat.toFixed(4)}, {record.check_out_lng.toFixed(4)}</span>
+                                <div className="flex items-center gap-1 text-[10px] md:text-xs text-muted-foreground">
+                                  <MapPin className="h-2.5 w-2.5 md:h-3 md:w-3 flex-shrink-0" />
+                                  <span className="truncate">{record.check_out_lat.toFixed(4)}, {record.check_out_lng.toFixed(4)}</span>
                                 </div>
                               )}
                               {record.check_out_time && (
-                                <p className="text-xs">{format(new Date(record.check_out_time), "hh:mm a")}</p>
+                                <p className="text-[10px] md:text-xs">{format(new Date(record.check_out_time), "hh:mm a")}</p>
                               )}
                             </>
                           ) : (
-                            <div className="w-full h-40 flex items-center justify-center border rounded bg-muted">
-                              <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                            <div className="w-full h-32 md:h-40 flex items-center justify-center border rounded bg-muted">
+                              <ImageIcon className="h-6 w-6 md:h-8 md:w-8 text-muted-foreground" />
                             </div>
                           )}
                         </div>
@@ -466,16 +504,16 @@ export default function AttendanceReport() {
           {/* Working Hours Report */}
           <TabsContent value="hours">
             <Card>
-              <CardContent className="p-0">
+              <CardContent className="p-0 overflow-hidden">
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Employee</TableHead>
-                        <TableHead>Venue</TableHead>
-                        <TableHead>Total Days</TableHead>
-                        <TableHead>Total Hours</TableHead>
-                        <TableHead>Avg Hours/Day</TableHead>
+                        <TableHead className="text-xs md:text-sm whitespace-nowrap">Employee</TableHead>
+                        <TableHead className="text-xs md:text-sm whitespace-nowrap hidden sm:table-cell">Venue</TableHead>
+                        <TableHead className="text-xs md:text-sm whitespace-nowrap">Days</TableHead>
+                        <TableHead className="text-xs md:text-sm whitespace-nowrap">Total</TableHead>
+                        <TableHead className="text-xs md:text-sm whitespace-nowrap hidden md:table-cell">Avg/Day</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -512,11 +550,11 @@ export default function AttendanceReport() {
                             const avgHours = (data.totalMinutes / 60 / data.days).toFixed(1);
                             return (
                               <TableRow key={idx}>
-                                <TableCell>{data.employee}</TableCell>
-                                <TableCell>{data.venue}</TableCell>
-                                <TableCell>{data.days}</TableCell>
-                                <TableCell>{totalHours}h</TableCell>
-                                <TableCell>{avgHours}h</TableCell>
+                                <TableCell className="text-xs md:text-sm">{data.employee}</TableCell>
+                                <TableCell className="text-xs md:text-sm hidden sm:table-cell">{data.venue}</TableCell>
+                                <TableCell className="text-xs md:text-sm">{data.days}</TableCell>
+                                <TableCell className="text-xs md:text-sm">{totalHours}h</TableCell>
+                                <TableCell className="text-xs md:text-sm hidden md:table-cell">{avgHours}h</TableCell>
                               </TableRow>
                             );
                           });
