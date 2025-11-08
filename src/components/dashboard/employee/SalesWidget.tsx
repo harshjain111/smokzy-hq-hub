@@ -217,6 +217,7 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
                   id="closingPhoto"
                   type="file"
                   accept="image/*"
+                  capture="environment"
                   onChange={(e) => setPhotoFile(e.target.files?.[0] || null)}
                   required
                 />
