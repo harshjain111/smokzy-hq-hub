@@ -64,6 +64,12 @@ const SlideToConfirm = ({
     if (position >= maxPosition * 0.85) {
       setPosition(maxPosition);
       setIsConfirmed(true);
+      
+      // Haptic feedback on success
+      if (navigator.vibrate) {
+        navigator.vibrate([50, 30, 50]); // Short-pause-short vibration pattern
+      }
+      
       onConfirm();
     } else {
       setPosition(0);
