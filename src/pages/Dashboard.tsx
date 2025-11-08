@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import AdminDashboard from "@/components/dashboard/AdminDashboard";
 import EmployeeDashboard from "@/components/dashboard/EmployeeDashboard";
 import ProfileMenu from "@/components/ProfileMenu";
+import AdminSettingsMenu from "@/components/AdminSettingsMenu";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -110,10 +111,13 @@ const Dashboard = () => {
           <div>
             <h1 className="text-2xl font-bold text-primary">Smokzy Operations</h1>
             <p className="text-sm text-muted-foreground">
-              {userRole.role === "admin" ? "Admin Dashboard" : venueName || "Loading..."}
+              {userRole.role === "admin" ? "Multi-Venue Management" : venueName || "Loading..."}
             </p>
           </div>
-          <ProfileMenu user={user!} role={userRole.role} />
+          <div className="flex items-center gap-3">
+            {userRole.role === "admin" && <AdminSettingsMenu />}
+            <ProfileMenu user={user!} role={userRole.role} />
+          </div>
         </div>
       </header>
 

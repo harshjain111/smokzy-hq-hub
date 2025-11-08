@@ -178,247 +178,97 @@ const AdminDashboard = ({ user }: AdminDashboardProps) => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Admin Dashboard</h2>
-          <p className="text-muted-foreground">
-            {selectedVenueId === "all" ? "Overview of all venues" : "Manage your hookah bar operations"}
-          </p>
-        </div>
-        
-        <div className="w-64">
-          <Select value={selectedVenueId} onValueChange={setSelectedVenueId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select venue" />
-            </SelectTrigger>
-            <SelectContent className="bg-background z-50">
-              <SelectItem value="all">All Venues - Overview</SelectItem>
-              {venues.map((venue) => (
-                <SelectItem key={venue.id} value={venue.id}>
-                  {venue.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+      {/* Hero Section - Today's Total Sales */}
+      <Card className="bg-gradient-to-br from-primary/10 to-accent/10 border-primary/20">
+        <CardHeader>
+          <CardTitle className="text-3xl font-bold flex items-center gap-3">
+            <TrendingUp className="h-8 w-8 text-success" />
+            Today's Total Sales
+          </CardTitle>
+          <CardDescription className="text-base">Across all venues</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="text-5xl font-bold text-success">{overallStats.totalSales}</div>
+          <p className="text-sm text-muted-foreground mt-2">Hookahs sold today</p>
+        </CardContent>
+      </Card>
 
-      {selectedVenueId === "all" ? (
-        // Overall Summary View
+      {/* Sales Breakdown Bar Chart */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart3 className="h-5 w-5" />
+            Sales Breakdown by Venue
+          </CardTitle>
+          <CardDescription>Today's performance across all locations</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={venueSalesData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis 
+                dataKey="venue_name" 
+                angle={-45}
+                textAnchor="end"
+                height={80}
+              />
+              <YAxis />
+              <Tooltip />
+              <Bar dataKey="total_sales" fill="hsl(var(--primary))" name="Sales" radius={[8, 8, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* Venue Cards Grid */}
+      {venues.length > 0 && (
         <>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Total Venues</CardTitle>
-                <Building2 className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{overallStats.totalVenues}</div>
-                <p className="text-xs text-muted-foreground">Active locations</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Total Employees</CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{overallStats.totalEmployees}</div>
-                <p className="text-xs text-muted-foreground">Across all venues</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Low Stock Items</CardTitle>
-                <AlertTriangle className="h-4 w-4 text-warning" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-warning">{overallStats.totalLowStock}</div>
-                <p className="text-xs text-muted-foreground">Need restocking</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Today's Total Sales</CardTitle>
-                <TrendingUp className="h-4 w-4 text-success" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-success">{overallStats.totalSales}</div>
-                <p className="text-xs text-muted-foreground">Hookahs sold</p>
-              </CardContent>
-            </Card>
+          <div className="flex items-center justify-between">
+            <h3 className="text-2xl font-semibold">Venues</h3>
+            <p className="text-sm text-muted-foreground">{venues.length} total</p>
           </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5" />
-                Sales Overview by Venue
-              </CardTitle>
-              <CardDescription>Today's sales performance across all locations</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={350}>
-                <BarChart data={venueSalesData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis 
-                    dataKey="venue_name" 
-                    angle={-45}
-                    textAnchor="end"
-                    height={100}
-                  />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="total_sales" fill="hsl(var(--success))" name="Total Sales" />
-                  <Bar dataKey="active_staff" fill="hsl(var(--primary))" name="Active Staff" />
-                  <Bar dataKey="low_stock" fill="hsl(var(--warning))" name="Low Stock Items" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          <Tabs defaultValue="venues" className="space-y-4">
-            <TabsList>
-              <TabsTrigger value="venues">Manage Venues</TabsTrigger>
-              <TabsTrigger value="employees">Manage Employees</TabsTrigger>
-              <TabsTrigger value="categories">Hookah Categories</TabsTrigger>
-              <TabsTrigger value="activity">Employee Activity</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="venues" className="space-y-4">
-              <VenueManagement />
-            </TabsContent>
-
-            <TabsContent value="employees" className="space-y-4">
-              <EmployeeManagement />
-            </TabsContent>
-
-            <TabsContent value="categories" className="space-y-4">
-              <HookahCategoryManagement />
-            </TabsContent>
-
-            <TabsContent value="activity" className="space-y-4">
-              <EmployeeActivityReport />
-            </TabsContent>
-          </Tabs>
-        </>
-      ) : selectedVenueId ? (
-        // Detailed Venue View
-        <>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Total Employees</CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.totalEmployees}</div>
-                <p className="text-xs text-muted-foreground">At {selectedVenue?.name}</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Active Staff</CardTitle>
-                <Users className="h-4 w-4 text-success" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-success">{stats.activeStaff}</div>
-                <p className="text-xs text-muted-foreground">Currently on duty</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Low Stock Alerts</CardTitle>
-                <AlertTriangle className="h-4 w-4 text-warning" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-warning">{stats.lowStockCount}</div>
-                <p className="text-xs text-muted-foreground">Items need restock</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Today's Sales</CardTitle>
-                <TrendingUp className="h-4 w-4 text-success" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-success">{stats.todaySales}</div>
-                <p className="text-xs text-muted-foreground">Hookahs sold today</p>
-              </CardContent>
-            </Card>
+          
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {venues.map((venue) => {
+              const venueData = venueSalesData.find(v => v.venue_name === venue.name);
+              return (
+                <Card 
+                  key={venue.id} 
+                  className="cursor-pointer hover:shadow-lg transition-shadow border-2 hover:border-primary/50"
+                  onClick={() => window.location.href = `/venue/${venue.id}`}
+                >
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Building2 className="h-5 w-5 text-primary" />
+                      {venue.name}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Today's Sales</span>
+                      <span className="text-xl font-bold text-success">{venueData?.total_sales || 0}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Active Staff</span>
+                      <span className="text-lg font-semibold text-primary">{venueData?.active_staff || 0}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Low Stock</span>
+                      <span className="text-lg font-semibold text-warning">{venueData?.low_stock || 0}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
-
-          <Tabs defaultValue="stock" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-5">
-              <TabsTrigger value="stock">Stock</TabsTrigger>
-              <TabsTrigger value="sales">Sales</TabsTrigger>
-              <TabsTrigger value="attendance">Attendance</TabsTrigger>
-              <TabsTrigger value="activity">Employee Activity</TabsTrigger>
-              <TabsTrigger value="manage">Manage</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="stock" className="space-y-4">
-              <StockOverview venueId={selectedVenueId} venueName={selectedVenue?.name || ""} />
-            </TabsContent>
-
-            <TabsContent value="sales" className="space-y-4">
-              <SalesReports venueId={selectedVenueId} venueName={selectedVenue?.name || ""} />
-            </TabsContent>
-
-            <TabsContent value="attendance" className="space-y-4">
-              <AttendanceOverview venueId={selectedVenueId} venueName={selectedVenue?.name || ""} />
-            </TabsContent>
-
-            <TabsContent value="activity" className="space-y-4">
-              <EmployeeActivityReport venueId={selectedVenueId} />
-            </TabsContent>
-
-            <TabsContent value="manage" className="space-y-4">
-              <Tabs defaultValue="venues">
-                <TabsList>
-                  <TabsTrigger value="venues">Venues</TabsTrigger>
-                  <TabsTrigger value="employees">Employees</TabsTrigger>
-                  <TabsTrigger value="categories">Categories</TabsTrigger>
-                </TabsList>
-                <TabsContent value="venues">
-                  <VenueManagement />
-                </TabsContent>
-                <TabsContent value="employees">
-                  <EmployeeManagement />
-                </TabsContent>
-                <TabsContent value="categories">
-                  <HookahCategoryManagement />
-                </TabsContent>
-              </Tabs>
-            </TabsContent>
-          </Tabs>
         </>
-      ) : null}
+      )}
 
       {venues.length === 0 && (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-10">
             <Building2 className="h-12 w-12 text-muted-foreground mb-4" />
-            <p className="text-muted-foreground mb-4">No venues found. Create your first venue to get started.</p>
-            <Tabs defaultValue="venues" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="venues">Venues</TabsTrigger>
-                <TabsTrigger value="employees">Employees</TabsTrigger>
-              </TabsList>
-              <TabsContent value="venues">
-                <VenueManagement />
-              </TabsContent>
-              <TabsContent value="employees">
-                <EmployeeManagement />
-              </TabsContent>
-            </Tabs>
+            <p className="text-muted-foreground">No venues found. Use the settings menu to create your first venue.</p>
           </CardContent>
         </Card>
       )}

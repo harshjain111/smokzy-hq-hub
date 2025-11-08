@@ -9,6 +9,10 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import NotFound from "./pages/NotFound";
 import AttendanceReport from "./pages/AttendanceReport";
 import MyProfile from "./pages/MyProfile";
+import VenueDetail from "./pages/VenueDetail";
+import ManageVenues from "./pages/ManageVenues";
+import ManageEmployees from "./pages/ManageEmployees";
+import ManageCategories from "./pages/ManageCategories";
 
 const queryClient = new QueryClient();
 
@@ -20,7 +24,12 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/auth" element={<Auth />} />
+          <Route path="/venue/:venueId" element={<ProtectedRoute><VenueDetail /></ProtectedRoute>} />
+          <Route path="/manage-venues" element={<ProtectedRoute><ManageVenues /></ProtectedRoute>} />
+          <Route path="/manage-employees" element={<ProtectedRoute><ManageEmployees /></ProtectedRoute>} />
+          <Route path="/manage-categories" element={<ProtectedRoute><ManageCategories /></ProtectedRoute>} />
           <Route path="/attendance-report" element={<ProtectedRoute><AttendanceReport /></ProtectedRoute>} />
           <Route path="/my-profile" element={<ProtectedRoute><MyProfile /></ProtectedRoute>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
