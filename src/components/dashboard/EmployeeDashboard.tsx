@@ -5,6 +5,7 @@ import AttendanceWidget from "./employee/AttendanceWidget";
 import TasksWidget from "./employee/TasksWidget";
 import StockWidget from "./employee/StockWidget";
 import SalesWidget from "./employee/SalesWidget";
+import ClosingPhotoWidget from "./employee/ClosingPhotoWidget";
 
 interface EmployeeDashboardProps {
   user: User;
@@ -27,10 +28,11 @@ const EmployeeDashboard = ({ user, venueId }: EmployeeDashboardProps) => {
       </Card>
 
       <Tabs defaultValue="attendance" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="attendance">Attendance</TabsTrigger>
           <TabsTrigger value="stock">Stock</TabsTrigger>
           <TabsTrigger value="sales">Sales</TabsTrigger>
+          <TabsTrigger value="photo">Photo</TabsTrigger>
         </TabsList>
 
         <TabsContent value="attendance">
@@ -43,6 +45,10 @@ const EmployeeDashboard = ({ user, venueId }: EmployeeDashboardProps) => {
 
         <TabsContent value="sales">
           <SalesWidget user={user} venueId={venueId} />
+        </TabsContent>
+
+        <TabsContent value="photo">
+          <ClosingPhotoWidget user={user} venueId={venueId} />
         </TabsContent>
       </Tabs>
     </div>
