@@ -21,7 +21,8 @@ interface TaskStatus {
 }
 
 const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
-  const [todayAttendance, setTodayAttendance] = useState<any>(null);
+  const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
+  const [currentShift, setCurrentShift] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [tasks, setTasks] = useState<TaskStatus>({
     stockReported: false,
@@ -96,15 +97,21 @@ const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
   }, [venueId]);
 
   const fetchTodayAttendance = async () => {
-    const today = format(new Date(), "yyyy-MM-dd");
+    // Fetch all attendance records from the last 24 hours
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    
     const { data } = await supabase
       .from("attendance")
       .select("*")
       .eq("user_id", user.id)
-      .gte("check_in_time", today)
-      .maybeSingle();
+      .gte("check_in_time", twentyFourHoursAgo)
+      .order("check_in_time", { ascending: false });
 
-    setTodayAttendance(data);
+    setAttendanceRecords(data || []);
+    
+    // Find the current active shift (checked in but not checked out)
+    const activeShift = data?.find(record => !record.check_out_time);
+    setCurrentShift(activeShift || null);
   };
 
   const checkTaskStatus = async () => {
@@ -326,7 +333,7 @@ const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
           check_out_lng: location.lng,
           check_out_time: new Date().toISOString(),
         })
-        .eq("id", todayAttendance.id);
+        .eq("id", currentShift.id);
 
       if (error) throw error;
 
@@ -356,30 +363,49 @@ const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
             Attendance
           </CardTitle>
           <CardDescription>
-            {todayAttendance?.check_out_time
-              ? "You've completed your shift"
-              : todayAttendance
+            {currentShift
               ? "You're currently on duty"
+              : attendanceRecords.length > 0
+              ? "Ready for next shift"
               : "Slide to check in"}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {todayAttendance && (
-            <div className="p-4 bg-muted rounded-lg space-y-2">
+          {/* Current Active Shift */}
+          {currentShift && (
+            <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-primary">Current Shift</span>
+                <span className="text-xs text-muted-foreground">
+                  {format(new Date(currentShift.check_in_time), "MMM dd")}
+                </span>
+              </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Check In:</span>
                 <span className="font-medium">
-                  {format(new Date(todayAttendance.check_in_time), "hh:mm a")}
+                  {format(new Date(currentShift.check_in_time), "hh:mm a")}
                 </span>
               </div>
-              {todayAttendance.check_out_time && (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Check Out:</span>
-                  <span className="font-medium">
-                    {format(new Date(todayAttendance.check_out_time), "hh:mm a")}
-                  </span>
+            </div>
+          )}
+
+          {/* Recent Completed Shifts (last 24 hours) */}
+          {attendanceRecords.filter(r => r.check_out_time).length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-muted-foreground">Recent Shifts</h4>
+              {attendanceRecords.filter(r => r.check_out_time).slice(0, 3).map((record) => (
+                <div key={record.id} className="p-3 bg-muted/50 rounded-lg space-y-1">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>{format(new Date(record.check_in_time), "MMM dd, yyyy")}</span>
+                    <span className="text-green-600 dark:text-green-400">✓ Completed</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span>{format(new Date(record.check_in_time), "hh:mm a")}</span>
+                    <span>→</span>
+                    <span>{format(new Date(record.check_out_time), "hh:mm a")}</span>
+                  </div>
                 </div>
-              )}
+              ))}
             </div>
           )}
 
@@ -391,37 +417,35 @@ const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
             muted
           />
 
-          {(!todayAttendance || !todayAttendance.check_out_time) && (
-            <div className="space-y-4">
-              {!todayAttendance ? (
+          <div className="space-y-4">
+            {!currentShift ? (
+              <SlideToConfirm
+                onConfirm={handleCheckIn}
+                loading={loading}
+                text="Slide to Check In"
+                icon={<LogIn className="h-5 w-5" />}
+                successText="Checked In!"
+              />
+            ) : (
+              <>
+                {!allTasksComplete && (
+                  <div className="p-3 bg-warning/10 rounded-lg border border-warning/20">
+                    <p className="text-sm text-warning text-center">
+                      Complete all tasks to enable check-out
+                    </p>
+                  </div>
+                )}
                 <SlideToConfirm
-                  onConfirm={handleCheckIn}
+                  onConfirm={handleCheckOut}
+                  disabled={!allTasksComplete}
                   loading={loading}
-                  text="Slide to Check In"
-                  icon={<LogIn className="h-5 w-5" />}
-                  successText="Checked In!"
+                  text="Slide to Check Out"
+                  icon={<LogOut className="h-5 w-5" />}
+                  successText="Checked Out!"
                 />
-              ) : (
-                <>
-                  {!allTasksComplete && (
-                    <div className="p-3 bg-warning/10 rounded-lg border border-warning/20">
-                      <p className="text-sm text-warning text-center">
-                        Complete all tasks to enable check-out
-                      </p>
-                    </div>
-                  )}
-                  <SlideToConfirm
-                    onConfirm={handleCheckOut}
-                    disabled={!allTasksComplete}
-                    loading={loading}
-                    text="Slide to Check Out"
-                    icon={<LogOut className="h-5 w-5" />}
-                    successText="Checked Out!"
-                  />
-                </>
-              )}
-            </div>
-          )}
+              </>
+            )}
+          </div>
         </CardContent>
       </Card>
 
