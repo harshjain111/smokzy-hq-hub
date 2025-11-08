@@ -550,8 +550,14 @@ export default function AttendanceReport() {
                             <TableHead className="sticky left-[40px] md:left-[50px] bg-background z-20 text-xs md:text-sm whitespace-nowrap border-r font-semibold w-[120px] md:w-[150px]">Name</TableHead>
                             <TableHead className="sticky left-[160px] md:left-[200px] bg-background z-20 text-xs md:text-sm whitespace-nowrap border-r font-semibold hidden sm:table-cell w-[100px] md:w-[120px]">Venue</TableHead>
                             <TableHead className="sticky left-[260px] md:left-[320px] bg-background z-20 text-xs md:text-sm whitespace-nowrap border-r font-semibold hidden md:table-cell w-[80px] md:w-[100px]">Role</TableHead>
-                            {getDateColumns().map((date) => (
-                              <TableHead key={date.toISOString()} className="text-xs md:text-sm text-center border-r min-w-[100px] md:min-w-[120px] font-semibold">
+                            {getDateColumns().map((date, idx) => (
+                              <TableHead
+                                key={date.toISOString()}
+                                className={cn(
+                                  "text-xs md:text-sm text-center border-r min-w-[100px] md:min-w-[120px] font-semibold",
+                                  idx === 0 && "sticky left-[160px] sm:left-[260px] md:left-[420px] bg-background z-10"
+                                )}
+                              >
                                 <div>{format(date, "dd-MM-yyyy")}</div>
                                 <div className="text-[10px] md:text-xs text-muted-foreground font-normal">{format(date, "EEEE")}</div>
                               </TableHead>
@@ -571,13 +577,19 @@ export default function AttendanceReport() {
                               <TableCell className="sticky left-[260px] md:left-[320px] bg-background z-10 text-xs md:text-sm whitespace-nowrap border-r hidden md:table-cell capitalize w-[80px] md:w-[100px]">
                                 {employeeData.role?.role || "N/A"}
                               </TableCell>
-                            {getDateColumns().map((date) => {
+                            {getDateColumns().map((date, idx) => {
                               const dateKey = format(date, "yyyy-MM-dd");
                               const attendance = employeeData.attendanceByDate.get(dateKey);
                               
                               if (!attendance) {
                                 return (
-                                  <TableCell key={dateKey} className="text-center text-xs md:text-sm border-r">
+                                  <TableCell
+                                    key={dateKey}
+                                    className={cn(
+                                      "text-center text-xs md:text-sm border-r",
+                                      idx === 0 && "sticky left-[160px] sm:left-[260px] md:left-[420px] bg-background z-0"
+                                    )}
+                                  >
                                     -
                                   </TableCell>
                                 );
@@ -587,7 +599,13 @@ export default function AttendanceReport() {
                               const isEarly = isEarlyCheckOut(attendance.check_out_time);
 
                               return (
-                                <TableCell key={dateKey} className="text-center border-r p-2">
+                                <TableCell
+                                  key={dateKey}
+                                  className={cn(
+                                    "text-center border-r p-2",
+                                    idx === 0 && "sticky left-[160px] sm:left-[260px] md:left-[420px] bg-background z-0"
+                                  )}
+                                >
                                   <div className="space-y-1">
                                     <div className="flex items-center justify-center gap-1 text-[10px] md:text-xs">
                                       <span>{format(new Date(attendance.check_in_time), "hh:mm a")}</span>
