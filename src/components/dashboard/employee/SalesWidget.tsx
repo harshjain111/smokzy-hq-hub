@@ -23,6 +23,7 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
   const [categoryId, setCategoryId] = useState("");
   const [quantity, setQuantity] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [todaySales, setTodaySales] = useState<any[]>([]);
   const [hookahCategories, setHookahCategories] = useState<{ id: string; name: string }[]>([]);
   const [showSalesAppreciation, setShowSalesAppreciation] = useState(false);
@@ -89,6 +90,25 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
     }
   };
 
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setPhotoFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRetakePhoto = () => {
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    const fileInput = document.getElementById("closingPhoto") as HTMLInputElement;
+    if (fileInput) fileInput.value = "";
+  };
+
   const handleUploadClosingPhoto = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -121,6 +141,7 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
 
       toast.success("Closing photo uploaded successfully");
       setPhotoFile(null);
+      setPhotoPreview(null);
       setPhotoOpen(false);
       setShowPhotoAppreciation(true);
     } catch (error) {
@@ -211,18 +232,49 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
               <DialogDescription>Photo of the cleaned counter</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleUploadClosingPhoto} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="closingPhoto">Counter Photo</Label>
-                <Input
-                  id="closingPhoto"
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  onChange={(e) => setPhotoFile(e.target.files?.[0] || null)}
-                  required
-                />
-              </div>
-              <Button type="submit" className="w-full">Upload Photo</Button>
+              {!photoPreview ? (
+                <div className="space-y-2">
+                  <Label htmlFor="closingPhoto">Counter Photo</Label>
+                  <Input
+                    id="closingPhoto"
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handlePhotoSelect}
+                    required
+                  />
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <Label>Photo Preview</Label>
+                  <div className="relative rounded-lg overflow-hidden border-2 border-border">
+                    <img 
+                      src={photoPreview} 
+                      alt="Closing photo preview" 
+                      className="w-full h-auto"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={handleRetakePhoto}
+                      className="flex-1"
+                    >
+                      <Camera className="mr-2 h-4 w-4" />
+                      Retake
+                    </Button>
+                    <Button type="submit" className="flex-1">
+                      Confirm & Upload
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {!photoPreview && (
+                <Button type="button" disabled className="w-full">
+                  Take Photo First
+                </Button>
+              )}
             </form>
           </DialogContent>
         </Dialog>
