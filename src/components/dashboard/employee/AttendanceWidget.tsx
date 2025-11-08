@@ -120,13 +120,13 @@ const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
         .select("id")
         .eq("venue_id", venueId)
         .eq("report_date", today)
-        .maybeSingle(),
+        .limit(1),
       supabase
         .from("closing_photos")
         .select("id")
         .eq("venue_id", venueId)
         .eq("photo_date", today)
-        .maybeSingle(),
+        .limit(1),
     ]);
 
     let stockReported = false;
@@ -140,8 +140,8 @@ const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
 
     setTasks({
       stockReported,
-      salesReported: !!salesCheck.data,
-      closingPhoto: !!closingCheck.data,
+      salesReported: !!(salesCheck.data && salesCheck.data.length > 0),
+      closingPhoto: !!(closingCheck.data && closingCheck.data.length > 0),
     });
   };
 

@@ -98,13 +98,13 @@ const TasksWidget = ({ user, venueId }: TasksWidgetProps) => {
         .select("id")
         .eq("venue_id", venueId)
         .eq("report_date", today)
-        .maybeSingle(),
+        .limit(1),
       supabase
         .from("closing_photos")
         .select("id")
         .eq("venue_id", venueId)
         .eq("photo_date", today)
-        .maybeSingle(),
+        .limit(1),
     ]);
 
     // Stock is only considered reported if ALL items have been updated today
@@ -124,8 +124,8 @@ const TasksWidget = ({ user, venueId }: TasksWidgetProps) => {
 
     setTasks({
       stockReported,
-      salesReported: !!salesCheck.data,
-      closingPhoto: !!closingCheck.data,
+      salesReported: !!(salesCheck.data && salesCheck.data.length > 0),
+      closingPhoto: !!(closingCheck.data && closingCheck.data.length > 0),
     });
   };
 
