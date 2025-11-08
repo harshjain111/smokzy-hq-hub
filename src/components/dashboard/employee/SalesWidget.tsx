@@ -45,11 +45,17 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
   const checkTaskStatus = async () => {
     const today = format(new Date(), "yyyy-MM-dd");
 
-    const [stockCheck, closingCheck] = await Promise.all([
+    const [stockCheck, salesCheck, closingCheck] = await Promise.all([
       supabase
         .from("stock")
         .select("id, quantity, created_at, updated_at")
         .eq("venue_id", venueId),
+      supabase
+        .from("sales_reports")
+        .select("id")
+        .eq("venue_id", venueId)
+        .eq("report_date", today)
+        .limit(1),
       supabase
         .from("closing_photos")
         .select("id")
@@ -69,7 +75,7 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
 
     setTaskStatus({
       stockReported,
-      salesReported: true, // This is already completed since we're in SalesWidget
+      salesReported: !!(salesCheck.data && salesCheck.data.length > 0),
       closingPhoto: !!(closingCheck.data && closingCheck.data.length > 0),
     });
   };

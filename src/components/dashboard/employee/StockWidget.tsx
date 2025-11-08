@@ -59,7 +59,11 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
   const checkTaskStatus = async () => {
     const today = format(new Date(), "yyyy-MM-dd");
 
-    const [salesCheck, closingCheck] = await Promise.all([
+    const [stockCheck, salesCheck, closingCheck] = await Promise.all([
+      supabase
+        .from("stock")
+        .select("id, quantity, created_at, updated_at")
+        .eq("venue_id", venueId),
       supabase
         .from("sales_reports")
         .select("id")
@@ -74,8 +78,17 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
         .limit(1),
     ]);
 
+    let stockReported = false;
+    if (stockCheck.data && stockCheck.data.length > 0) {
+      const todayDate = format(new Date(), "yyyy-MM-dd");
+      stockReported = stockCheck.data.every((item: any) => {
+        const itemUpdateDate = format(new Date(item.updated_at), "yyyy-MM-dd");
+        return itemUpdateDate === todayDate && item.updated_at !== item.created_at;
+      });
+    }
+
     setTaskStatus({
-      stockReported: allItemsUpdatedToday,
+      stockReported,
       salesReported: !!(salesCheck.data && salesCheck.data.length > 0),
       closingPhoto: !!(closingCheck.data && closingCheck.data.length > 0),
     });

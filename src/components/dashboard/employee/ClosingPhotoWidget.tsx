@@ -27,6 +27,7 @@ const ClosingPhotoWidget = ({ user, venueId }: ClosingPhotoWidgetProps) => {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [showPhotoAppreciation, setShowPhotoAppreciation] = useState(false);
   const [isCameraActive, setIsCameraActive] = useState(false);
+  const [photoUploaded, setPhotoUploaded] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [taskStatus, setTaskStatus] = useState<TaskStatus>({
@@ -37,12 +38,25 @@ const ClosingPhotoWidget = ({ user, venueId }: ClosingPhotoWidgetProps) => {
 
   useEffect(() => {
     checkTaskStatus();
+    checkPhotoStatus();
   }, [venueId]);
+
+  const checkPhotoStatus = async () => {
+    const today = format(new Date(), "yyyy-MM-dd");
+    const { data } = await supabase
+      .from("closing_photos")
+      .select("id")
+      .eq("venue_id", venueId)
+      .eq("photo_date", today)
+      .limit(1);
+
+    setPhotoUploaded(!!(data && data.length > 0));
+  };
 
   const checkTaskStatus = async () => {
     const today = format(new Date(), "yyyy-MM-dd");
 
-    const [stockCheck, salesCheck] = await Promise.all([
+    const [stockCheck, salesCheck, closingCheck] = await Promise.all([
       supabase
         .from("stock")
         .select("id, quantity, created_at, updated_at")
@@ -52,6 +66,12 @@ const ClosingPhotoWidget = ({ user, venueId }: ClosingPhotoWidgetProps) => {
         .select("id")
         .eq("venue_id", venueId)
         .eq("report_date", today)
+        .limit(1),
+      supabase
+        .from("closing_photos")
+        .select("id")
+        .eq("venue_id", venueId)
+        .eq("photo_date", today)
         .limit(1),
     ]);
 
@@ -67,7 +87,7 @@ const ClosingPhotoWidget = ({ user, venueId }: ClosingPhotoWidgetProps) => {
     setTaskStatus({
       stockReported,
       salesReported: !!(salesCheck.data && salesCheck.data.length > 0),
-      closingPhoto: true, // This is already completed since we're in ClosingPhotoWidget
+      closingPhoto: !!(closingCheck.data && closingCheck.data.length > 0),
     });
   };
 
@@ -189,7 +209,9 @@ const ClosingPhotoWidget = ({ user, venueId }: ClosingPhotoWidgetProps) => {
       setPhotoBlob(null);
       setPhotoPreview(null);
       setPhotoOpen(false);
+      setPhotoUploaded(true);
       setShowPhotoAppreciation(true);
+      checkTaskStatus(); // Refresh task status
     } catch (error) {
       toast.error("Failed to upload photo");
       console.error(error);
@@ -204,16 +226,27 @@ const ClosingPhotoWidget = ({ user, venueId }: ClosingPhotoWidgetProps) => {
             <Camera className="h-5 w-5" />
             Closing Photo
           </CardTitle>
-          <CardDescription>Upload photo of the cleaned counter</CardDescription>
+          <CardDescription>
+            {photoUploaded 
+              ? "Closing photo uploaded for today ✓" 
+              : "Upload photo of the cleaned counter"}
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <Dialog open={photoOpen} onOpenChange={setPhotoOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" className="w-full">
-                <Camera className="mr-2 h-4 w-4" />
-                Upload Closing Photo
-              </Button>
-            </DialogTrigger>
+          {photoUploaded ? (
+            <div className="text-center py-6 space-y-2">
+              <div className="text-4xl">✓</div>
+              <p className="text-sm font-medium text-foreground">Photo Uploaded</p>
+              <p className="text-xs text-muted-foreground">Your team has uploaded the closing photo for today</p>
+            </div>
+          ) : (
+            <Dialog open={photoOpen} onOpenChange={setPhotoOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="w-full">
+                  <Camera className="mr-2 h-4 w-4" />
+                  Upload Closing Photo
+                </Button>
+              </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Capture Closing Photo</DialogTitle>
@@ -271,6 +304,7 @@ const ClosingPhotoWidget = ({ user, venueId }: ClosingPhotoWidgetProps) => {
               </div>
             </DialogContent>
           </Dialog>
+          )}
         </CardContent>
       </Card>
 
