@@ -162,12 +162,23 @@ export default function AttendanceReport() {
 
         // Create signed URLs for private bucket images
         const enrichedData = await Promise.all(attendanceRecords.map(async (record) => {
-          const checkInUrl = record.check_in_selfie_url
-            ? (await supabase.storage.from('attendance-photos').createSignedUrl(record.check_in_selfie_url, 3600)).data?.signedUrl
+          // Extract file path from URL (remove the base URL part)
+          const extractPath = (url: string | null) => {
+            if (!url) return null;
+            const match = url.match(/\/attendance-photos\/(.+)$/);
+            return match ? match[1] : null;
+          };
+
+          const checkInPath = extractPath(record.check_in_selfie_url);
+          const checkOutPath = extractPath(record.check_out_selfie_url);
+
+          const checkInUrl = checkInPath
+            ? (await supabase.storage.from('attendance-photos').createSignedUrl(checkInPath, 3600)).data?.signedUrl
             : null;
-          const checkOutUrl = record.check_out_selfie_url
-            ? (await supabase.storage.from('attendance-photos').createSignedUrl(record.check_out_selfie_url, 3600)).data?.signedUrl
+          const checkOutUrl = checkOutPath
+            ? (await supabase.storage.from('attendance-photos').createSignedUrl(checkOutPath, 3600)).data?.signedUrl
             : null;
+
           return {
             ...record,
             profiles: profilesMap.get(record.user_id) || null,

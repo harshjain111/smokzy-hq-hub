@@ -2,11 +2,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CalendarIcon, Download, ImageIcon, MapPin } from "lucide-react";
+import { Building2, Calendar, User, ImageIcon } from "lucide-react";
 import { format } from "date-fns";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import PageLayout from "@/components/PageLayout";
 
 interface PhotoRecord {
@@ -20,179 +17,309 @@ interface PhotoRecord {
   signed_url?: string | null;
 }
 
+interface VenueOverview {
+  venue_id: string;
+  venue_name: string;
+  latest_photo: PhotoRecord | null;
+  photo_count: number;
+}
+
 export default function CounterPictures() {
-  const [dateRangeType, setDateRangeType] = useState<"current" | "last" | "custom">("current");
-  const [customRange, setCustomRange] = useState<{ from: Date; to: Date } | null>(null);
-  const [venue, setVenue] = useState<string>("all");
-  const [venues, setVenues] = useState<any[]>([]);
-  const [photos, setPhotos] = useState<PhotoRecord[]>([]);
+  const [view, setView] = useState<"overview" | string>("overview");
+  const [overviewData, setOverviewData] = useState<VenueOverview[]>([]);
+  const [venuePhotos, setVenuePhotos] = useState<PhotoRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    (async () => {
-      const { data } = await supabase.from("venues").select("id, name").order("name");
-      setVenues(data || []);
-    })();
-  }, []);
-
-  useEffect(() => {
-    fetchPhotos();
-  }, [dateRangeType, customRange, venue]);
-
-  const getDateRange = () => {
-    const now = new Date();
-    if (dateRangeType === "current") {
-      return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: new Date(now.getFullYear(), now.getMonth() + 1, 0) };
+    if (view === "overview") {
+      fetchOverview();
+    } else {
+      fetchVenuePhotos(view);
     }
-    if (dateRangeType === "last") {
-      return { from: new Date(now.getFullYear(), now.getMonth() - 1, 1), to: new Date(now.getFullYear(), now.getMonth(), 0) };
-    }
-    return customRange || { from: now, to: now };
-  };
+  }, [view]);
 
-  const fetchPhotos = async () => {
+  const fetchOverview = async () => {
     setLoading(true);
     try {
-      const range = getDateRange();
-      let query = supabase.from("closing_photos").select("*").gte("photo_date", format(range.from, "yyyy-MM-dd")).lte("photo_date", format(range.to, "yyyy-MM-dd")).order("photo_date", { ascending: false });
-      if (venue !== "all") query = query.eq("venue_id", venue);
-      const { data, error } = await query;
-      if (error) throw error;
+      const today = format(new Date(), "yyyy-MM-dd");
+      
+      // Get all venues
+      const { data: venues } = await supabase
+        .from("venues")
+        .select("id, name")
+        .order("name");
 
-      const venueIds = [...new Set((data || []).map((r) => r.venue_id))];
-      const userIds = [...new Set((data || []).map((r) => r.uploaded_by))];
-      const [venuesRes, profilesRes] = await Promise.all([
-        supabase.from("venues").select("id, name").in("id", venueIds),
-        supabase.from("profiles").select("id, full_name").in("id", userIds),
-      ]);
-      const venuesMap = new Map(venuesRes.data?.map((v) => [v.id, v]) || []);
-      const profilesMap = new Map(profilesRes.data?.map((p) => [p.id, p]) || []);
+      if (!venues) {
+        setOverviewData([]);
+        return;
+      }
 
-      const withSigned = await Promise.all((data || []).map(async (r) => ({
-        ...r,
-        venues: venuesMap.get(r.venue_id) || null,
-        profiles: profilesMap.get(r.uploaded_by) || null,
-        signed_url: r.photo_url ? (await supabase.storage.from("closing-photos").createSignedUrl(r.photo_url, 3600)).data?.signedUrl || null : null,
-      })));
+      // For each venue, get today's latest photo
+      const overviews = await Promise.all(
+        venues.map(async (venue) => {
+          const { data: photos } = await supabase
+            .from("closing_photos")
+            .select("*")
+            .eq("venue_id", venue.id)
+            .eq("photo_date", today)
+            .order("created_at", { ascending: false })
+            .limit(1);
 
-      setPhotos(withSigned);
-    } catch (e) {
-      console.error(e);
+          const latestPhoto = photos?.[0] || null;
+
+          // Get count of photos from last 30 days
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          
+          const { count } = await supabase
+            .from("closing_photos")
+            .select("*", { count: "exact", head: true })
+            .eq("venue_id", venue.id)
+            .gte("photo_date", format(thirtyDaysAgo, "yyyy-MM-dd"));
+
+          // If there's a photo, fetch uploader info and create signed URL
+          let enrichedPhoto = null;
+          if (latestPhoto) {
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("full_name")
+              .eq("id", latestPhoto.uploaded_by)
+              .single();
+
+            // Extract file path from URL
+            const extractPath = (url: string | null) => {
+              if (!url) return null;
+              const match = url.match(/\/closing-photos\/(.+)$/);
+              return match ? match[1] : null;
+            };
+
+            const photoPath = extractPath(latestPhoto.photo_url);
+            const signedUrl = photoPath
+              ? (await supabase.storage.from("closing-photos").createSignedUrl(photoPath, 3600)).data?.signedUrl
+              : null;
+
+            enrichedPhoto = {
+              ...latestPhoto,
+              profiles: profile,
+              venues: { name: venue.name },
+              signed_url: signedUrl,
+            };
+          }
+
+          return {
+            venue_id: venue.id,
+            venue_name: venue.name,
+            latest_photo: enrichedPhoto,
+            photo_count: count || 0,
+          };
+        })
+      );
+
+      setOverviewData(overviews);
+    } catch (error) {
+      console.error("Error fetching overview:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const exportCsv = () => {
-    const headers = ["Date", "Venue", "Uploaded By", "Photo Present"]; 
-    const rows = photos.map((p) => [p.photo_date, p.venues?.name || "N/A", p.profiles?.full_name || "N/A", p.photo_url ? "Yes" : "No"]);
-    const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `counter-pictures-${format(new Date(), "yyyy-MM-dd")}.csv`;
-    link.click();
+  const fetchVenuePhotos = async (venueId: string) => {
+    setLoading(true);
+    try {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      const { data: photos, error } = await supabase
+        .from("closing_photos")
+        .select("*")
+        .eq("venue_id", venueId)
+        .gte("photo_date", format(thirtyDaysAgo, "yyyy-MM-dd"))
+        .order("photo_date", { ascending: false });
+
+      if (error) throw error;
+
+      // Fetch venue and uploader info
+      const userIds = [...new Set((photos || []).map((p) => p.uploaded_by))];
+      const [venueRes, profilesRes] = await Promise.all([
+        supabase.from("venues").select("id, name").eq("id", venueId).single(),
+        supabase.from("profiles").select("id, full_name").in("id", userIds),
+      ]);
+
+      const profilesMap = new Map(profilesRes.data?.map((p) => [p.id, p]) || []);
+
+      // Extract file path helper
+      const extractPath = (url: string | null) => {
+        if (!url) return null;
+        const match = url.match(/\/closing-photos\/(.+)$/);
+        return match ? match[1] : null;
+      };
+
+      const enrichedPhotos = await Promise.all(
+        (photos || []).map(async (photo) => {
+          const photoPath = extractPath(photo.photo_url);
+          const signedUrl = photoPath
+            ? (await supabase.storage.from("closing-photos").createSignedUrl(photoPath, 3600)).data?.signedUrl
+            : null;
+
+          return {
+            ...photo,
+            venues: venueRes.data,
+            profiles: profilesMap.get(photo.uploaded_by) || null,
+            signed_url: signedUrl,
+          };
+        })
+      );
+
+      setVenuePhotos(enrichedPhotos);
+    } catch (error) {
+      console.error("Error fetching venue photos:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <PageLayout title="Counter Pictures" subtitle="View executive-uploaded counter photos">
-      <div className="max-w-7xl mx-auto space-y-4 md:space-y-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-end gap-3">
-          <Button variant="outline" size="sm" onClick={exportCsv}>
-            <Download className="h-4 w-4 mr-2" /> Export CSV
+    <PageLayout title="Counter Pictures" subtitle="View daily counter photos from all venues">
+      <div className="space-y-6">
+        {/* Navigation */}
+        {view !== "overview" && (
+          <Button variant="outline" onClick={() => setView("overview")}>
+            ← Back to Overview
           </Button>
-        </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Filters</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-          <Select value={dateRangeType} onValueChange={(v: any) => setDateRangeType(v)}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select period" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="current">Current Month</SelectItem>
-              <SelectItem value="last">Last Month</SelectItem>
-              <SelectItem value="custom">Custom Range</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {dateRangeType === "custom" && (
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="w-full justify-start">
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {customRange?.from ? `${format(customRange.from, "MMM dd")} - ${format(customRange?.to || customRange.from, "MMM dd, yyyy")}` : "Pick range"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  initialFocus
-                  mode="range"
-                  selected={{ from: customRange?.from, to: customRange?.to }}
-                  onSelect={(range: any) => range?.from && range?.to && setCustomRange({ from: range.from, to: range.to })}
-                  numberOfMonths={2}
-                  className="pointer-events-auto"
-                />
-              </PopoverContent>
-            </Popover>
-          )}
-
-          <Select value={venue} onValueChange={setVenue}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="All Venues" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Venues</SelectItem>
-              {venues.map((v) => (
-                <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
-        {loading ? (
-          <div className="p-8 text-center">Loading...</div>
-        ) : photos.length === 0 ? (
-          <div className="p-8 text-center">No photos</div>
-        ) : (
-          photos.map((p) => (
-            <Card key={p.id}>
-              <CardHeader>
-                <CardTitle className="text-base">
-                  {p.venues?.name || "N/A"} • {format(new Date(p.photo_date), "MMM dd, yyyy")}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {p.signed_url ? (
-                  <img
-                    src={p.signed_url}
-                    alt="Counter"
-                    className="w-full h-48 object-cover rounded border"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="%23ddd"/><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="%23999">No Image</text></svg>';
-                    }}
-                  />
-                ) : (
-                  <div className="w-full h-48 flex items-center justify-center border rounded bg-muted">
-                    <ImageIcon className="h-8 w-8 text-muted-foreground" />
-                  </div>
-                )}
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <MapPin className="h-3 w-3" />
-                  <span>Uploaded by {p.profiles?.full_name || "Unknown"}</span>
-                </div>
-              </CardContent>
-            </Card>
-          ))
         )}
-      </div>
+
+        {loading ? (
+          <div className="p-12 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading photos...</p>
+          </div>
+        ) : view === "overview" ? (
+          /* Overview View - Today's Photos */
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Today's Counter Photos</h2>
+              <div className="text-sm text-muted-foreground">
+                {format(new Date(), "EEEE, MMMM dd, yyyy")}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {overviewData.map((venue) => (
+                <Card key={venue.venue_id} className="overflow-hidden hover:shadow-lg transition-shadow">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center justify-between text-lg">
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-5 w-5 text-primary" />
+                        <span>{venue.venue_name}</span>
+                      </div>
+                      <span className="text-sm font-normal text-muted-foreground">
+                        {venue.photo_count} photos (30d)
+                      </span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {venue.latest_photo ? (
+                      <>
+                        <div className="relative aspect-video w-full overflow-hidden rounded-lg border bg-muted">
+                          {venue.latest_photo.signed_url ? (
+                            <img
+                              src={venue.latest_photo.signed_url}
+                              alt={`${venue.venue_name} counter`}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                e.currentTarget.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300"><rect width="400" height="300" fill="%23ddd"/><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="%23999" font-size="20">No Image</text></svg>';
+                              }}
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <ImageIcon className="h-12 w-12 text-muted-foreground" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <User className="h-4 w-4" />
+                          <span>{venue.latest_photo.profiles?.full_name || "Unknown"}</span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="aspect-video w-full flex flex-col items-center justify-center bg-muted rounded-lg border border-dashed">
+                        <ImageIcon className="h-12 w-12 text-muted-foreground mb-2" />
+                        <p className="text-sm text-muted-foreground">No photo uploaded today</p>
+                      </div>
+                    )}
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => setView(venue.venue_id)}
+                    >
+                      View All Photos ({venue.photo_count})
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+
+              {overviewData.length === 0 && (
+                <div className="col-span-full p-12 text-center">
+                  <p className="text-muted-foreground">No venues found</p>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          /* Venue Detail View - Last 30 Days */
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold">
+                {venuePhotos[0]?.venues?.name || "Venue"} - Last 30 Days
+              </h2>
+              <div className="text-sm text-muted-foreground">
+                {venuePhotos.length} photos
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {venuePhotos.map((photo) => (
+                <Card key={photo.id} className="overflow-hidden">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-primary" />
+                      {format(new Date(photo.photo_date), "MMM dd, yyyy")}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <div className="relative aspect-video w-full overflow-hidden rounded border bg-muted">
+                      {photo.signed_url ? (
+                        <img
+                          src={photo.signed_url}
+                          alt="Counter"
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300"><rect width="400" height="300" fill="%23ddd"/><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="%23999" font-size="16">No Image</text></svg>';
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <User className="h-3 w-3" />
+                      <span className="truncate">{photo.profiles?.full_name || "Unknown"}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+
+              {venuePhotos.length === 0 && (
+                <div className="col-span-full p-12 text-center">
+                  <p className="text-muted-foreground">No photos found for this venue</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </PageLayout>
   );
-};
+}
