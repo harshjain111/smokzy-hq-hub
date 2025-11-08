@@ -226,14 +226,173 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
-        <Dialog open={addItemOpen} onOpenChange={setAddItemOpen}>
-          <DialogTrigger asChild>
-            <Button className="flex-1">
-              <Plus className="mr-2 h-4 w-4" />
-              Register New Item
-            </Button>
-          </DialogTrigger>
+      {allItemsUpdatedToday ? (
+        <Card className="border-primary/50 bg-primary/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5 text-primary" />
+              Today's Stock Updated ✓
+            </CardTitle>
+            <CardDescription>Your team has updated all stock items for today</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="text-sm text-muted-foreground">
+              All {stock.length} items have been counted and updated
+            </div>
+            <Dialog open={updateStockOpen} onOpenChange={setUpdateStockOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="w-full" onClick={handleOpenUpdateStock}>
+                  <Package className="mr-2 h-4 w-4" />
+                  Edit Stock Quantities
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Edit Today's Stock Quantities</DialogTitle>
+                  <DialogDescription>Modify the stock quantities entered earlier today</DialogDescription>
+                </DialogHeader>
+                
+                <div className="space-y-6">
+                  {/* Flavours Section */}
+                  {stock.filter(item => item.category === 'flavour').length > 0 && (
+                    <div className="space-y-2">
+                      <h3 className="text-lg font-semibold">Flavours</h3>
+                      <div className="border rounded-lg overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-muted/50">
+                              <TableHead className="w-[40%]">Item Name</TableHead>
+                              <TableHead className="w-[30%]">Current Stock</TableHead>
+                              <TableHead className="w-[30%]">Update To</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {stock.filter(item => item.category === 'flavour').map((item) => (
+                              <TableRow key={item.id}>
+                                <TableCell className="font-medium">{item.item_name}</TableCell>
+                                <TableCell className="text-muted-foreground">{item.quantity} {item.unit}</TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    placeholder={item.quantity.toString()}
+                                    value={stockUpdates[item.id] || ""}
+                                    onChange={(e) => setStockUpdates(prev => ({
+                                      ...prev,
+                                      [item.id]: e.target.value
+                                    }))}
+                                    className="w-full"
+                                  />
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Hookah Pots Section */}
+                  {stock.filter(item => item.category === 'hookah_pots').length > 0 && (
+                    <div className="space-y-2">
+                      <h3 className="text-lg font-semibold">Hookah Pots</h3>
+                      <div className="border rounded-lg overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-muted/50">
+                              <TableHead className="w-[40%]">Item Name</TableHead>
+                              <TableHead className="w-[30%]">Current Stock</TableHead>
+                              <TableHead className="w-[30%]">Update To</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {stock.filter(item => item.category === 'hookah_pots').map((item) => (
+                              <TableRow key={item.id}>
+                                <TableCell className="font-medium">{item.item_name}</TableCell>
+                                <TableCell className="text-muted-foreground">{item.quantity} {item.unit}</TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    placeholder={item.quantity.toString()}
+                                    value={stockUpdates[item.id] || ""}
+                                    onChange={(e) => setStockUpdates(prev => ({
+                                      ...prev,
+                                      [item.id]: e.target.value
+                                    }))}
+                                    className="w-full"
+                                  />
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Accessories Section */}
+                  {stock.filter(item => item.category === 'accessories').length > 0 && (
+                    <div className="space-y-2">
+                      <h3 className="text-lg font-semibold">Accessories</h3>
+                      <div className="border rounded-lg overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-muted/50">
+                              <TableHead className="w-[40%]">Item Name</TableHead>
+                              <TableHead className="w-[30%]">Current Stock</TableHead>
+                              <TableHead className="w-[30%]">Update To</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {stock.filter(item => item.category === 'accessories').map((item) => (
+                              <TableRow key={item.id}>
+                                <TableCell className="font-medium">{item.item_name}</TableCell>
+                                <TableCell className="text-muted-foreground">{item.quantity} {item.unit}</TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    placeholder={item.quantity.toString()}
+                                    value={stockUpdates[item.id] || ""}
+                                    onChange={(e) => setStockUpdates(prev => ({
+                                      ...prev,
+                                      [item.id]: e.target.value
+                                    }))}
+                                    className="w-full"
+                                  />
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-2 pt-4">
+                  <Button type="button" onClick={handleUpdateStock} className="flex-1">
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Changes
+                  </Button>
+                  <Button type="button" variant="outline" onClick={() => setUpdateStockOpen(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="flex gap-2">
+          <Dialog open={addItemOpen} onOpenChange={setAddItemOpen}>
+            <DialogTrigger asChild>
+              <Button className="flex-1">
+                <Plus className="mr-2 h-4 w-4" />
+                Register New Item
+              </Button>
+            </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Register Stock Item</DialogTitle>
@@ -295,7 +454,7 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
           <DialogTrigger asChild>
             <Button variant="outline" className="flex-1" onClick={handleOpenUpdateStock}>
               <Package className="mr-2 h-4 w-4" />
-              {allItemsUpdatedToday ? "Edit Today's Stock" : "Update Stock"}
+              Update Stock
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">

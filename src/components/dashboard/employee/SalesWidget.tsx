@@ -25,11 +25,13 @@ interface TaskStatus {
 
 const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
   const [open, setOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [categoryId, setCategoryId] = useState("");
   const [quantity, setQuantity] = useState("");
   const [todaySales, setTodaySales] = useState<any[]>([]);
   const [hookahCategories, setHookahCategories] = useState<{ id: string; name: string }[]>([]);
   const [showSalesAppreciation, setShowSalesAppreciation] = useState(false);
+  const [editingSale, setEditingSale] = useState<any>(null);
   const [taskStatus, setTaskStatus] = useState<TaskStatus>({
     stockReported: false,
     salesReported: false,
@@ -136,26 +138,136 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
     }
   };
 
+  const handleEditSale = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!editingSale) return;
+
+    const { error } = await supabase
+      .from("sales_reports")
+      .update({ quantity_sold: parseInt(quantity) })
+      .eq("id", editingSale.id);
+
+    if (error) {
+      toast.error("Failed to update sales");
+      console.error(error);
+    } else {
+      toast.success("Sales updated successfully");
+      setQuantity("");
+      setEditOpen(false);
+      setEditingSale(null);
+      fetchTodaySales();
+      checkTaskStatus();
+    }
+  };
+
+  const openEditDialog = (sale: any) => {
+    setEditingSale(sale);
+    setQuantity(sale.quantity_sold.toString());
+    setEditOpen(true);
+  };
+
   const totalSales = todaySales.reduce((sum, sale) => sum + sale.quantity_sold, 0);
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-success" />
-            Report Sales
-          </CardTitle>
-          <CardDescription>Submit today's sales by category</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button className="w-full">
-                <Plus className="mr-2 h-4 w-4" />
-                Report Sales
-              </Button>
-            </DialogTrigger>
+      {todaySales.length > 0 ? (
+        <Card className="border-primary/50 bg-primary/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              Today's Sales Reported ✓
+            </CardTitle>
+            <CardDescription>Your team has reported sales for today</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <div className="text-sm font-medium">Total Sales: {totalSales} hookahs</div>
+              <div className="space-y-2">
+                {todaySales.map((sale) => (
+                  <div key={sale.id} className="flex items-center justify-between p-2 border rounded-lg">
+                    <div>
+                      <div className="font-medium">{sale.venue_hookah_categories?.category_name}</div>
+                      <div className="text-sm text-muted-foreground">{sale.quantity_sold} sold</div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openEditDialog(sale)}
+                    >
+                      Edit
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="w-full">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add More Sales
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Report Additional Sales</DialogTitle>
+                  <DialogDescription>Add sales for another category</DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleSubmitSales} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="category">Hookah Category</Label>
+                    {hookahCategories.length > 0 ? (
+                      <Select value={categoryId} onValueChange={setCategoryId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-background z-50">
+                          {hookahCategories.map((cat) => (
+                            <SelectItem key={cat.id} value={cat.id}>
+                              {cat.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No categories available</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="quantity">Quantity Sold</Label>
+                    <Input
+                      id="quantity"
+                      type="number"
+                      min="0"
+                      placeholder="Enter quantity"
+                      value={quantity}
+                      onChange={(e) => setQuantity(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <Button type="submit" className="w-full">Submit Sales</Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-success" />
+              Report Sales
+            </CardTitle>
+            <CardDescription>Submit today's sales by category</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild>
+                <Button className="w-full">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Report Sales
+                </Button>
+              </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Report Daily Sales</DialogTitle>
