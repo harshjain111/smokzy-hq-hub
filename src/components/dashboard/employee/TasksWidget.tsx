@@ -25,9 +25,9 @@ const TasksWidget = ({ user, venueId }: TasksWidgetProps) => {
   useEffect(() => {
     checkTaskStatus();
     
-    // Set up realtime subscription to refresh when stock is updated
-    const channel = supabase
-      .channel('stock-updates')
+    // Set up realtime subscriptions for all task-related tables
+    const stockChannel = supabase
+      .channel('stock-updates-tasks')
       .on(
         'postgres_changes',
         {
@@ -37,13 +37,50 @@ const TasksWidget = ({ user, venueId }: TasksWidgetProps) => {
           filter: `venue_id=eq.${venueId}`
         },
         () => {
+          console.log('Stock updated - refreshing tasks');
+          checkTaskStatus();
+        }
+      )
+      .subscribe();
+
+    const salesChannel = supabase
+      .channel('sales-updates-tasks')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'sales_reports',
+          filter: `venue_id=eq.${venueId}`
+        },
+        () => {
+          console.log('Sales reported - refreshing tasks');
+          checkTaskStatus();
+        }
+      )
+      .subscribe();
+
+    const closingPhotoChannel = supabase
+      .channel('closing-photo-updates-tasks')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'closing_photos',
+          filter: `venue_id=eq.${venueId}`
+        },
+        () => {
+          console.log('Closing photo uploaded - refreshing tasks');
           checkTaskStatus();
         }
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(stockChannel);
+      supabase.removeChannel(salesChannel);
+      supabase.removeChannel(closingPhotoChannel);
     };
   }, [venueId]);
 

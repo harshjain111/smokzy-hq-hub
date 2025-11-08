@@ -34,7 +34,65 @@ const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
   useEffect(() => {
     fetchTodayAttendance();
     checkTaskStatus();
-  }, []);
+
+    // Set up realtime subscriptions to refresh task status
+    const stockChannel = supabase
+      .channel('stock-updates-attendance')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'stock',
+          filter: `venue_id=eq.${venueId}`
+        },
+        () => {
+          console.log('Stock updated - refreshing attendance tasks');
+          checkTaskStatus();
+        }
+      )
+      .subscribe();
+
+    const salesChannel = supabase
+      .channel('sales-updates-attendance')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'sales_reports',
+          filter: `venue_id=eq.${venueId}`
+        },
+        () => {
+          console.log('Sales reported - refreshing attendance tasks');
+          checkTaskStatus();
+        }
+      )
+      .subscribe();
+
+    const closingPhotoChannel = supabase
+      .channel('closing-photo-updates-attendance')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'closing_photos',
+          filter: `venue_id=eq.${venueId}`
+        },
+        () => {
+          console.log('Closing photo uploaded - refreshing attendance tasks');
+          checkTaskStatus();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(stockChannel);
+      supabase.removeChannel(salesChannel);
+      supabase.removeChannel(closingPhotoChannel);
+    };
+  }, [venueId]);
 
   const fetchTodayAttendance = async () => {
     const today = format(new Date(), "yyyy-MM-dd");
