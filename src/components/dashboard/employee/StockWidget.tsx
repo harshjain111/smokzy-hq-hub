@@ -455,27 +455,24 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
         </Dialog>
       </div>
 
-      <div className="grid gap-3">
+      <div className="grid gap-2">
         {stock.map((item) => (
           <Card key={item.id} className={item.quantity <= item.low_stock_threshold ? "border-warning" : ""}>
-            <CardHeader className="pb-3">
+            <CardContent className="p-3">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
-                  <CardTitle className="text-base">{item.item_name}</CardTitle>
-                  <p className="text-xs text-muted-foreground capitalize mt-1">{item.category.replace('_', ' ')}</p>
+                  <div className="flex items-center gap-2 mb-1">
+                    <Package className="h-3.5 w-3.5 text-muted-foreground" />
+                    <h4 className="font-semibold text-sm">{item.item_name}</h4>
+                  </div>
+                  <p className="text-xs text-muted-foreground capitalize">{item.category.replace('_', ' ')}</p>
                 </div>
-                <Package className="h-4 w-4 text-muted-foreground" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="text-2xl font-bold">{item.quantity}</p>
-                  <p className="text-sm text-muted-foreground">{item.unit}</p>
+                <div className="text-right">
+                  <p className="text-xl font-bold">{item.quantity} {item.unit}</p>
+                  {item.quantity <= item.low_stock_threshold && (
+                    <span className="text-warning text-xs font-medium">Low Stock</span>
+                  )}
                 </div>
-                {item.quantity <= item.low_stock_threshold && (
-                  <div className="text-warning text-sm font-medium">Low Stock</div>
-                )}
               </div>
             </CardContent>
           </Card>
