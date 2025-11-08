@@ -8,12 +8,32 @@ import { LogOut } from "lucide-react";
 import { toast } from "sonner";
 import AdminDashboard from "@/components/dashboard/AdminDashboard";
 import EmployeeDashboard from "@/components/dashboard/EmployeeDashboard";
+import ProfileMenu from "@/components/ProfileMenu";
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [initializing, setInitializing] = useState(true);
+  const [venueName, setVenueName] = useState<string>("");
   const { userRole, loading } = useUserRole(user);
+
+  useEffect(() => {
+    if (userRole?.venueId) {
+      fetchVenueName(userRole.venueId);
+    }
+  }, [userRole?.venueId]);
+
+  const fetchVenueName = async (venueId: string) => {
+    const { data } = await supabase
+      .from("venues")
+      .select("name")
+      .eq("id", venueId)
+      .single();
+
+    if (data?.name) {
+      setVenueName(data.name);
+    }
+  };
 
   useEffect(() => {
     // Check session first before rendering anything
@@ -90,13 +110,10 @@ const Dashboard = () => {
           <div>
             <h1 className="text-2xl font-bold text-primary">Smokzy Operations</h1>
             <p className="text-sm text-muted-foreground">
-              {userRole.role === "admin" ? "Admin Dashboard" : "Employee Portal"}
+              {userRole.role === "admin" ? "Admin Dashboard" : venueName || "Loading..."}
             </p>
           </div>
-          <Button onClick={handleLogout} variant="outline" size="sm">
-            <LogOut className="mr-2 h-4 w-4" />
-            Logout
-          </Button>
+          <ProfileMenu user={user!} role={userRole.role} />
         </div>
       </header>
 
