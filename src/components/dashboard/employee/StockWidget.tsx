@@ -385,10 +385,11 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
           </CardContent>
         </Card>
       ) : (
-        <div className="flex gap-2">
+        <div className="space-y-3">
+          {/* Register New Item Button - Full Width at Top */}
           <Dialog open={addItemOpen} onOpenChange={setAddItemOpen}>
             <DialogTrigger asChild>
-              <Button className="flex-1">
+              <Button className="w-full">
                 <Plus className="mr-2 h-4 w-4" />
                 Register New Item
               </Button>
@@ -450,23 +451,24 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
             </DialogContent>
           </Dialog>
 
-          <Dialog open={updateStockOpen} onOpenChange={setUpdateStockOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" className="flex-1" onClick={handleOpenUpdateStock}>
-                <Package className="mr-2 h-4 w-4" />
-                Update Stock
-              </Button>
-            </DialogTrigger>
-            {/* ... rest of update dialog content stays the same ... */}
-          </Dialog>
+          {/* Update Stock and Report Breakage - Side by Side */}
+          <div className="grid grid-cols-2 gap-2">
+            <Dialog open={updateStockOpen} onOpenChange={setUpdateStockOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="w-full" onClick={handleOpenUpdateStock}>
+                  <Package className="mr-2 h-4 w-4" />
+                  Update Stock
+                </Button>
+              </DialogTrigger>
+            </Dialog>
 
-          <Dialog open={breakageOpen} onOpenChange={setBreakageOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" className="flex-1">
-                <AlertTriangle className="mr-2 h-4 w-4" />
-                Report Breakage
-              </Button>
-            </DialogTrigger>
+            <Dialog open={breakageOpen} onOpenChange={setBreakageOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="w-full">
+                  <AlertTriangle className="mr-2 h-4 w-4" />
+                  Report Breakage
+                </Button>
+              </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Report Breakage</DialogTitle>
@@ -505,7 +507,8 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
                 <Button type="submit" className="w-full">Submit Report</Button>
               </form>
             </DialogContent>
-          </Dialog>
+            </Dialog>
+          </div>
         </div>
       )}
 
