@@ -1,14 +1,16 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, AlertTriangle, TrendingUp, Activity } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Users, AlertTriangle, TrendingUp, Activity, FileText, Camera } from "lucide-react";
 import StockOverview from "@/components/dashboard/admin/StockOverview";
 import SalesReports from "@/components/dashboard/admin/SalesReports";
 import AttendanceOverview from "@/components/dashboard/admin/AttendanceOverview";
 import EmployeeActivityReport from "@/components/dashboard/admin/EmployeeActivityReport";
 import PageLayout from "@/components/PageLayout";
+import { format } from "date-fns";
 
 interface VenueStats {
   totalEmployees: number;
@@ -19,7 +21,9 @@ interface VenueStats {
 
 const VenueDetail = () => {
   const { venueId } = useParams();
+  const navigate = useNavigate();
   const [venueName, setVenueName] = useState("");
+  const [counterPhoto, setCounterPhoto] = useState<string | null>(null);
   const [stats, setStats] = useState<VenueStats>({
     totalEmployees: 0,
     lowStockCount: 0,
@@ -31,6 +35,7 @@ const VenueDetail = () => {
     if (venueId) {
       fetchVenueDetails();
       fetchVenueStats();
+      fetchCounterPhoto();
     }
   }, [venueId]);
 
@@ -43,6 +48,32 @@ const VenueDetail = () => {
 
     if (data) {
       setVenueName(data.name);
+    }
+  };
+
+  const fetchCounterPhoto = async () => {
+    const today = format(new Date(), "yyyy-MM-dd");
+    const { data } = await supabase
+      .from("closing_photos")
+      .select("photo_url")
+      .eq("venue_id", venueId)
+      .eq("photo_date", today)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (data?.photo_url) {
+      // Extract file path from URL
+      const match = data.photo_url.match(/\/closing-photos\/(.+)$/);
+      const photoPath = match ? match[1] : null;
+      
+      if (photoPath) {
+        const { data: signedData } = await supabase.storage
+          .from("closing-photos")
+          .createSignedUrl(photoPath, 3600);
+        
+        setCounterPhoto(signedData?.signedUrl || null);
+      }
     }
   };
 
@@ -91,6 +122,42 @@ const VenueDetail = () => {
   return (
     <PageLayout title={venueName} subtitle="Detailed venue overview">
       <div className="space-y-6">
+        {/* Action Buttons */}
+        <div className="flex gap-3">
+          <Button onClick={() => navigate(`/venue/${venueId}/reports`)}>
+            <FileText className="mr-2 h-4 w-4" />
+            Detailed Reports
+          </Button>
+          <Button variant="outline" onClick={() => navigate("/counter-pictures")}>
+            <Camera className="mr-2 h-4 w-4" />
+            View All Counter Photos
+          </Button>
+        </div>
+
+        {/* Counter Photo Card */}
+        {counterPhoto && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Camera className="h-5 w-5" />
+                Today's Counter Photo
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="relative w-full max-w-2xl mx-auto">
+                <img
+                  src={counterPhoto}
+                  alt="Counter photo"
+                  className="w-full h-auto rounded-lg border"
+                  onError={(e) => {
+                    e.currentTarget.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rect width="800" height="600" fill="%23ddd"/><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="%23999" font-size="24">No Image</text></svg>';
+                  }}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>

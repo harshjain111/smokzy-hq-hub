@@ -9,6 +9,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import NotFound from "./pages/NotFound";
 import MyProfile from "./pages/MyProfile";
 import VenueDetail from "./pages/VenueDetail";
+import VenueReports from "./pages/VenueReports";
 import ManageVenues from "./pages/ManageVenues";
 import ManageEmployees from "./pages/ManageEmployees";
 import ManageCategories from "./pages/ManageCategories";
@@ -28,6 +29,7 @@ const App = () => (
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/venue/:venueId" element={<ProtectedRoute><VenueDetail /></ProtectedRoute>} />
+          <Route path="/venue/:venueId/reports" element={<ProtectedRoute><VenueReports /></ProtectedRoute>} />
           <Route path="/manage-venues" element={<ProtectedRoute><ManageVenues /></ProtectedRoute>} />
           <Route path="/manage-employees" element={<ProtectedRoute><ManageEmployees /></ProtectedRoute>} />
           <Route path="/manage-categories" element={<ProtectedRoute><ManageCategories /></ProtectedRoute>} />
