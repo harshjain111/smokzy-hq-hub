@@ -9,6 +9,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import { Package, Plus, AlertTriangle, Save } from "lucide-react";
+import { format } from "date-fns";
+import AppreciationDialog from "./AppreciationDialog";
 
 interface StockWidgetProps {
   venueId: string;
@@ -35,6 +37,8 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
   const [breakageItem, setBreakageItem] = useState("");
   const [breakageQuantity, setBreakageQuantity] = useState("");
   const [breakageCause, setBreakageCause] = useState("");
+  const [allItemsUpdatedToday, setAllItemsUpdatedToday] = useState(false);
+  const [showAppreciation, setShowAppreciation] = useState(false);
 
   useEffect(() => {
     fetchStock();
@@ -48,7 +52,40 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
       .order("category")
       .order("item_name");
 
-    setStock(data || []);
+    if (data) {
+      setStock(data);
+      checkIfAllItemsUpdatedToday(data);
+    }
+  };
+
+  const checkIfAllItemsUpdatedToday = (stockData: StockItem[]) => {
+    if (stockData.length === 0) {
+      setAllItemsUpdatedToday(false);
+      return;
+    }
+
+    const today = format(new Date(), "yyyy-MM-dd");
+    const allUpdated = stockData.every((item: any) => {
+      const itemUpdateDate = format(new Date(item.updated_at), "yyyy-MM-dd");
+      const itemCreateDate = format(new Date(item.created_at), "yyyy-MM-dd");
+      return itemUpdateDate === today && item.updated_at !== item.created_at;
+    });
+
+    setAllItemsUpdatedToday(allUpdated);
+  };
+
+  const handleOpenUpdateStock = () => {
+    // Pre-fill with current stock values if all items were updated today
+    if (allItemsUpdatedToday) {
+      const currentValues: Record<string, string> = {};
+      stock.forEach((item) => {
+        currentValues[item.id] = item.quantity.toString();
+      });
+      setStockUpdates(currentValues);
+    } else {
+      setStockUpdates({});
+    }
+    setUpdateStockOpen(true);
   };
 
   const handleAddStockItem = async (e: React.FormEvent) => {
@@ -98,7 +135,12 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
       toast.success(`Updated ${updates.length} item(s) successfully`);
       setStockUpdates({});
       setUpdateStockOpen(false);
-      fetchStock();
+      await fetchStock();
+      
+      // Show appreciation if all items were updated
+      if (updates.length === stock.length) {
+        setShowAppreciation(true);
+      }
     } catch (error) {
       toast.error("Failed to update stock");
       console.error(error);
@@ -199,15 +241,21 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
 
         <Dialog open={updateStockOpen} onOpenChange={setUpdateStockOpen}>
           <DialogTrigger asChild>
-            <Button variant="outline" className="flex-1">
+            <Button variant="outline" className="flex-1" onClick={handleOpenUpdateStock}>
               <Package className="mr-2 h-4 w-4" />
-              Update Stock
+              {allItemsUpdatedToday ? "Edit Today's Stock" : "Update Stock"}
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Update Stock Quantities</DialogTitle>
-              <DialogDescription>Enter the current stock quantity for each item (weighed/counted)</DialogDescription>
+              <DialogTitle>
+                {allItemsUpdatedToday ? "Edit Today's Stock Quantities" : "Update Stock Quantities"}
+              </DialogTitle>
+              <DialogDescription>
+                {allItemsUpdatedToday
+                  ? "Modify the stock quantities you entered earlier today"
+                  : "Enter the current stock quantity for each item (weighed/counted)"}
+              </DialogDescription>
             </DialogHeader>
             
             <div className="space-y-6">
@@ -441,6 +489,12 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
           </Card>
         )}
       </div>
+
+      <AppreciationDialog
+        open={showAppreciation}
+        onOpenChange={setShowAppreciation}
+        taskType="stock"
+      />
     </div>
   );
 };

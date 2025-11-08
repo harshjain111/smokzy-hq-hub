@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { toast } from "sonner";
 import { TrendingUp, Plus, Camera } from "lucide-react";
 import { format } from "date-fns";
+import AppreciationDialog from "./AppreciationDialog";
 
 interface SalesWidgetProps {
   user: User;
@@ -24,6 +25,8 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [todaySales, setTodaySales] = useState<any[]>([]);
   const [hookahCategories, setHookahCategories] = useState<{ id: string; name: string }[]>([]);
+  const [showSalesAppreciation, setShowSalesAppreciation] = useState(false);
+  const [showPhotoAppreciation, setShowPhotoAppreciation] = useState(false);
 
   useEffect(() => {
     fetchHookahCategories();
@@ -82,6 +85,7 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
       setQuantity("");
       setOpen(false);
       fetchTodaySales();
+      setShowSalesAppreciation(true);
     }
   };
 
@@ -118,8 +122,10 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
       toast.success("Closing photo uploaded successfully");
       setPhotoFile(null);
       setPhotoOpen(false);
-    } catch (error: any) {
-      toast.error(error.message || "Failed to upload photo");
+      setShowPhotoAppreciation(true);
+    } catch (error) {
+      toast.error("Failed to upload photo");
+      console.error(error);
     }
   };
 
@@ -236,6 +242,18 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
           ))}
         </div>
       )}
+
+      <AppreciationDialog
+        open={showSalesAppreciation}
+        onOpenChange={setShowSalesAppreciation}
+        taskType="sales"
+      />
+      
+      <AppreciationDialog
+        open={showPhotoAppreciation}
+        onOpenChange={setShowPhotoAppreciation}
+        taskType="photo"
+      />
     </div>
   );
 };
