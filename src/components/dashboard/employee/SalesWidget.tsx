@@ -268,67 +268,96 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
                   Report Sales
                 </Button>
               </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Report Daily Sales</DialogTitle>
-                <DialogDescription>Enter sales by hookah category</DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleSubmitSales} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="category">Hookah Category</Label>
-                  {hookahCategories.length > 0 ? (
-                    <Select value={categoryId} onValueChange={setCategoryId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-background z-50">
-                        {hookahCategories.map((cat) => (
-                          <SelectItem key={cat.id} value={cat.id}>
-                            {cat.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <p className="text-sm text-muted-foreground p-3 bg-muted rounded-md">
-                      No hookah categories configured for this venue. Please contact admin.
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="qty">Quantity Sold</Label>
-                  <Input
-                    id="qty"
-                    type="number"
-                    value={quantity}
-                    onChange={(e) => setQuantity(e.target.value)}
-                    required
-                  />
-                </div>
-                <Button type="submit" className="w-full" disabled={hookahCategories.length === 0}>
-                  Submit Sales
-                </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Report Daily Sales</DialogTitle>
+                  <DialogDescription>Enter sales by hookah category</DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleSubmitSales} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="category">Hookah Category</Label>
+                    {hookahCategories.length > 0 ? (
+                      <Select value={categoryId} onValueChange={setCategoryId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-background z-50">
+                          {hookahCategories.map((cat) => (
+                            <SelectItem key={cat.id} value={cat.id}>
+                              {cat.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <p className="text-sm text-muted-foreground p-3 bg-muted rounded-md">
+                        No hookah categories configured for this venue. Please contact admin.
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="qty">Quantity Sold</Label>
+                    <Input
+                      id="qty"
+                      type="number"
+                      value={quantity}
+                      onChange={(e) => setQuantity(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={hookahCategories.length === 0}>
+                    Submit Sales
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
 
-          {todaySales.length > 0 && (
+            {todaySales.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="font-semibold">Today's Sales</h3>
+                {todaySales.map((sale) => (
+                  <Card key={sale.id}>
+                    <CardContent className="py-3">
+                      <div className="flex justify-between items-center">
+                        <span className="capitalize">{sale.venue_hookah_categories?.category_name || 'Unknown'}</span>
+                        <span className="font-bold">{sale.quantity_sold} units</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Edit Sales Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Sales</DialogTitle>
+            <DialogDescription>Update the quantity for {editingSale?.venue_hookah_categories?.category_name}</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEditSale} className="space-y-4">
             <div className="space-y-2">
-              <h3 className="font-semibold">Today's Sales</h3>
-              {todaySales.map((sale) => (
-                <Card key={sale.id}>
-                  <CardContent className="py-3">
-                    <div className="flex justify-between items-center">
-                      <span className="capitalize">{sale.venue_hookah_categories?.category_name || 'Unknown'}</span>
-                      <span className="font-bold">{sale.quantity_sold} units</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+              <Label htmlFor="edit-quantity">Quantity Sold</Label>
+              <Input
+                id="edit-quantity"
+                type="number"
+                min="0"
+                placeholder="Enter quantity"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                required
+              />
             </div>
-          )}
-        </CardContent>
-      </Card>
+            <div className="flex gap-2">
+              <Button type="submit" className="flex-1">Save Changes</Button>
+              <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <AppreciationDialog
         open={showSalesAppreciation}
