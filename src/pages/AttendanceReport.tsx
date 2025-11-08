@@ -540,10 +540,10 @@ export default function AttendanceReport() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead className="sticky left-0 bg-background z-20 text-xs md:text-sm whitespace-nowrap border-r font-semibold w-[50px]">ID</TableHead>
-                            <TableHead className="sticky left-[50px] bg-background z-20 text-xs md:text-sm whitespace-nowrap border-r font-semibold w-[150px]">Name</TableHead>
-                            <TableHead className="sticky left-[200px] bg-background z-20 text-xs md:text-sm whitespace-nowrap border-r font-semibold hidden sm:table-cell w-[120px]">Venue</TableHead>
-                            <TableHead className="sticky left-[320px] bg-background z-20 text-xs md:text-sm whitespace-nowrap border-r font-semibold hidden md:table-cell w-[100px]">Role</TableHead>
+                            <TableHead className="sticky left-0 bg-background z-20 text-xs md:text-sm whitespace-nowrap border-r font-semibold w-[40px] md:w-[50px]">ID</TableHead>
+                            <TableHead className="sticky left-[40px] md:left-[50px] bg-background z-20 text-xs md:text-sm whitespace-nowrap border-r font-semibold w-[120px] md:w-[150px]">Name</TableHead>
+                            <TableHead className="sticky left-[160px] md:left-[200px] bg-background z-20 text-xs md:text-sm whitespace-nowrap border-r font-semibold hidden sm:table-cell w-[100px] md:w-[120px]">Venue</TableHead>
+                            <TableHead className="sticky left-[260px] md:left-[320px] bg-background z-20 text-xs md:text-sm whitespace-nowrap border-r font-semibold hidden md:table-cell w-[80px] md:w-[100px]">Role</TableHead>
                             {getDateColumns().map((date) => (
                               <TableHead key={date.toISOString()} className="text-xs md:text-sm text-center border-r min-w-[100px] md:min-w-[120px] font-semibold">
                                 <div>{format(date, "dd-MM-yyyy")}</div>
@@ -555,14 +555,14 @@ export default function AttendanceReport() {
                         <TableBody>
                           {getEmployeeAttendanceMatrix().map((employeeData, idx) => (
                             <TableRow key={idx}>
-                              <TableCell className="sticky left-0 bg-background z-10 text-xs md:text-sm border-r font-medium w-[50px]">{idx + 1}</TableCell>
-                              <TableCell className="sticky left-[50px] bg-background z-10 text-xs md:text-sm whitespace-nowrap border-r font-medium w-[150px]">
+                              <TableCell className="sticky left-0 bg-background z-10 text-xs md:text-sm border-r font-medium w-[40px] md:w-[50px]">{idx + 1}</TableCell>
+                              <TableCell className="sticky left-[40px] md:left-[50px] bg-background z-10 text-xs md:text-sm whitespace-nowrap border-r font-medium w-[120px] md:w-[150px]">
                                 {employeeData.employee?.full_name || "N/A"}
                               </TableCell>
-                              <TableCell className="sticky left-[200px] bg-background z-10 text-xs md:text-sm whitespace-nowrap border-r hidden sm:table-cell w-[120px]">
+                              <TableCell className="sticky left-[160px] md:left-[200px] bg-background z-10 text-xs md:text-sm whitespace-nowrap border-r hidden sm:table-cell w-[100px] md:w-[120px]">
                                 {employeeData.venue?.name || "N/A"}
                               </TableCell>
-                              <TableCell className="sticky left-[320px] bg-background z-10 text-xs md:text-sm whitespace-nowrap border-r hidden md:table-cell capitalize w-[100px]">
+                              <TableCell className="sticky left-[260px] md:left-[320px] bg-background z-10 text-xs md:text-sm whitespace-nowrap border-r hidden md:table-cell capitalize w-[80px] md:w-[100px]">
                                 {employeeData.role?.role || "N/A"}
                               </TableCell>
                             {getDateColumns().map((date) => {
@@ -708,9 +708,9 @@ export default function AttendanceReport() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="sticky left-0 bg-background z-20 text-xs md:text-sm whitespace-nowrap border-r font-semibold w-[50px]">ID</TableHead>
-                          <TableHead className="sticky left-[50px] bg-background z-20 text-xs md:text-sm whitespace-nowrap border-r font-semibold w-[150px]">Name</TableHead>
-                          <TableHead className="sticky left-[200px] bg-background z-20 text-xs md:text-sm whitespace-nowrap border-r font-semibold hidden sm:table-cell w-[120px]">Venue</TableHead>
+                          <TableHead className="sticky left-0 bg-background z-20 text-xs md:text-sm whitespace-nowrap border-r font-semibold w-[40px] md:w-[50px]">ID</TableHead>
+                          <TableHead className="sticky left-[40px] md:left-[50px] bg-background z-20 text-xs md:text-sm whitespace-nowrap border-r font-semibold w-[120px] md:w-[150px]">Name</TableHead>
+                          <TableHead className="sticky left-[160px] md:left-[200px] bg-background z-20 text-xs md:text-sm whitespace-nowrap border-r font-semibold hidden sm:table-cell w-[100px] md:w-[120px]">Venue</TableHead>
                           {getDateColumns().map((date) => (
                             <TableHead key={date.toISOString()} className="text-xs md:text-sm text-center border-r min-w-[80px] font-semibold">
                               <div>{format(date, "dd-MM")}</div>
@@ -724,11 +724,11 @@ export default function AttendanceReport() {
                       <TableBody>
                         {getEmployeeAttendanceMatrix().map((employeeData, idx) => (
                           <TableRow key={idx}>
-                            <TableCell className="sticky left-0 bg-background z-10 text-xs md:text-sm border-r font-medium w-[50px]">{idx + 1}</TableCell>
-                            <TableCell className="sticky left-[50px] bg-background z-10 text-xs md:text-sm whitespace-nowrap border-r font-medium w-[150px]">
+                            <TableCell className="sticky left-0 bg-background z-10 text-xs md:text-sm border-r font-medium w-[40px] md:w-[50px]">{idx + 1}</TableCell>
+                            <TableCell className="sticky left-[40px] md:left-[50px] bg-background z-10 text-xs md:text-sm whitespace-nowrap border-r font-medium w-[120px] md:w-[150px]">
                               {employeeData.employee?.full_name || "N/A"}
                             </TableCell>
-                            <TableCell className="sticky left-[200px] bg-background z-10 text-xs md:text-sm whitespace-nowrap border-r hidden sm:table-cell w-[120px]">
+                            <TableCell className="sticky left-[160px] md:left-[200px] bg-background z-10 text-xs md:text-sm whitespace-nowrap border-r hidden sm:table-cell w-[100px] md:w-[120px]">
                               {employeeData.venue?.name || "N/A"}
                             </TableCell>
                             {getDateColumns().map((date) => {
