@@ -13,6 +13,7 @@ import ManageVenues from "./pages/ManageVenues";
 import ManageEmployees from "./pages/ManageEmployees";
 import ManageCategories from "./pages/ManageCategories";
 import AttendanceReport from "./pages/AttendanceReport";
+import CounterPictures from "./pages/CounterPictures";
 
 const queryClient = new QueryClient();
 

@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { Settings, Building2, Users, Tag, CalendarClock } from "lucide-react";
+import { Settings, Building2, Users, Tag, CalendarClock, Camera } from "lucide-react";
 
 const AdminSettingsMenu = () => {
   const navigate = useNavigate();
@@ -39,6 +39,10 @@ const AdminSettingsMenu = () => {
         <DropdownMenuItem onClick={() => navigate("/attendance-report")}>
           <CalendarClock className="mr-2 h-4 w-4" />
           Attendance Report
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate("/counter-pictures")}>
+          <Camera className="mr-2 h-4 w-4" />
+          Counter Pictures
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

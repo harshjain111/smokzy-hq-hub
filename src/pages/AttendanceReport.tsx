@@ -159,11 +159,22 @@ export default function AttendanceReport() {
         const venuesMap = new Map(venuesRes.data?.map(v => [v.id, v]) || []);
         const rolesMap = new Map(rolesRes.data?.map(r => [r.user_id, r]) || []);
 
-        const enrichedData = attendanceRecords.map(record => ({
-          ...record,
-          profiles: profilesMap.get(record.user_id) || null,
-          venues: venuesMap.get(record.venue_id) || null,
-          user_role: rolesMap.get(record.user_id) || null,
+        // Create signed URLs for private bucket images
+        const enrichedData = await Promise.all(attendanceRecords.map(async (record) => {
+          const checkInUrl = record.check_in_selfie_url
+            ? (await supabase.storage.from('attendance-photos').createSignedUrl(record.check_in_selfie_url, 3600)).data?.signedUrl
+            : null;
+          const checkOutUrl = record.check_out_selfie_url
+            ? (await supabase.storage.from('attendance-photos').createSignedUrl(record.check_out_selfie_url, 3600)).data?.signedUrl
+            : null;
+          return {
+            ...record,
+            profiles: profilesMap.get(record.user_id) || null,
+            venues: venuesMap.get(record.venue_id) || null,
+            user_role: rolesMap.get(record.user_id) || null,
+            check_in_signed_url: checkInUrl,
+            check_out_signed_url: checkOutUrl,
+          };
         }));
 
         setAttendanceData(enrichedData as any);
@@ -620,13 +631,9 @@ export default function AttendanceReport() {
                 <div className="p-8 text-center">No records found</div>
               ) : (
                 attendanceData.map((record) => {
-                  // Get signed URL for images
-                  const checkInImageUrl = record.check_in_selfie_url 
-                    ? `${supabase.storage.from('attendance-photos').getPublicUrl(record.check_in_selfie_url.split('/').pop() || '').data.publicUrl}`
-                    : null;
-                  const checkOutImageUrl = record.check_out_selfie_url
-                    ? `${supabase.storage.from('attendance-photos').getPublicUrl(record.check_out_selfie_url.split('/').pop() || '').data.publicUrl}`
-                    : null;
+                  // Use signed URLs created during fetch
+                  const checkInImageUrl = (record as any).check_in_signed_url || null;
+                  const checkOutImageUrl = (record as any).check_out_signed_url || null;
 
                   return (
                   <Card key={record.id}>
