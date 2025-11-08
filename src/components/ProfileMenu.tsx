@@ -79,7 +79,7 @@ const ProfileMenu = ({ user, role }: ProfileMenuProps) => {
         </DropdownMenuItem>
         {role === "employee" && (
           <>
-            <DropdownMenuItem className="cursor-pointer">
+            <DropdownMenuItem className="cursor-pointer" onClick={() => navigate("/attendance-report")}>
               <Calendar className="mr-2 h-4 w-4" />
               <span>Attendance Report</span>
             </DropdownMenuItem>
