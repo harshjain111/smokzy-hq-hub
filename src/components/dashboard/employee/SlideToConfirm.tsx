@@ -22,6 +22,7 @@ const SlideToConfirm = ({
   const [isDragging, setIsDragging] = useState(false);
   const [position, setPosition] = useState(0);
   const [isConfirmed, setIsConfirmed] = useState(false);
+  const [shouldShake, setShouldShake] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const sliderRef = useRef<HTMLDivElement>(null);
 
@@ -39,8 +40,22 @@ const SlideToConfirm = ({
     }
   }, [isConfirmed]);
 
+  useEffect(() => {
+    if (shouldShake) {
+      const timer = setTimeout(() => setShouldShake(false), 400);
+      return () => clearTimeout(timer);
+    }
+  }, [shouldShake]);
+
   const handleStart = (clientX: number) => {
-    if (disabled || loading) return;
+    if (disabled || loading) {
+      // Trigger shake animation when trying to interact with disabled slider
+      setShouldShake(true);
+      if (navigator.vibrate) {
+        navigator.vibrate(50); // Short vibration for feedback
+      }
+      return;
+    }
     setIsDragging(true);
   };
 
@@ -111,6 +126,7 @@ const SlideToConfirm = ({
       className={cn(
         "relative h-14 rounded-full overflow-hidden select-none transition-opacity",
         disabled && "opacity-50 cursor-not-allowed",
+        shouldShake && "animate-shake",
         "bg-muted border-2 border-border"
       )}
     >
