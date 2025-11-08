@@ -7,12 +7,12 @@ import Dashboard from "./pages/Dashboard";
 import Auth from "./pages/Auth";
 import ProtectedRoute from "./components/ProtectedRoute";
 import NotFound from "./pages/NotFound";
-import AttendanceReport from "./pages/AttendanceReport";
 import MyProfile from "./pages/MyProfile";
 import VenueDetail from "./pages/VenueDetail";
 import ManageVenues from "./pages/ManageVenues";
 import ManageEmployees from "./pages/ManageEmployees";
 import ManageCategories from "./pages/ManageCategories";
+import AttendanceReport from "./pages/AttendanceReport";
 
 const queryClient = new QueryClient();
 

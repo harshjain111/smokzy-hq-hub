@@ -1,541 +1,535 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { User } from "@supabase/supabase-js";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar } from "@/components/ui/calendar";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Calendar as CalendarIcon, Clock, CheckCircle2, XCircle, TrendingUp } from "lucide-react";
-import { format, differenceInHours, differenceInMinutes, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, startOfWeek, endOfWeek, eachWeekOfInterval, addMonths } from "date-fns";
-import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, Download, MapPin, Image as ImageIcon } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
+import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, AreaChart } from "recharts";
+import { toast } from "sonner";
 
 interface AttendanceRecord {
   id: string;
+  user_id: string;
+  venue_id: string;
   check_in_time: string;
   check_out_time: string | null;
+  check_in_lat: number;
+  check_in_lng: number;
+  check_out_lat: number | null;
+  check_out_lng: number | null;
   check_in_selfie_url: string;
   check_out_selfie_url: string | null;
   tasks_completed: boolean;
-  venue_id: string;
+  profiles: { full_name: string } | null;
+  venues: { name: string } | null;
 }
 
 interface DateRange {
-  from: Date | undefined;
-  to: Date | undefined;
+  from: Date;
+  to: Date;
 }
 
-const AttendanceReport = () => {
+export default function AttendanceReport() {
   const navigate = useNavigate();
-  const [user, setUser] = useState<User | null>(null);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [dateRange, setDateRange] = useState<DateRange>({
-    from: startOfMonth(new Date()),
-    to: endOfMonth(new Date())
-  });
-  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [presentDates, setPresentDates] = useState<Date[]>([]);
-  const [absentDates, setAbsentDates] = useState<Date[]>([]);
+  const [dateRangeType, setDateRangeType] = useState<"current" | "last" | "custom">("current");
+  const [customRange, setCustomRange] = useState<DateRange | null>(null);
+  const [selectedEmployee, setSelectedEmployee] = useState<string>("all");
+  const [selectedVenue, setSelectedVenue] = useState<string>("all");
+  const [attendanceData, setAttendanceData] = useState<AttendanceRecord[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [venues, setVenues] = useState<any[]>([]);
 
   useEffect(() => {
-    fetchUser();
+    fetchFilters();
   }, []);
 
   useEffect(() => {
-    if (user && dateRange.from && dateRange.to) {
-      fetchAttendanceData();
-    }
-  }, [user, dateRange]);
+    fetchAttendanceData();
+  }, [dateRangeType, customRange, selectedEmployee, selectedVenue]);
 
-  const fetchUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    setUser(user);
+  const fetchFilters = async () => {
+    try {
+      const [employeesRes, venuesRes] = await Promise.all([
+        supabase.from("profiles").select("id, full_name").order("full_name"),
+        supabase.from("venues").select("id, name").order("name"),
+      ]);
+
+      if (employeesRes.data) setEmployees(employeesRes.data);
+      if (venuesRes.data) setVenues(venuesRes.data);
+    } catch (error) {
+      console.error("Error fetching filters:", error);
+      toast.error("Failed to load filters");
+    }
+  };
+
+  const getDateRange = (): DateRange => {
+    const now = new Date();
+    if (dateRangeType === "current") {
+      return {
+        from: new Date(now.getFullYear(), now.getMonth(), 1),
+        to: new Date(now.getFullYear(), now.getMonth() + 1, 0),
+      };
+    } else if (dateRangeType === "last") {
+      return {
+        from: new Date(now.getFullYear(), now.getMonth() - 1, 1),
+        to: new Date(now.getFullYear(), now.getMonth(), 0),
+      };
+    } else if (customRange) {
+      return customRange;
+    }
+    return { from: now, to: now };
   };
 
   const fetchAttendanceData = async () => {
-    if (!user || !dateRange.from || !dateRange.to) return;
-
     setLoading(true);
+    try {
+      const range = getDateRange();
+      let query = supabase
+        .from("attendance")
+        .select(`
+          *,
+          profiles(full_name),
+          venues(name)
+        `)
+        .gte("check_in_time", range.from.toISOString())
+        .lte("check_in_time", range.to.toISOString())
+        .order("check_in_time", { ascending: false });
 
-    const { data, error } = await supabase
-      .from("attendance")
-      .select("*")
-      .eq("user_id", user.id)
-      .gte("check_in_time", dateRange.from.toISOString())
-      .lte("check_in_time", dateRange.to.toISOString())
-      .order("check_in_time", { ascending: false });
+      if (selectedEmployee !== "all") {
+        query = query.eq("user_id", selectedEmployee);
+      }
 
-    if (error) {
-      toast.error("Failed to fetch attendance data");
-      console.error(error);
-    } else {
-      setAttendanceRecords(data || []);
-      
-      // Get all days in range
-      const allDays = eachDayOfInterval({ start: dateRange.from, end: dateRange.to });
-      
-      // Extract dates with attendance (present)
-      const present = (data || [])
-        .filter(r => r.check_out_time)
-        .map(record => new Date(record.check_in_time));
-      setPresentDates(present);
-      
-      // Calculate absent dates (excluding weekends/future dates)
-      const today = new Date();
-      const absent = allDays.filter(day => {
-        const isPast = day <= today;
-        const isNotPresent = !present.some(p => isSameDay(p, day));
-        const isWeekday = day.getDay() !== 0 && day.getDay() !== 6; // Exclude weekends
-        return isPast && isNotPresent && isWeekday;
-      });
-      setAbsentDates(absent);
+      if (selectedVenue !== "all") {
+        query = query.eq("venue_id", selectedVenue);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      setAttendanceData((data as any) || []);
+    } catch (error) {
+      console.error("Error fetching attendance:", error);
+      toast.error("Failed to load attendance data");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const calculateWorkingHours = (checkIn: string, checkOut: string | null) => {
     if (!checkOut) return "In Progress";
-    
-    const start = new Date(checkIn);
-    const end = new Date(checkOut);
-    const hours = differenceInHours(end, start);
-    const minutes = differenceInMinutes(end, start) % 60;
-    
-    return `${hours}h ${minutes}m`;
-  };
-
-  const calculateTotalHours = () => {
-    let totalMinutes = 0;
-    attendanceRecords.forEach(record => {
-      if (record.check_out_time) {
-        const start = new Date(record.check_in_time);
-        const end = new Date(record.check_out_time);
-        totalMinutes += differenceInMinutes(end, start);
-      }
-    });
-    
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
+    const diff = new Date(checkOut).getTime() - new Date(checkIn).getTime();
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
     return `${hours}h ${minutes}m`;
   };
 
   const getDaysPresent = () => {
-    return attendanceRecords.filter(r => r.check_out_time).length;
+    const uniqueDays = new Set(
+      attendanceData.map((record) =>
+        format(new Date(record.check_in_time), "yyyy-MM-dd")
+      )
+    );
+    return uniqueDays.size;
   };
 
-  const getTaskCompletionRate = () => {
-    if (attendanceRecords.length === 0) return "0%";
-    const completed = attendanceRecords.filter(r => r.tasks_completed).length;
-    return `${Math.round((completed / attendanceRecords.length) * 100)}%`;
-  };
+  const exportToCSV = () => {
+    const headers = ["Date", "Employee", "Venue", "Check In", "Check Out", "Working Hours", "Tasks Completed"];
+    const rows = attendanceData.map((record) => [
+      format(new Date(record.check_in_time), "yyyy-MM-dd"),
+      record.profiles?.full_name || "N/A",
+      record.venues?.name || "N/A",
+      format(new Date(record.check_in_time), "HH:mm:ss"),
+      record.check_out_time ? format(new Date(record.check_out_time), "HH:mm:ss") : "N/A",
+      calculateWorkingHours(record.check_in_time, record.check_out_time),
+      record.tasks_completed ? "Yes" : "No",
+    ]);
 
-  const getWeeklyHoursData = () => {
-    if (!dateRange.from || !dateRange.to) return [];
-    
-    const weeks = eachWeekOfInterval({ start: dateRange.from, end: dateRange.to });
-    
-    return weeks.map(weekStart => {
-      const weekEnd = endOfWeek(weekStart);
-      const weekRecords = attendanceRecords.filter(record => {
-        const recordDate = new Date(record.check_in_time);
-        return recordDate >= weekStart && recordDate <= weekEnd;
-      });
-      
-      const totalMinutes = weekRecords.reduce((acc, record) => {
-        if (record.check_out_time) {
-          return acc + differenceInMinutes(new Date(record.check_out_time), new Date(record.check_in_time));
-        }
-        return acc;
-      }, 0);
-      
-      return {
-        week: format(weekStart, "MMM dd"),
-        hours: Math.round((totalMinutes / 60) * 10) / 10,
-        days: weekRecords.filter(r => r.check_out_time).length
-      };
-    });
+    const csv = [headers, ...rows].map((row) => row.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `attendance-report-${format(new Date(), "yyyy-MM-dd")}.csv`;
+    a.click();
   };
-
-  const getMonthlyComparisonData = () => {
-    const months = [];
-    for (let i = 2; i >= 0; i--) {
-      const monthDate = addMonths(new Date(), -i);
-      const monthStart = startOfMonth(monthDate);
-      const monthEnd = endOfMonth(monthDate);
-      
-      const monthRecords = attendanceRecords.filter(record => {
-        const recordDate = new Date(record.check_in_time);
-        return recordDate >= monthStart && recordDate <= monthEnd;
-      });
-      
-      const totalMinutes = monthRecords.reduce((acc, record) => {
-        if (record.check_out_time) {
-          return acc + differenceInMinutes(new Date(record.check_out_time), new Date(record.check_in_time));
-        }
-        return acc;
-      }, 0);
-      
-      months.push({
-        month: format(monthDate, "MMM yyyy"),
-        hours: Math.round((totalMinutes / 60) * 10) / 10,
-        days: monthRecords.filter(r => r.check_out_time).length
-      });
-    }
-    
-    return months;
-  };
-
-  const getDailyTrendData = () => {
-    return attendanceRecords
-      .filter(r => r.check_out_time)
-      .map(record => ({
-        date: format(new Date(record.check_in_time), "MMM dd"),
-        hours: Math.round((differenceInMinutes(new Date(record.check_out_time!), new Date(record.check_in_time)) / 60) * 10) / 10
-      }))
-      .reverse()
-      .slice(-14); // Last 14 days
-  };
-
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-6">
+    <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate("/")}
-            >
+            <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">Attendance Report</h1>
-              <p className="text-muted-foreground">View your attendance history and analytics</p>
-            </div>
+            <h1 className="text-3xl font-bold">Attendance Report</h1>
           </div>
-          
-          {/* Date Range Picker */}
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className={cn("justify-start text-left font-normal", !dateRange && "text-muted-foreground")}>
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {dateRange?.from ? (
-                  dateRange.to ? (
-                    <>
-                      {format(dateRange.from, "LLL dd, y")} - {format(dateRange.to, "LLL dd, y")}
-                    </>
-                  ) : (
-                    format(dateRange.from, "LLL dd, y")
-                  )
-                ) : (
-                  <span>Pick a date range</span>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <div className="p-3 space-y-2">
-                <div className="flex gap-2">
+          <Button onClick={exportToCSV} variant="outline">
+            <Download className="mr-2 h-4 w-4" />
+            Export CSV
+          </Button>
+        </div>
+
+        {/* Filters */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Filters</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Date Range Type */}
+            <Select value={dateRangeType} onValueChange={(v: any) => setDateRangeType(v)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select period" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="current">Current Month</SelectItem>
+                <SelectItem value="last">Last Month</SelectItem>
+                <SelectItem value="custom">Custom Range</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Custom Date Range */}
+            {dateRangeType === "custom" && (
+              <Popover>
+                <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const today = new Date();
-                      setDateRange({ from: startOfMonth(today), to: endOfMonth(today) });
-                    }}
+                    className={cn(
+                      "justify-start text-left font-normal",
+                      !customRange && "text-muted-foreground"
+                    )}
                   >
-                    This Month
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {customRange?.from ? (
+                      customRange.to ? (
+                        <>
+                          {format(customRange.from, "LLL dd, y")} -{" "}
+                          {format(customRange.to, "LLL dd, y")}
+                        </>
+                      ) : (
+                        format(customRange.from, "LLL dd, y")
+                      )
+                    ) : (
+                      <span>Pick a date range</span>
+                    )}
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const lastMonth = addMonths(new Date(), -1);
-                      setDateRange({ from: startOfMonth(lastMonth), to: endOfMonth(lastMonth) });
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    initialFocus
+                    mode="range"
+                    selected={{ from: customRange?.from, to: customRange?.to }}
+                    onSelect={(range: any) => {
+                      if (range?.from && range?.to) {
+                        setCustomRange({ from: range.from, to: range.to });
+                      }
                     }}
-                  >
-                    Last Month
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const threeMonthsAgo = addMonths(new Date(), -3);
-                      setDateRange({ from: startOfMonth(threeMonthsAgo), to: new Date() });
-                    }}
-                  >
-                    Last 3 Months
-                  </Button>
+                    numberOfMonths={2}
+                    className="pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+            )}
+
+            {/* Employee Filter */}
+            <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+              <SelectTrigger>
+                <SelectValue placeholder="All Employees" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Employees</SelectItem>
+                {employees.map((emp) => (
+                  <SelectItem key={emp.id} value={emp.id}>
+                    {emp.full_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Venue Filter */}
+            <Select value={selectedVenue} onValueChange={setSelectedVenue}>
+              <SelectTrigger>
+                <SelectValue placeholder="All Venues" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Venues</SelectItem>
+                {venues.map((venue) => (
+                  <SelectItem key={venue.id} value={venue.id}>
+                    {venue.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
+
+        {/* Reports Tabs */}
+        <Tabs defaultValue="summary" className="w-full">
+          <TabsList className="grid w-full grid-cols-4 border-b border-border">
+            <TabsTrigger value="summary" className="border-r border-border data-[state=active]:border-b-2 data-[state=active]:border-primary">Summary</TabsTrigger>
+            <TabsTrigger value="daily" className="border-r border-border data-[state=active]:border-b-2 data-[state=active]:border-primary">Daily Punching</TabsTrigger>
+            <TabsTrigger value="images" className="border-r border-border data-[state=active]:border-b-2 data-[state=active]:border-primary">Images & Location</TabsTrigger>
+            <TabsTrigger value="hours" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">Working Hours</TabsTrigger>
+          </TabsList>
+
+          {/* Summary Report */}
+          <TabsContent value="summary" className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Total Days Present</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-4xl font-bold">{getDaysPresent()}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Total Records</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-4xl font-bold">{attendanceData.length}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Tasks Completion Rate</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-4xl font-bold">
+                    {attendanceData.length > 0
+                      ? Math.round(
+                          (attendanceData.filter((r) => r.tasks_completed).length /
+                            attendanceData.length) *
+                            100
+                        )
+                      : 0}
+                    %
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Daily Punching Report */}
+          <TabsContent value="daily">
+            <Card>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Employee</TableHead>
+                        <TableHead>Venue</TableHead>
+                        <TableHead>Check In</TableHead>
+                        <TableHead>Check Out</TableHead>
+                        <TableHead>Working Hours</TableHead>
+                        <TableHead>Tasks</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {loading ? (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center">Loading...</TableCell>
+                        </TableRow>
+                      ) : attendanceData.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center">No records found</TableCell>
+                        </TableRow>
+                      ) : (
+                        attendanceData.map((record) => (
+                          <TableRow key={record.id}>
+                            <TableCell>{format(new Date(record.check_in_time), "MMM dd, yyyy")}</TableCell>
+                            <TableCell>{record.profiles?.full_name || "N/A"}</TableCell>
+                            <TableCell>{record.venues?.name || "N/A"}</TableCell>
+                            <TableCell>{format(new Date(record.check_in_time), "hh:mm a")}</TableCell>
+                            <TableCell>
+                              {record.check_out_time
+                                ? format(new Date(record.check_out_time), "hh:mm a")
+                                : "In Progress"}
+                            </TableCell>
+                            <TableCell>
+                              {calculateWorkingHours(record.check_in_time, record.check_out_time)}
+                            </TableCell>
+                            <TableCell>
+                              <span
+                                className={cn(
+                                  "px-2 py-1 rounded text-xs",
+                                  record.tasks_completed
+                                    ? "bg-green-100 text-green-800"
+                                    : "bg-yellow-100 text-yellow-800"
+                                )}
+                              >
+                                {record.tasks_completed ? "Completed" : "Pending"}
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
                 </div>
-              </div>
-            </PopoverContent>
-          </Popover>
-        </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-        {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Total Hours</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">{calculateTotalHours()}</div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Days Present</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">{getDaysPresent()}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Total Records</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">{attendanceRecords.length}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Task Completion</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">{getTaskCompletionRate()}</div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Analytics Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Daily Trend */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5" />
-                Daily Working Hours Trend
-              </CardTitle>
-              <CardDescription>Last 14 days working hours</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={250}>
-                <AreaChart data={getDailyTrendData()}>
-                  <defs>
-                    <linearGradient id="colorHours" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: "hsl(var(--background))", 
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px"
-                    }}
-                  />
-                  <Area type="monotone" dataKey="hours" stroke="hsl(var(--primary))" fillOpacity={1} fill="url(#colorHours)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          {/* Weekly Hours */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Average Weekly Hours</CardTitle>
-              <CardDescription>Working hours by week</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={getWeeklyHoursData()}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="week" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: "hsl(var(--background))", 
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px"
-                    }}
-                  />
-                  <Bar dataKey="hours" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          {/* Monthly Comparison */}
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle>Monthly Comparison</CardTitle>
-              <CardDescription>Compare hours and days worked across months</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={getMonthlyComparisonData()}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" />
-                  <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" />
-                  <YAxis yAxisId="right" orientation="right" stroke="hsl(var(--muted-foreground))" />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: "hsl(var(--background))", 
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px"
-                    }}
-                  />
-                  <Legend />
-                  <Line yAxisId="left" type="monotone" dataKey="hours" stroke="hsl(var(--primary))" strokeWidth={2} name="Total Hours" />
-                  <Line yAxisId="right" type="monotone" dataKey="days" stroke="hsl(var(--chart-2))" strokeWidth={2} name="Days Present" />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Calendar */}
-          <Card className="lg:col-span-1">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CalendarIcon className="h-5 w-5" />
-                Attendance Calendar
-              </CardTitle>
-              <CardDescription>
-                <div className="flex items-center gap-4 mt-2 text-xs">
-                  <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: "hsl(var(--primary))" }}></div>
-                    <span>Present</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 rounded-full bg-destructive"></div>
-                    <span>Absent</span>
-                  </div>
-                </div>
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={setSelectedDate}
-                className="rounded-md border"
-                modifiers={{
-                  present: presentDates,
-                  absent: absentDates
-                }}
-                modifiersStyles={{
-                  present: {
-                    backgroundColor: "hsl(var(--primary))",
-                    color: "hsl(var(--primary-foreground))",
-                    fontWeight: "bold"
-                  },
-                  absent: {
-                    backgroundColor: "hsl(var(--destructive))",
-                    color: "hsl(var(--destructive-foreground))",
-                    fontWeight: "bold"
-                  }
-                }}
-              />
-            </CardContent>
-          </Card>
-
-          {/* Attendance Records */}
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="h-5 w-5" />
-                Attendance Records
-              </CardTitle>
-              <CardDescription>
-                {dateRange.from && dateRange.to && 
-                  `${format(dateRange.from, "MMM dd, yyyy")} - ${format(dateRange.to, "MMM dd, yyyy")}`
-                }
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+          {/* Images & Location Report */}
+          <TabsContent value="images">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {loading ? (
-                <div className="text-center py-8 text-muted-foreground">Loading...</div>
-              ) : attendanceRecords.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  No attendance records found for this month
-                </div>
+                <p>Loading...</p>
+              ) : attendanceData.length === 0 ? (
+                <p>No records found</p>
               ) : (
-                <div className="space-y-4 max-h-[600px] overflow-y-auto">
-                  {attendanceRecords.map((record) => (
-                    <div
-                      key={record.id}
-                      className="border rounded-lg p-4 space-y-3 hover:bg-accent/50 transition-colors"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="font-semibold text-foreground">
-                          {format(new Date(record.check_in_time), "PPP")}
+                attendanceData.map((record) => (
+                  <Card key={record.id}>
+                    <CardHeader>
+                      <CardTitle className="text-lg">
+                        {record.profiles?.full_name || "N/A"} - {format(new Date(record.check_in_time), "MMM dd, yyyy")}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        {/* Check In */}
+                        <div className="space-y-2">
+                          <p className="font-semibold text-sm">Check In</p>
+                          {record.check_in_selfie_url && (
+                            <img
+                              src={record.check_in_selfie_url}
+                              alt="Check in"
+                              className="w-full h-40 object-cover rounded border"
+                            />
+                          )}
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <MapPin className="h-3 w-3" />
+                            <span>{record.check_in_lat.toFixed(4)}, {record.check_in_lng.toFixed(4)}</span>
+                          </div>
+                          <p className="text-xs">{format(new Date(record.check_in_time), "hh:mm a")}</p>
                         </div>
-                        <div className="flex items-center gap-2">
-                          {record.tasks_completed ? (
-                            <Badge variant="default" className="gap-1">
-                              <CheckCircle2 className="h-3 w-3" />
-                              Tasks Done
-                            </Badge>
+
+                        {/* Check Out */}
+                        <div className="space-y-2">
+                          <p className="font-semibold text-sm">Check Out</p>
+                          {record.check_out_selfie_url ? (
+                            <>
+                              <img
+                                src={record.check_out_selfie_url}
+                                alt="Check out"
+                                className="w-full h-40 object-cover rounded border"
+                              />
+                              {record.check_out_lat && record.check_out_lng && (
+                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                  <MapPin className="h-3 w-3" />
+                                  <span>{record.check_out_lat.toFixed(4)}, {record.check_out_lng.toFixed(4)}</span>
+                                </div>
+                              )}
+                              {record.check_out_time && (
+                                <p className="text-xs">{format(new Date(record.check_out_time), "hh:mm a")}</p>
+                              )}
+                            </>
                           ) : (
-                            <Badge variant="secondary" className="gap-1">
-                              <XCircle className="h-3 w-3" />
-                              Incomplete
-                            </Badge>
+                            <div className="w-full h-40 flex items-center justify-center border rounded bg-muted">
+                              <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                            </div>
                           )}
                         </div>
                       </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <div className="text-muted-foreground mb-1">Check In</div>
-                          <div className="font-medium text-foreground">
-                            {format(new Date(record.check_in_time), "p")}
-                          </div>
-                        </div>
-                        
-                        <div>
-                          <div className="text-muted-foreground mb-1">Check Out</div>
-                          <div className="font-medium text-foreground">
-                            {record.check_out_time 
-                              ? format(new Date(record.check_out_time), "p")
-                              : "Not checked out"
-                            }
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="pt-2 border-t">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Working Hours:</span>
-                          <span className="font-semibold text-foreground">
-                            {calculateWorkingHours(record.check_in_time, record.check_out_time)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    </CardContent>
+                  </Card>
+                ))
               )}
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+          </TabsContent>
+
+          {/* Working Hours Report */}
+          <TabsContent value="hours">
+            <Card>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Employee</TableHead>
+                        <TableHead>Venue</TableHead>
+                        <TableHead>Total Days</TableHead>
+                        <TableHead>Total Hours</TableHead>
+                        <TableHead>Avg Hours/Day</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {loading ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center">Loading...</TableCell>
+                        </TableRow>
+                      ) : attendanceData.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center">No records found</TableCell>
+                        </TableRow>
+                      ) : (
+                        (() => {
+                          const groupedData = attendanceData.reduce((acc, record) => {
+                            const key = `${record.user_id}-${record.venue_id}`;
+                            if (!acc[key]) {
+                              acc[key] = {
+                                employee: record.profiles?.full_name || "N/A",
+                                venue: record.venues?.name || "N/A",
+                                days: 0,
+                                totalMinutes: 0,
+                              };
+                            }
+                            acc[key].days += 1;
+                            if (record.check_out_time) {
+                              const diff = new Date(record.check_out_time).getTime() - new Date(record.check_in_time).getTime();
+                              acc[key].totalMinutes += diff / (1000 * 60);
+                            }
+                            return acc;
+                          }, {} as Record<string, any>);
+
+                          return Object.values(groupedData).map((data: any, idx) => {
+                            const totalHours = Math.floor(data.totalMinutes / 60);
+                            const avgHours = (data.totalMinutes / 60 / data.days).toFixed(1);
+                            return (
+                              <TableRow key={idx}>
+                                <TableCell>{data.employee}</TableCell>
+                                <TableCell>{data.venue}</TableCell>
+                                <TableCell>{data.days}</TableCell>
+                                <TableCell>{totalHours}h</TableCell>
+                                <TableCell>{avgHours}h</TableCell>
+                              </TableRow>
+                            );
+                          });
+                        })()
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
-};
-
-export default AttendanceReport;
+}
