@@ -14,40 +14,63 @@ interface EmployeeDashboardProps {
 
 const EmployeeDashboard = ({ user, venueId }: EmployeeDashboardProps) => {
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6 pb-6">
+      {/* Mobile-optimized Tasks Card */}
       <Card className="bg-gradient-to-br from-primary/10 to-accent/10 border-primary/20">
-        <CardHeader>
-          <CardTitle>Your Daily Tasks</CardTitle>
-          <CardDescription>
+        <CardHeader className="p-4 md:p-6">
+          <CardTitle className="text-xl md:text-2xl">Your Daily Tasks</CardTitle>
+          <CardDescription className="text-sm md:text-base">
             Complete all tasks before clocking out
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4 pt-0 md:p-6 md:pt-0">
           <TasksWidget user={user} venueId={venueId} />
         </CardContent>
       </Card>
 
+      {/* Mobile-First Tabs with Larger Touch Targets */}
       <Tabs defaultValue="attendance" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="attendance">Attendance</TabsTrigger>
-          <TabsTrigger value="stock">Stock</TabsTrigger>
-          <TabsTrigger value="sales">Sales</TabsTrigger>
-          <TabsTrigger value="photo">Photo</TabsTrigger>
+        {/* Scrollable horizontal tabs on mobile, grid on desktop */}
+        <TabsList className="w-full h-auto flex md:grid md:grid-cols-4 overflow-x-auto gap-2 p-1 bg-muted/50">
+          <TabsTrigger 
+            value="attendance" 
+            className="flex-1 min-w-[100px] h-12 md:h-10 text-sm md:text-base whitespace-nowrap data-[state=active]:bg-background data-[state=active]:shadow-sm"
+          >
+            Attendance
+          </TabsTrigger>
+          <TabsTrigger 
+            value="stock" 
+            className="flex-1 min-w-[100px] h-12 md:h-10 text-sm md:text-base whitespace-nowrap data-[state=active]:bg-background data-[state=active]:shadow-sm"
+          >
+            Stock
+          </TabsTrigger>
+          <TabsTrigger 
+            value="sales" 
+            className="flex-1 min-w-[100px] h-12 md:h-10 text-sm md:text-base whitespace-nowrap data-[state=active]:bg-background data-[state=active]:shadow-sm"
+          >
+            Sales
+          </TabsTrigger>
+          <TabsTrigger 
+            value="photo" 
+            className="flex-1 min-w-[100px] h-12 md:h-10 text-sm md:text-base whitespace-nowrap data-[state=active]:bg-background data-[state=active]:shadow-sm"
+          >
+            Photo
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="attendance">
+        <TabsContent value="attendance" className="mt-4">
           <AttendanceWidget user={user} venueId={venueId} />
         </TabsContent>
 
-        <TabsContent value="stock">
+        <TabsContent value="stock" className="mt-4">
           <StockWidget venueId={venueId} />
         </TabsContent>
 
-        <TabsContent value="sales">
+        <TabsContent value="sales" className="mt-4">
           <SalesWidget user={user} venueId={venueId} />
         </TabsContent>
 
-        <TabsContent value="photo">
+        <TabsContent value="photo" className="mt-4">
           <ClosingPhotoWidget user={user} venueId={venueId} />
         </TabsContent>
       </Tabs>
