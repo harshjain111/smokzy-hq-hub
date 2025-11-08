@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowLeft, Camera, Loader2, User as UserIcon } from "lucide-react";
+import { Camera, Loader2, User as UserIcon } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
+import PageLayout from "@/components/PageLayout";
 
 const profileSchema = z.object({
   full_name: z.string().trim().min(1, "Name is required").max(100, "Name must be less than 100 characters"),
@@ -165,22 +166,8 @@ const MyProfile = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-6">
+    <PageLayout title="My Profile" subtitle="Manage your personal information">
       <div className="max-w-4xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate("/")}
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">My Profile</h1>
-            <p className="text-muted-foreground">Manage your personal information</p>
-          </div>
-        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Profile Picture Card */}
@@ -298,7 +285,7 @@ const MyProfile = () => {
           </Card>
         </div>
       </div>
-    </div>
+    </PageLayout>
   );
 };
 

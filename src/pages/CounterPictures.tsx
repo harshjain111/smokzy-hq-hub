@@ -7,6 +7,7 @@ import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import PageLayout from "@/components/PageLayout";
 
 interface PhotoRecord {
   id: string;
@@ -95,15 +96,13 @@ export default function CounterPictures() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-4 md:space-y-6 p-3 md:p-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <h1 className="text-2xl md:text-3xl font-bold">Counter Pictures</h1>
-        <div className="flex gap-2">
+    <PageLayout title="Counter Pictures" subtitle="View executive-uploaded counter photos">
+      <div className="max-w-7xl mx-auto space-y-4 md:space-y-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-end gap-3">
           <Button variant="outline" size="sm" onClick={exportCsv}>
             <Download className="h-4 w-4 mr-2" /> Export CSV
           </Button>
         </div>
-      </div>
 
       <Card>
         <CardHeader>
@@ -193,6 +192,7 @@ export default function CounterPictures() {
           ))
         )}
       </div>
-    </div>
+      </div>
+    </PageLayout>
   );
-}
+};

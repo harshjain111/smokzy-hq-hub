@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft, Users, AlertTriangle, TrendingUp, Activity } from "lucide-react";
+import { Users, AlertTriangle, TrendingUp, Activity } from "lucide-react";
 import StockOverview from "@/components/dashboard/admin/StockOverview";
 import SalesReports from "@/components/dashboard/admin/SalesReports";
 import AttendanceOverview from "@/components/dashboard/admin/AttendanceOverview";
 import EmployeeActivityReport from "@/components/dashboard/admin/EmployeeActivityReport";
+import PageLayout from "@/components/PageLayout";
 
 interface VenueStats {
   totalEmployees: number;
@@ -19,7 +19,6 @@ interface VenueStats {
 
 const VenueDetail = () => {
   const { venueId } = useParams();
-  const navigate = useNavigate();
   const [venueName, setVenueName] = useState("");
   const [stats, setStats] = useState<VenueStats>({
     totalEmployees: 0,
@@ -90,26 +89,8 @@ const VenueDetail = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-card sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center gap-4">
-            <Button 
-              variant="ghost" 
-              size="icon"
-              onClick={() => navigate("/dashboard")}
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold text-primary">{venueName}</h1>
-              <p className="text-sm text-muted-foreground">Detailed venue overview</p>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <main className="container mx-auto px-4 py-6 space-y-6">
+    <PageLayout title={venueName} subtitle="Detailed venue overview">
+      <div className="space-y-6">
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
@@ -182,8 +163,8 @@ const VenueDetail = () => {
             <EmployeeActivityReport venueId={venueId} />
           </TabsContent>
         </Tabs>
-      </main>
-    </div>
+      </div>
+    </PageLayout>
   );
 };
 

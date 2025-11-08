@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Download, MapPin, Image as ImageIcon } from "lucide-react";
+import { Download, MapPin, Image as ImageIcon } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
@@ -26,6 +26,7 @@ import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import PageLayout from "@/components/PageLayout";
 
 interface AttendanceRecord {
   id: string;
@@ -318,16 +319,10 @@ export default function AttendanceReport() {
   };
 
   return (
-    <div className="min-h-screen bg-background p-3 md:p-6">
+    <PageLayout title="Attendance Report" subtitle="View and analyze attendance records">
       <div className="max-w-7xl mx-auto space-y-4 md:space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3 md:gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
-              <ArrowLeft className="h-4 w-4 md:h-5 md:w-5" />
-            </Button>
-            <h1 className="text-2xl md:text-3xl font-bold">Attendance Report</h1>
-          </div>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-end gap-3">
           <Button onClick={exportToCSV} variant="outline" size="sm" className="w-full sm:w-auto">
             <Download className="mr-2 h-3 w-3 md:h-4 md:w-4" />
             Export CSV
@@ -774,6 +769,6 @@ export default function AttendanceReport() {
           </TabsContent>
         </Tabs>
       </div>
-    </div>
+    </PageLayout>
   );
-}
+};
