@@ -76,7 +76,7 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
   };
 
   const handleUpdateStock = async () => {
-    const updates = Object.entries(stockUpdates).filter(([_, qty]) => qty && parseInt(qty) > 0);
+    const updates = Object.entries(stockUpdates).filter(([_, qty]) => qty && parseInt(qty) >= 0);
     
     if (updates.length === 0) {
       toast.error("Please enter at least one quantity");
@@ -84,14 +84,11 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
     }
 
     try {
-      for (const [itemId, addedQty] of updates) {
-        const item = stock.find(s => s.id === itemId);
-        if (!item) continue;
-
+      for (const [itemId, currentQty] of updates) {
         const { error } = await supabase
           .from("stock")
           .update({
-            quantity: item.quantity + parseInt(addedQty),
+            quantity: parseInt(currentQty),
           })
           .eq("id", itemId);
 
@@ -210,7 +207,7 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
           <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Update Stock Quantities</DialogTitle>
-              <DialogDescription>Enter quantities to add for each item (current stock will be updated)</DialogDescription>
+              <DialogDescription>Enter the current stock quantity for each item (weighed/counted)</DialogDescription>
             </DialogHeader>
             
             <div className="space-y-6">
@@ -223,23 +220,21 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
                       <TableHeader>
                         <TableRow className="bg-muted/50">
                           <TableHead className="w-[40%]">Item Name</TableHead>
-                          <TableHead className="w-[20%]">Current Stock</TableHead>
-                          <TableHead className="w-[20%]">Add Quantity</TableHead>
-                          <TableHead className="w-[20%]">New Total</TableHead>
+                          <TableHead className="w-[30%]">Previous Stock</TableHead>
+                          <TableHead className="w-[30%]">Current Stock</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {stock.filter(item => item.category === 'flavour').map((item) => {
-                          const addedQty = parseInt(stockUpdates[item.id] || "0");
                           return (
                             <TableRow key={item.id}>
                               <TableCell className="font-medium">{item.item_name}</TableCell>
-                              <TableCell>{item.quantity} {item.unit}</TableCell>
+                              <TableCell className="text-muted-foreground">{item.quantity} {item.unit}</TableCell>
                               <TableCell>
                                 <Input
                                   type="number"
                                   min="0"
-                                  placeholder="0"
+                                  placeholder={`Enter current ${item.unit}`}
                                   value={stockUpdates[item.id] || ""}
                                   onChange={(e) => setStockUpdates(prev => ({
                                     ...prev,
@@ -247,9 +242,6 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
                                   }))}
                                   className="w-full"
                                 />
-                              </TableCell>
-                              <TableCell className="font-semibold">
-                                {item.quantity + addedQty} {item.unit}
                               </TableCell>
                             </TableRow>
                           );
@@ -269,23 +261,21 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
                       <TableHeader>
                         <TableRow className="bg-muted/50">
                           <TableHead className="w-[40%]">Item Name</TableHead>
-                          <TableHead className="w-[20%]">Current Stock</TableHead>
-                          <TableHead className="w-[20%]">Add Quantity</TableHead>
-                          <TableHead className="w-[20%]">New Total</TableHead>
+                          <TableHead className="w-[30%]">Previous Stock</TableHead>
+                          <TableHead className="w-[30%]">Current Stock</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {stock.filter(item => item.category === 'hookah_pots').map((item) => {
-                          const addedQty = parseInt(stockUpdates[item.id] || "0");
                           return (
                             <TableRow key={item.id}>
                               <TableCell className="font-medium">{item.item_name}</TableCell>
-                              <TableCell>{item.quantity} {item.unit}</TableCell>
+                              <TableCell className="text-muted-foreground">{item.quantity} {item.unit}</TableCell>
                               <TableCell>
                                 <Input
                                   type="number"
                                   min="0"
-                                  placeholder="0"
+                                  placeholder={`Enter current ${item.unit}`}
                                   value={stockUpdates[item.id] || ""}
                                   onChange={(e) => setStockUpdates(prev => ({
                                     ...prev,
@@ -293,9 +283,6 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
                                   }))}
                                   className="w-full"
                                 />
-                              </TableCell>
-                              <TableCell className="font-semibold">
-                                {item.quantity + addedQty} {item.unit}
                               </TableCell>
                             </TableRow>
                           );
@@ -315,23 +302,21 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
                       <TableHeader>
                         <TableRow className="bg-muted/50">
                           <TableHead className="w-[40%]">Item Name</TableHead>
-                          <TableHead className="w-[20%]">Current Stock</TableHead>
-                          <TableHead className="w-[20%]">Add Quantity</TableHead>
-                          <TableHead className="w-[20%]">New Total</TableHead>
+                          <TableHead className="w-[30%]">Previous Stock</TableHead>
+                          <TableHead className="w-[30%]">Current Stock</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {stock.filter(item => item.category === 'accessories').map((item) => {
-                          const addedQty = parseInt(stockUpdates[item.id] || "0");
                           return (
                             <TableRow key={item.id}>
                               <TableCell className="font-medium">{item.item_name}</TableCell>
-                              <TableCell>{item.quantity} {item.unit}</TableCell>
+                              <TableCell className="text-muted-foreground">{item.quantity} {item.unit}</TableCell>
                               <TableCell>
                                 <Input
                                   type="number"
                                   min="0"
-                                  placeholder="0"
+                                  placeholder={`Enter current ${item.unit}`}
                                   value={stockUpdates[item.id] || ""}
                                   onChange={(e) => setStockUpdates(prev => ({
                                     ...prev,
@@ -339,9 +324,6 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
                                   }))}
                                   className="w-full"
                                 />
-                              </TableCell>
-                              <TableCell className="font-semibold">
-                                {item.quantity + addedQty} {item.unit}
                               </TableCell>
                             </TableRow>
                           );
