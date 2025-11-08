@@ -1,10 +1,8 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Camera } from "lucide-react";
@@ -18,51 +16,112 @@ interface ClosingPhotoWidgetProps {
 
 const ClosingPhotoWidget = ({ user, venueId }: ClosingPhotoWidgetProps) => {
   const [photoOpen, setPhotoOpen] = useState(false);
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoBlob, setPhotoBlob] = useState<Blob | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [showPhotoAppreciation, setShowPhotoAppreciation] = useState(false);
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [stream, setStream] = useState<MediaStream | null>(null);
 
-  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      try {
-        toast.info("Compressing image...");
-        const compressedFile = await compressImage(file);
-        setPhotoFile(compressedFile);
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setPhotoPreview(reader.result as string);
-        };
-        reader.readAsDataURL(compressedFile);
-      } catch (error) {
-        console.error("Compression error:", error);
-        toast.error("Failed to compress image");
+  const startCamera = async () => {
+    try {
+      setIsCameraActive(true);
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+        audio: false,
+      });
+      
+      setStream(mediaStream);
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+        await videoRef.current.play();
       }
+    } catch (error) {
+      console.error("Camera error:", error);
+      toast.error("Failed to access camera");
+      setIsCameraActive(false);
+    }
+  };
+
+  const capturePhoto = async () => {
+    try {
+      const canvas = document.createElement("canvas");
+      const video = videoRef.current;
+      
+      if (!video) {
+        throw new Error("Video element not found");
+      }
+
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext("2d");
+      
+      if (!ctx) {
+        throw new Error("Could not get canvas context");
+      }
+
+      ctx.drawImage(video, 0, 0);
+      
+      canvas.toBlob(async (blob) => {
+        if (blob) {
+          try {
+            // Convert blob to File for compression
+            const file = new File([blob], "closing-photo.jpg", { type: "image/jpeg" });
+            
+            // Compress the image
+            toast.info("Compressing image...");
+            const compressedFile = await compressImage(file, {
+              maxWidth: 1920,
+              maxHeight: 1920,
+              quality: 0.85
+            });
+            
+            setPhotoBlob(compressedFile);
+            
+            // Create preview
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              setPhotoPreview(reader.result as string);
+            };
+            reader.readAsDataURL(compressedFile);
+            
+            // Stop camera
+            if (stream) {
+              stream.getTracks().forEach((track) => track.stop());
+              setStream(null);
+            }
+            setIsCameraActive(false);
+          } catch (error) {
+            console.error("Compression error:", error);
+            toast.error("Failed to compress image");
+          }
+        }
+      }, "image/jpeg", 0.95);
+    } catch (error) {
+      console.error("Capture error:", error);
+      toast.error("Failed to capture photo");
     }
   };
 
   const handleRetakePhoto = () => {
-    setPhotoFile(null);
+    setPhotoBlob(null);
     setPhotoPreview(null);
-    const fileInput = document.getElementById("closingPhoto") as HTMLInputElement;
-    if (fileInput) fileInput.value = "";
+    startCamera();
   };
 
-  const handleUploadClosingPhoto = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!photoFile) {
-      toast.error("Please select a photo");
+  const handleUploadClosingPhoto = async () => {
+    if (!photoBlob) {
+      toast.error("Please capture a photo");
       return;
     }
 
     try {
-      const fileExt = photoFile.name.split(".").pop();
-      const fileName = `${venueId}/${Date.now()}.${fileExt}`;
+      const fileName = `${venueId}/${Date.now()}.jpg`;
 
       const { error: uploadError } = await supabase.storage
         .from("closing-photos")
-        .upload(fileName, photoFile);
+        .upload(fileName, photoBlob);
 
       if (uploadError) throw uploadError;
 
@@ -79,7 +138,7 @@ const ClosingPhotoWidget = ({ user, venueId }: ClosingPhotoWidgetProps) => {
       if (error) throw error;
 
       toast.success("Closing photo uploaded successfully");
-      setPhotoFile(null);
+      setPhotoBlob(null);
       setPhotoPreview(null);
       setPhotoOpen(false);
       setShowPhotoAppreciation(true);
@@ -109,25 +168,35 @@ const ClosingPhotoWidget = ({ user, venueId }: ClosingPhotoWidgetProps) => {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Upload Closing Photo</DialogTitle>
-                <DialogDescription>Photo of the cleaned counter</DialogDescription>
+                <DialogTitle>Capture Closing Photo</DialogTitle>
+                <DialogDescription>Take a photo of the cleaned counter</DialogDescription>
               </DialogHeader>
-              <form onSubmit={handleUploadClosingPhoto} className="space-y-4">
-                {!photoPreview ? (
-                  <div className="space-y-2">
-                    <Label htmlFor="closingPhoto">Counter Photo</Label>
-                    <Input
-                      id="closingPhoto"
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      onChange={handlePhotoSelect}
-                      required
-                    />
-                  </div>
-                ) : (
+              
+              <div className="space-y-4">
+                {/* Hidden video element for camera */}
+                <video
+                  ref={videoRef}
+                  className={isCameraActive ? "w-full rounded-lg" : "hidden"}
+                  playsInline
+                  muted
+                />
+
+                {!photoPreview && !isCameraActive && (
+                  <Button onClick={startCamera} className="w-full">
+                    <Camera className="mr-2 h-4 w-4" />
+                    Start Camera
+                  </Button>
+                )}
+
+                {isCameraActive && !photoPreview && (
+                  <Button onClick={capturePhoto} className="w-full">
+                    <Camera className="mr-2 h-4 w-4" />
+                    Capture Photo
+                  </Button>
+                )}
+
+                {photoPreview && (
                   <div className="space-y-3">
-                    <Label>Photo Preview</Label>
                     <div className="relative rounded-lg overflow-hidden border-2 border-border">
                       <img 
                         src={photoPreview} 
@@ -145,18 +214,13 @@ const ClosingPhotoWidget = ({ user, venueId }: ClosingPhotoWidgetProps) => {
                         <Camera className="mr-2 h-4 w-4" />
                         Retake
                       </Button>
-                      <Button type="submit" className="flex-1">
+                      <Button onClick={handleUploadClosingPhoto} className="flex-1">
                         Confirm & Upload
                       </Button>
                     </div>
                   </div>
                 )}
-                {!photoPreview && (
-                  <Button type="button" disabled className="w-full">
-                    Take Photo First
-                  </Button>
-                )}
-              </form>
+              </div>
             </DialogContent>
           </Dialog>
         </CardContent>
