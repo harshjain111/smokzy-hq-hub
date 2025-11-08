@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { TrendingUp, Plus, Camera } from "lucide-react";
 import { format } from "date-fns";
 import AppreciationDialog from "./AppreciationDialog";
+import { compressImage } from "@/lib/imageCompression";
 
 interface SalesWidgetProps {
   user: User;
@@ -90,15 +91,22 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
     }
   };
 
-  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setPhotoFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPhotoPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      try {
+        toast.info("Compressing image...");
+        const compressedFile = await compressImage(file);
+        setPhotoFile(compressedFile);
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setPhotoPreview(reader.result as string);
+        };
+        reader.readAsDataURL(compressedFile);
+      } catch (error) {
+        console.error("Compression error:", error);
+        toast.error("Failed to compress image");
+      }
     }
   };
 

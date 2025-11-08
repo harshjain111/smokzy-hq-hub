@@ -7,6 +7,7 @@ import { Camera, MapPin, Clock, LogIn, LogOut } from "lucide-react";
 import { format } from "date-fns";
 import SlideToConfirm from "./SlideToConfirm";
 import TasksCompletionDialog from "./TasksCompletionDialog";
+import { compressImage } from "@/lib/imageCompression";
 
 interface AttendanceWidgetProps {
   user: User;
@@ -172,7 +173,7 @@ const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
   };
 
   const capturePhoto = async (mediaStream: MediaStream): Promise<Blob> => {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       try {
         const canvas = document.createElement("canvas");
         const video = videoRef.current;
@@ -193,12 +194,27 @@ const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
 
         ctx.drawImage(video, 0, 0);
         
-        canvas.toBlob((blob) => {
+        canvas.toBlob(async (blob) => {
           if (blob) {
-            // Stop camera
-            mediaStream.getTracks().forEach((track) => track.stop());
-            setStream(null);
-            resolve(blob);
+            try {
+              // Convert blob to File for compression
+              const file = new File([blob], "photo.jpg", { type: "image/jpeg" });
+              
+              // Compress the image
+              const compressedFile = await compressImage(file, {
+                maxWidth: 1280,
+                maxHeight: 1280,
+                quality: 0.85
+              });
+              
+              // Stop camera
+              mediaStream.getTracks().forEach((track) => track.stop());
+              setStream(null);
+              
+              resolve(compressedFile);
+            } catch (error) {
+              reject(error);
+            }
           } else {
             reject(new Error("Failed to create blob from canvas"));
           }
