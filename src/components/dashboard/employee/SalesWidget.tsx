@@ -17,6 +17,12 @@ interface SalesWidgetProps {
   venueId: string;
 }
 
+interface TaskStatus {
+  stockReported: boolean;
+  salesReported: boolean;
+  closingPhoto: boolean;
+}
+
 const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
   const [open, setOpen] = useState(false);
   const [categoryId, setCategoryId] = useState("");
@@ -24,11 +30,49 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
   const [todaySales, setTodaySales] = useState<any[]>([]);
   const [hookahCategories, setHookahCategories] = useState<{ id: string; name: string }[]>([]);
   const [showSalesAppreciation, setShowSalesAppreciation] = useState(false);
+  const [taskStatus, setTaskStatus] = useState<TaskStatus>({
+    stockReported: false,
+    salesReported: false,
+    closingPhoto: false,
+  });
 
   useEffect(() => {
     fetchHookahCategories();
     fetchTodaySales();
+    checkTaskStatus();
   }, [venueId]);
+
+  const checkTaskStatus = async () => {
+    const today = format(new Date(), "yyyy-MM-dd");
+
+    const [stockCheck, closingCheck] = await Promise.all([
+      supabase
+        .from("stock")
+        .select("id, quantity, created_at, updated_at")
+        .eq("venue_id", venueId),
+      supabase
+        .from("closing_photos")
+        .select("id")
+        .eq("venue_id", venueId)
+        .eq("photo_date", today)
+        .limit(1),
+    ]);
+
+    let stockReported = false;
+    if (stockCheck.data && stockCheck.data.length > 0) {
+      const todayDate = format(new Date(), "yyyy-MM-dd");
+      stockReported = stockCheck.data.every((item: any) => {
+        const itemUpdateDate = format(new Date(item.updated_at), "yyyy-MM-dd");
+        return itemUpdateDate === todayDate && item.updated_at !== item.created_at;
+      });
+    }
+
+    setTaskStatus({
+      stockReported,
+      salesReported: true, // This is already completed since we're in SalesWidget
+      closingPhoto: !!(closingCheck.data && closingCheck.data.length > 0),
+    });
+  };
 
   const fetchHookahCategories = async () => {
     const { data } = await supabase
@@ -172,6 +216,7 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
         open={showSalesAppreciation}
         onOpenChange={setShowSalesAppreciation}
         taskType="sales"
+        taskStatus={taskStatus}
       />
     </div>
   );

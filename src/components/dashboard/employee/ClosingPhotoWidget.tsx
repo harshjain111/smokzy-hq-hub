@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,10 +8,17 @@ import { toast } from "sonner";
 import { Camera } from "lucide-react";
 import AppreciationDialog from "./AppreciationDialog";
 import { compressImage } from "@/lib/imageCompression";
+import { format } from "date-fns";
 
 interface ClosingPhotoWidgetProps {
   user: User;
   venueId: string;
+}
+
+interface TaskStatus {
+  stockReported: boolean;
+  salesReported: boolean;
+  closingPhoto: boolean;
 }
 
 const ClosingPhotoWidget = ({ user, venueId }: ClosingPhotoWidgetProps) => {
@@ -22,6 +29,47 @@ const ClosingPhotoWidget = ({ user, venueId }: ClosingPhotoWidgetProps) => {
   const [isCameraActive, setIsCameraActive] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [taskStatus, setTaskStatus] = useState<TaskStatus>({
+    stockReported: false,
+    salesReported: false,
+    closingPhoto: false,
+  });
+
+  useEffect(() => {
+    checkTaskStatus();
+  }, [venueId]);
+
+  const checkTaskStatus = async () => {
+    const today = format(new Date(), "yyyy-MM-dd");
+
+    const [stockCheck, salesCheck] = await Promise.all([
+      supabase
+        .from("stock")
+        .select("id, quantity, created_at, updated_at")
+        .eq("venue_id", venueId),
+      supabase
+        .from("sales_reports")
+        .select("id")
+        .eq("venue_id", venueId)
+        .eq("report_date", today)
+        .limit(1),
+    ]);
+
+    let stockReported = false;
+    if (stockCheck.data && stockCheck.data.length > 0) {
+      const todayDate = format(new Date(), "yyyy-MM-dd");
+      stockReported = stockCheck.data.every((item: any) => {
+        const itemUpdateDate = format(new Date(item.updated_at), "yyyy-MM-dd");
+        return itemUpdateDate === todayDate && item.updated_at !== item.created_at;
+      });
+    }
+
+    setTaskStatus({
+      stockReported,
+      salesReported: !!(salesCheck.data && salesCheck.data.length > 0),
+      closingPhoto: true, // This is already completed since we're in ClosingPhotoWidget
+    });
+  };
 
   const startCamera = async () => {
     try {
@@ -230,6 +278,7 @@ const ClosingPhotoWidget = ({ user, venueId }: ClosingPhotoWidgetProps) => {
         open={showPhotoAppreciation}
         onOpenChange={setShowPhotoAppreciation}
         taskType="photo"
+        taskStatus={taskStatus}
       />
     </>
   );

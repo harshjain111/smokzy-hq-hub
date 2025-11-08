@@ -25,6 +25,12 @@ interface StockItem {
   unit: string;
 }
 
+interface TaskStatus {
+  stockReported: boolean;
+  salesReported: boolean;
+  closingPhoto: boolean;
+}
+
 const StockWidget = ({ venueId }: StockWidgetProps) => {
   const [stock, setStock] = useState<StockItem[]>([]);
   const [addItemOpen, setAddItemOpen] = useState(false);
@@ -39,10 +45,41 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
   const [breakageCause, setBreakageCause] = useState("");
   const [allItemsUpdatedToday, setAllItemsUpdatedToday] = useState(false);
   const [showAppreciation, setShowAppreciation] = useState(false);
+  const [taskStatus, setTaskStatus] = useState<TaskStatus>({
+    stockReported: false,
+    salesReported: false,
+    closingPhoto: false,
+  });
 
   useEffect(() => {
     fetchStock();
+    checkTaskStatus();
   }, [venueId]);
+
+  const checkTaskStatus = async () => {
+    const today = format(new Date(), "yyyy-MM-dd");
+
+    const [salesCheck, closingCheck] = await Promise.all([
+      supabase
+        .from("sales_reports")
+        .select("id")
+        .eq("venue_id", venueId)
+        .eq("report_date", today)
+        .limit(1),
+      supabase
+        .from("closing_photos")
+        .select("id")
+        .eq("venue_id", venueId)
+        .eq("photo_date", today)
+        .limit(1),
+    ]);
+
+    setTaskStatus({
+      stockReported: allItemsUpdatedToday,
+      salesReported: !!(salesCheck.data && salesCheck.data.length > 0),
+      closingPhoto: !!(closingCheck.data && closingCheck.data.length > 0),
+    });
+  };
 
   const fetchStock = async () => {
     const { data } = await supabase
@@ -58,9 +95,10 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
     }
   };
 
-  const checkIfAllItemsUpdatedToday = (stockData: StockItem[]) => {
+  const checkIfAllItemsUpdatedToday = async (stockData: StockItem[]) => {
     if (stockData.length === 0) {
       setAllItemsUpdatedToday(false);
+      await checkTaskStatus();
       return;
     }
 
@@ -72,6 +110,7 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
     });
 
     setAllItemsUpdatedToday(allUpdated);
+    await checkTaskStatus();
   };
 
   const handleOpenUpdateStock = () => {
@@ -491,6 +530,7 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
         open={showAppreciation}
         onOpenChange={setShowAppreciation}
         taskType="stock"
+        taskStatus={taskStatus}
       />
     </div>
   );
