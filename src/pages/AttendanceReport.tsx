@@ -149,18 +149,21 @@ export default function AttendanceReport() {
         const userIds = [...new Set(attendanceRecords.map(r => r.user_id))];
         const venueIds = [...new Set(attendanceRecords.map(r => r.venue_id))];
 
-        const [profilesRes, venuesRes] = await Promise.all([
+        const [profilesRes, venuesRes, rolesRes] = await Promise.all([
           supabase.from("profiles").select("id, full_name").in("id", userIds),
           supabase.from("venues").select("id, name").in("id", venueIds),
+          supabase.from("user_roles").select("user_id, role, venue_id").in("user_id", userIds),
         ]);
 
         const profilesMap = new Map(profilesRes.data?.map(p => [p.id, p]) || []);
         const venuesMap = new Map(venuesRes.data?.map(v => [v.id, v]) || []);
+        const rolesMap = new Map(rolesRes.data?.map(r => [r.user_id, r]) || []);
 
         const enrichedData = attendanceRecords.map(record => ({
           ...record,
           profiles: profilesMap.get(record.user_id) || null,
           venues: venuesMap.get(record.venue_id) || null,
+          user_role: rolesMap.get(record.user_id) || null,
         }));
 
         setAttendanceData(enrichedData as any);
@@ -190,6 +193,61 @@ export default function AttendanceReport() {
       )
     );
     return uniqueDays.size;
+  };
+
+  const isLateCheckIn = (checkInTime: string) => {
+    const checkIn = new Date(checkInTime);
+    const hour = checkIn.getHours();
+    const minute = checkIn.getMinutes();
+    // Consider late if after 10:00 AM
+    return hour > 10 || (hour === 10 && minute > 0);
+  };
+
+  const isEarlyCheckOut = (checkOutTime: string | null) => {
+    if (!checkOutTime) return false;
+    const checkOut = new Date(checkOutTime);
+    const hour = checkOut.getHours();
+    // Consider early if before 10:00 PM (22:00)
+    return hour < 22;
+  };
+
+  const getDateColumns = () => {
+    const range = getDateRange();
+    const dates: Date[] = [];
+    const current = new Date(range.from);
+    
+    while (current <= range.to) {
+      dates.push(new Date(current));
+      current.setDate(current.getDate() + 1);
+    }
+    
+    return dates;
+  };
+
+  const getEmployeeAttendanceMatrix = () => {
+    // Group attendance by employee
+    const employeeMap = new Map<string, {
+      employee: any;
+      venue: any;
+      role: any;
+      attendanceByDate: Map<string, any>;
+    }>();
+
+    attendanceData.forEach(record => {
+      if (!employeeMap.has(record.user_id)) {
+        employeeMap.set(record.user_id, {
+          employee: record.profiles,
+          venue: record.venues,
+          role: (record as any).user_role,
+          attendanceByDate: new Map(),
+        });
+      }
+      
+      const dateKey = format(new Date(record.check_in_time), "yyyy-MM-dd");
+      employeeMap.get(record.user_id)!.attendanceByDate.set(dateKey, record);
+    });
+
+    return Array.from(employeeMap.values());
   };
 
   const exportToCSV = () => {
@@ -370,64 +428,85 @@ export default function AttendanceReport() {
             </div>
           </TabsContent>
 
-          {/* Daily Punching Report */}
+          {/* Daily Punching Report - Matrix Format */}
           <TabsContent value="daily">
             <Card>
               <CardContent className="p-0 overflow-hidden">
                 <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-xs md:text-sm whitespace-nowrap">Date</TableHead>
-                        <TableHead className="text-xs md:text-sm whitespace-nowrap">Employee</TableHead>
-                        <TableHead className="text-xs md:text-sm whitespace-nowrap hidden sm:table-cell">Venue</TableHead>
-                        <TableHead className="text-xs md:text-sm whitespace-nowrap">Check In</TableHead>
-                        <TableHead className="text-xs md:text-sm whitespace-nowrap hidden md:table-cell">Check Out</TableHead>
-                        <TableHead className="text-xs md:text-sm whitespace-nowrap hidden lg:table-cell">Hours</TableHead>
-                        <TableHead className="text-xs md:text-sm whitespace-nowrap">Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {loading ? (
+                  {loading ? (
+                    <div className="p-8 text-center">Loading...</div>
+                  ) : attendanceData.length === 0 ? (
+                    <div className="p-8 text-center">No records found</div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
                         <TableRow>
-                          <TableCell colSpan={7} className="text-center">Loading...</TableCell>
+                          <TableHead className="sticky left-0 bg-background z-10 text-xs md:text-sm whitespace-nowrap border-r">Emp ID</TableHead>
+                          <TableHead className="sticky left-[60px] md:left-[80px] bg-background z-10 text-xs md:text-sm whitespace-nowrap border-r">Name</TableHead>
+                          <TableHead className="sticky left-[140px] md:left-[200px] bg-background z-10 text-xs md:text-sm whitespace-nowrap border-r hidden sm:table-cell">Venue</TableHead>
+                          <TableHead className="sticky left-[220px] md:left-[340px] bg-background z-10 text-xs md:text-sm whitespace-nowrap border-r hidden md:table-cell">Role</TableHead>
+                          {getDateColumns().map((date) => (
+                            <TableHead key={date.toISOString()} className="text-xs md:text-sm text-center border-r min-w-[100px] md:min-w-[120px]">
+                              <div>{format(date, "dd-MM-yyyy")}</div>
+                              <div className="text-[10px] md:text-xs text-muted-foreground">{format(date, "EEEE")}</div>
+                            </TableHead>
+                          ))}
                         </TableRow>
-                      ) : attendanceData.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={7} className="text-center">No records found</TableCell>
-                        </TableRow>
-                      ) : (
-                        attendanceData.map((record) => (
-                          <TableRow key={record.id}>
-                            <TableCell className="text-xs md:text-sm whitespace-nowrap">{format(new Date(record.check_in_time), "MMM dd")}</TableCell>
-                            <TableCell className="text-xs md:text-sm">{record.profiles?.full_name || "N/A"}</TableCell>
-                            <TableCell className="text-xs md:text-sm hidden sm:table-cell">{record.venues?.name || "N/A"}</TableCell>
-                            <TableCell className="text-xs md:text-sm whitespace-nowrap">{format(new Date(record.check_in_time), "hh:mm a")}</TableCell>
-                            <TableCell className="text-xs md:text-sm whitespace-nowrap hidden md:table-cell">
-                              {record.check_out_time
-                                ? format(new Date(record.check_out_time), "hh:mm a")
-                                : "In Progress"}
+                      </TableHeader>
+                      <TableBody>
+                        {getEmployeeAttendanceMatrix().map((employeeData, idx) => (
+                          <TableRow key={idx}>
+                            <TableCell className="sticky left-0 bg-background z-10 text-xs md:text-sm border-r">{idx + 1}</TableCell>
+                            <TableCell className="sticky left-[60px] md:left-[80px] bg-background z-10 text-xs md:text-sm whitespace-nowrap border-r">
+                              {employeeData.employee?.full_name || "N/A"}
                             </TableCell>
-                            <TableCell className="text-xs md:text-sm hidden lg:table-cell">
-                              {calculateWorkingHours(record.check_in_time, record.check_out_time)}
+                            <TableCell className="sticky left-[140px] md:left-[200px] bg-background z-10 text-xs md:text-sm whitespace-nowrap border-r hidden sm:table-cell">
+                              {employeeData.venue?.name || "N/A"}
                             </TableCell>
-                            <TableCell className="text-xs md:text-sm">
-                              <span
-                                className={cn(
-                                  "px-1.5 py-0.5 md:px-2 md:py-1 rounded text-[10px] md:text-xs whitespace-nowrap",
-                                  record.tasks_completed
-                                    ? "bg-green-100 text-green-800"
-                                    : "bg-yellow-100 text-yellow-800"
-                                )}
-                              >
-                                {record.tasks_completed ? "Done" : "Pending"}
-                              </span>
+                            <TableCell className="sticky left-[220px] md:left-[340px] bg-background z-10 text-xs md:text-sm whitespace-nowrap border-r hidden md:table-cell capitalize">
+                              {employeeData.role?.role || "N/A"}
                             </TableCell>
+                            {getDateColumns().map((date) => {
+                              const dateKey = format(date, "yyyy-MM-dd");
+                              const attendance = employeeData.attendanceByDate.get(dateKey);
+                              
+                              if (!attendance) {
+                                return (
+                                  <TableCell key={dateKey} className="text-center text-xs md:text-sm border-r">
+                                    -
+                                  </TableCell>
+                                );
+                              }
+
+                              const isLate = isLateCheckIn(attendance.check_in_time);
+                              const isEarly = isEarlyCheckOut(attendance.check_out_time);
+
+                              return (
+                                <TableCell key={dateKey} className="text-center border-r p-2">
+                                  <div className="space-y-1">
+                                    <div className="flex items-center justify-center gap-1 text-[10px] md:text-xs">
+                                      <span>{format(new Date(attendance.check_in_time), "hh:mm a")}</span>
+                                      {isLate && (
+                                        <span className="text-orange-500" title="Late check-in">⚠️</span>
+                                      )}
+                                    </div>
+                                    {attendance.check_out_time && (
+                                      <div className="flex items-center justify-center gap-1 text-[10px] md:text-xs text-muted-foreground">
+                                        <span>{format(new Date(attendance.check_out_time), "hh:mm a")}</span>
+                                        {isEarly && (
+                                          <span className="text-orange-500" title="Early check-out">⚠️</span>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              );
+                            })}
                           </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
                 </div>
               </CardContent>
             </Card>
