@@ -60,13 +60,17 @@ const AttendancePreview = ({
                 style={{ height: '100%', width: '100%' }}
                 scrollWheelZoom={false}
               >
-                <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
-                <Marker position={[location.lat, location.lng]}>
-                  <Popup>Your check-in location</Popup>
-                </Marker>
+                {(() => (
+                  <>
+                    <TileLayer
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    />
+                    <Marker position={[location.lat, location.lng]}>
+                      <Popup>Your check-in location</Popup>
+                    </Marker>
+                  </>
+                )) as unknown as any}
               </MapContainer>
             </div>
             <p className="text-xs text-muted-foreground text-center">
