@@ -242,8 +242,8 @@ const ClosingPhotoWidget = ({ user, venueId }: ClosingPhotoWidgetProps) => {
           ) : (
             <Dialog open={photoOpen} onOpenChange={setPhotoOpen}>
               <DialogTrigger asChild>
-                <Button variant="outline" className="w-full">
-                  <Camera className="mr-2 h-4 w-4" />
+                <Button variant="outline" className="w-full border-2 min-h-[52px] text-base hover:bg-primary/5">
+                  <Camera className="mr-2 h-5 w-5" />
                   Upload Closing Photo
                 </Button>
               </DialogTrigger>
@@ -263,15 +263,15 @@ const ClosingPhotoWidget = ({ user, venueId }: ClosingPhotoWidgetProps) => {
                 />
 
                 {!photoPreview && !isCameraActive && (
-                  <Button onClick={startCamera} className="w-full">
-                    <Camera className="mr-2 h-4 w-4" />
+                  <Button onClick={startCamera} className="w-full border-2 border-primary/20 hover:border-primary/40 min-h-[52px] text-base">
+                    <Camera className="mr-2 h-5 w-5" />
                     Start Camera
                   </Button>
                 )}
 
                 {isCameraActive && !photoPreview && (
-                  <Button onClick={capturePhoto} className="w-full">
-                    <Camera className="mr-2 h-4 w-4" />
+                  <Button onClick={capturePhoto} className="w-full border-2 border-primary/20 hover:border-primary/40 min-h-[52px] text-base bg-primary hover:bg-primary/90">
+                    <Camera className="mr-2 h-5 w-5" />
                     Capture Photo
                   </Button>
                 )}
@@ -290,12 +290,12 @@ const ClosingPhotoWidget = ({ user, venueId }: ClosingPhotoWidgetProps) => {
                         type="button" 
                         variant="outline" 
                         onClick={handleRetakePhoto}
-                        className="flex-1"
+                        className="flex-1 border-2 min-h-[52px] text-base"
                       >
-                        <Camera className="mr-2 h-4 w-4" />
+                        <Camera className="mr-2 h-5 w-5" />
                         Retake
                       </Button>
-                      <Button onClick={handleUploadClosingPhoto} className="flex-1">
+                      <Button onClick={handleUploadClosingPhoto} className="flex-1 border-2 border-primary/20 min-h-[52px] text-base">
                         Confirm & Upload
                       </Button>
                     </div>
