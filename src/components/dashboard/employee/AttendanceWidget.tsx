@@ -394,7 +394,7 @@ const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
   };
 
   const handleSubmitCheckOut = async () => {
-    if (!previewData) return;
+    if (!previewData || !currentShift) return;
     
     setLoading(true);
     try {
@@ -408,6 +408,7 @@ const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
           check_out_lat: previewData.location.lat,
           check_out_lng: previewData.location.lng,
           check_out_time: new Date().toISOString(),
+          tasks_completed: true,
         })
         .eq("id", currentShift.id);
 
@@ -419,8 +420,10 @@ const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
       URL.revokeObjectURL(previewData.photoUrl);
       setShowPreview(false);
       setPreviewData(null);
+      setCurrentShift(null);
       
-      fetchTodayAttendance();
+      // Refresh attendance data to update UI
+      await fetchTodayAttendance();
     } catch (error: any) {
       console.error("Check-out error:", error);
       toast.error(error.message || "Failed to check out");

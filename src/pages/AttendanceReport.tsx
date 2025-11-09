@@ -60,8 +60,11 @@ export default function AttendanceReport() {
   const [attendanceData, setAttendanceData] = useState<AttendanceRecord[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [venues, setVenues] = useState<any[]>([]);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   useEffect(() => {
+    fetchCurrentUserRole();
     fetchFilters();
   }, []);
 
@@ -88,6 +91,30 @@ export default function AttendanceReport() {
       supabase.removeChannel(channel);
     };
   }, [dateRangeType, customRange, selectedEmployee, selectedVenue]);
+
+  const fetchCurrentUserRole = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setCurrentUser(user);
+        const { data: roleData } = await supabase
+          .from("user_roles")
+          .select("role, venue_id")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        
+        if (roleData) {
+          setUserRole(roleData.role);
+          // If employee, auto-filter to their own records
+          if (roleData.role === 'employee') {
+            setSelectedEmployee(user.id);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching user role:", error);
+    }
+  };
 
   const fetchFilters = async () => {
     try {
@@ -400,20 +427,22 @@ export default function AttendanceReport() {
               </Popover>
             )}
 
-            {/* Employee Filter */}
-            <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="All Employees" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Employees</SelectItem>
-                {employees.map((emp) => (
-                  <SelectItem key={emp.id} value={emp.id}>
-                    {emp.full_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* Employee Filter - Only show for admins */}
+            {userRole === 'admin' && (
+              <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="All Employees" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Employees</SelectItem>
+                  {employees.map((emp) => (
+                    <SelectItem key={emp.id} value={emp.id}>
+                      {emp.full_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
 
             {/* Venue Filter */}
             <Select value={selectedVenue} onValueChange={setSelectedVenue}>

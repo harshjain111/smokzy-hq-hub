@@ -60,13 +60,14 @@ const SlideToConfirm = ({
   };
 
   const handleMove = (clientX: number) => {
-    if (!isDragging || disabled || loading) return;
+    if (!isDragging || disabled || loading || isConfirmed) return;
 
     const containerRect = containerRef.current?.getBoundingClientRect();
+    const sliderWidth = sliderRef.current?.offsetWidth || 0;
     if (!containerRect) return;
 
     const newPosition = Math.min(
-      Math.max(0, clientX - containerRect.left - 32),
+      Math.max(0, clientX - containerRect.left - sliderWidth / 2),
       maxPosition
     );
     setPosition(newPosition);
@@ -76,7 +77,8 @@ const SlideToConfirm = ({
     if (!isDragging) return;
     setIsDragging(false);
 
-    if (position >= maxPosition * 0.85) {
+    // Reduced threshold from 0.85 to 0.75 for better responsiveness
+    if (position >= maxPosition * 0.75) {
       setPosition(maxPosition);
       setIsConfirmed(true);
       
