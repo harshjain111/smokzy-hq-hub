@@ -9,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format, startOfMonth, endOfMonth, subMonths, eachDayOfInterval } from "date-fns";
-import { CalendarIcon, Download } from "lucide-react";
+import { CalendarIcon, Download, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import PageLayout from "@/components/PageLayout";
 import { toast } from "sonner";
@@ -152,6 +152,14 @@ const VenueReports = () => {
   return (
     <PageLayout title={`${venueName} - Detailed Reports`} subtitle="Comprehensive venue analytics and leak prevention">
       <div className="space-y-6">
+        <Button
+          variant="outline"
+          onClick={() => navigate(`/venue/${venueId}`)}
+          className="mb-4"
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Venue
+        </Button>
         {/* Filters */}
         <Card>
           <CardHeader>
