@@ -54,12 +54,14 @@ const AttendancePreview = ({
             </div>
             <div className="h-64 w-full overflow-hidden rounded-lg border border-border">
               <MapContainer
+                key={`${location.lat}-${location.lng}`}
                 center={[location.lat, location.lng]}
                 zoom={15}
                 style={{ height: '100%', width: '100%' }}
                 scrollWheelZoom={false}
               >
                 <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
                 <Marker position={[location.lat, location.lng]}>
