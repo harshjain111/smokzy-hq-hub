@@ -188,6 +188,7 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
       setStockUpdates({});
       setUpdateStockOpen(false);
       await fetchStock();
+      await checkTaskStatus();
       
       // Show appreciation if all items were updated
       if (updates.length === stock.length) {

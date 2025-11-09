@@ -133,7 +133,8 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
       toast.success("Sales reported successfully");
       setQuantity("");
       setOpen(false);
-      fetchTodaySales();
+      await fetchTodaySales();
+      await checkTaskStatus();
       setShowSalesAppreciation(true);
     }
   };
