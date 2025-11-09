@@ -112,7 +112,8 @@ const Auth = () => {
             <img 
               src={smokzyLogo} 
               alt="Smokzy Logo" 
-              className="h-16 w-auto object-contain"
+              className="h-24 w-auto object-contain"
+              style={{ filter: 'drop-shadow(0 4px 12px rgba(212, 175, 55, 0.4))' }}
             />
           </div>
           <CardTitle className="text-2xl font-bold text-center text-auth-gold">

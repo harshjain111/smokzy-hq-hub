@@ -73,7 +73,8 @@ const PageLayout = ({ children, title, subtitle }: PageLayoutProps) => {
             <img 
               src={smokzyLogo} 
               alt="Smokzy" 
-              className="h-10 w-auto object-contain"
+              className="h-14 w-auto object-contain"
+              style={{ filter: 'drop-shadow(0 2px 8px rgba(212, 175, 55, 0.3))' }}
             />
             <div className="border-l pl-3 ml-1">
               <h1 className="text-xl font-semibold text-foreground">
