@@ -6,6 +6,7 @@ import TasksWidget from "./employee/TasksWidget";
 import StockWidget from "./employee/StockWidget";
 import SalesWidget from "./employee/SalesWidget";
 import ClosingPhotoWidget from "./employee/ClosingPhotoWidget";
+import WelcomeDialog from "@/components/WelcomeDialog";
 
 interface EmployeeDashboardProps {
   user: User;
@@ -15,6 +16,7 @@ interface EmployeeDashboardProps {
 const EmployeeDashboard = ({ user, venueId }: EmployeeDashboardProps) => {
   return (
     <div className="space-y-4 md:space-y-6 pb-6">
+      <WelcomeDialog userName={user.user_metadata?.full_name || user.email || "Team Member"} role="employee" />
       {/* Mobile-optimized Tasks Card */}
       <Card className="bg-gradient-to-br from-primary/10 to-accent/10 border-primary/20">
         <CardHeader className="p-4 md:p-6">

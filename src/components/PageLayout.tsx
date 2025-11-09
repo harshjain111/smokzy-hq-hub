@@ -8,6 +8,7 @@ import { Home } from "lucide-react";
 import ProfileMenu from "@/components/ProfileMenu";
 import AdminSettingsMenu from "@/components/AdminSettingsMenu";
 import smokzyLogo from "@/assets/smokzy-logo.png";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 interface PageLayoutProps {
   children: React.ReactNode;
@@ -52,14 +53,7 @@ const PageLayout = ({ children, title, subtitle }: PageLayoutProps) => {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   return (
