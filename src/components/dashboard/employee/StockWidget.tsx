@@ -386,7 +386,7 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
         </Card>
       ) : (
         <div className="space-y-3">
-          {/* Register New Item Button - Full Width at Top */}
+          {/* Register New Item Button */}
           <Dialog open={addItemOpen} onOpenChange={setAddItemOpen}>
             <DialogTrigger asChild>
               <Button className="w-full">
@@ -452,14 +452,143 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
           </Dialog>
 
           {/* Update Stock and Report Breakage - Side by Side */}
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-3">
             <Dialog open={updateStockOpen} onOpenChange={setUpdateStockOpen}>
               <DialogTrigger asChild>
-                <Button variant="outline" className="w-full" onClick={handleOpenUpdateStock}>
+                <Button variant="outline" className="w-full" onClick={handleOpenUpdateStock} disabled={stock.length === 0}>
                   <Package className="mr-2 h-4 w-4" />
                   Update Stock
                 </Button>
               </DialogTrigger>
+              <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Update Stock Quantities</DialogTitle>
+                  <DialogDescription>Enter current stock levels for each item</DialogDescription>
+                </DialogHeader>
+                
+                <div className="space-y-6">
+                  {/* Flavours Section */}
+                  {stock.filter(item => item.category === 'flavour').length > 0 && (
+                    <div className="space-y-2">
+                      <h3 className="text-lg font-semibold">Flavours</h3>
+                      <div className="border rounded-lg overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-muted/50">
+                              <TableHead className="w-[50%]">Item Name</TableHead>
+                              <TableHead className="w-[50%]">Current Stock</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {stock.filter(item => item.category === 'flavour').map((item) => (
+                              <TableRow key={item.id}>
+                                <TableCell className="font-medium">{item.item_name}</TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    placeholder="Enter quantity"
+                                    value={stockUpdates[item.id] || ""}
+                                    onChange={(e) => setStockUpdates(prev => ({
+                                      ...prev,
+                                      [item.id]: e.target.value
+                                    }))}
+                                    className="w-full"
+                                  />
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Hookah Pots Section */}
+                  {stock.filter(item => item.category === 'hookah_pots').length > 0 && (
+                    <div className="space-y-2">
+                      <h3 className="text-lg font-semibold">Hookah Pots</h3>
+                      <div className="border rounded-lg overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-muted/50">
+                              <TableHead className="w-[50%]">Item Name</TableHead>
+                              <TableHead className="w-[50%]">Current Stock</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {stock.filter(item => item.category === 'hookah_pots').map((item) => (
+                              <TableRow key={item.id}>
+                                <TableCell className="font-medium">{item.item_name}</TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    placeholder="Enter quantity"
+                                    value={stockUpdates[item.id] || ""}
+                                    onChange={(e) => setStockUpdates(prev => ({
+                                      ...prev,
+                                      [item.id]: e.target.value
+                                    }))}
+                                    className="w-full"
+                                  />
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Accessories Section */}
+                  {stock.filter(item => item.category === 'accessories').length > 0 && (
+                    <div className="space-y-2">
+                      <h3 className="text-lg font-semibold">Accessories</h3>
+                      <div className="border rounded-lg overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-muted/50">
+                              <TableHead className="w-[50%]">Item Name</TableHead>
+                              <TableHead className="w-[50%]">Current Stock</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {stock.filter(item => item.category === 'accessories').map((item) => (
+                              <TableRow key={item.id}>
+                                <TableCell className="font-medium">{item.item_name}</TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    placeholder="Enter quantity"
+                                    value={stockUpdates[item.id] || ""}
+                                    onChange={(e) => setStockUpdates(prev => ({
+                                      ...prev,
+                                      [item.id]: e.target.value
+                                    }))}
+                                    className="w-full"
+                                  />
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-2 pt-4">
+                  <Button type="button" onClick={handleUpdateStock} className="flex-1">
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Stock Updates
+                  </Button>
+                  <Button type="button" variant="outline" onClick={() => setUpdateStockOpen(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              </DialogContent>
             </Dialog>
 
             <Dialog open={breakageOpen} onOpenChange={setBreakageOpen}>
@@ -469,44 +598,44 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
                   Report Breakage
                 </Button>
               </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Report Breakage</DialogTitle>
-                <DialogDescription>Report broken or damaged items</DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleReportBreakage} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="item">Item Type</Label>
-                  <Input
-                    id="item"
-                    value={breakageItem}
-                    onChange={(e) => setBreakageItem(e.target.value)}
-                    placeholder="e.g., Hookah Pot, Glass, etc."
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="breakageQty">Quantity</Label>
-                  <Input
-                    id="breakageQty"
-                    type="number"
-                    value={breakageQuantity}
-                    onChange={(e) => setBreakageQuantity(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="cause">Cause of Breakage</Label>
-                  <Textarea
-                    id="cause"
-                    value={breakageCause}
-                    onChange={(e) => setBreakageCause(e.target.value)}
-                    required
-                  />
-                </div>
-                <Button type="submit" className="w-full">Submit Report</Button>
-              </form>
-            </DialogContent>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Report Breakage</DialogTitle>
+                  <DialogDescription>Report broken or damaged items</DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleReportBreakage} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="item">Item Type</Label>
+                    <Input
+                      id="item"
+                      value={breakageItem}
+                      onChange={(e) => setBreakageItem(e.target.value)}
+                      placeholder="e.g., Hookah Pot, Glass, etc."
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="breakageQty">Quantity</Label>
+                    <Input
+                      id="breakageQty"
+                      type="number"
+                      value={breakageQuantity}
+                      onChange={(e) => setBreakageQuantity(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="cause">Cause of Breakage</Label>
+                    <Textarea
+                      id="cause"
+                      value={breakageCause}
+                      onChange={(e) => setBreakageCause(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <Button type="submit" className="w-full">Submit Report</Button>
+                </form>
+              </DialogContent>
             </Dialog>
           </div>
         </div>
