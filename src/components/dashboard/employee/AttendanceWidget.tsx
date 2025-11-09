@@ -8,6 +8,7 @@ import { format } from "date-fns";
 import SlideToConfirm from "./SlideToConfirm";
 import TasksCompletionDialog from "./TasksCompletionDialog";
 import AttendancePreview from "./AttendancePreview";
+import CheckoutAppreciationDialog from "./CheckoutAppreciationDialog";
 import { compressImage } from "@/lib/imageCompression";
 
 interface AttendanceWidgetProps {
@@ -31,6 +32,7 @@ const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
     closingPhoto: false,
   });
   const [showTasksDialog, setShowTasksDialog] = useState(false);
+  const [showAppreciationDialog, setShowAppreciationDialog] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [previewData, setPreviewData] = useState<{
     photoBlob: Blob;
@@ -424,6 +426,9 @@ const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
       
       // Refresh attendance data to update UI
       await fetchTodayAttendance();
+      
+      // Show appreciation dialog
+      setShowAppreciationDialog(true);
     } catch (error: any) {
       console.error("Check-out error:", error);
       toast.error(error.message || "Failed to check out");
@@ -533,6 +538,11 @@ const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
         open={showTasksDialog}
         onOpenChange={setShowTasksDialog}
         tasks={tasks}
+      />
+
+      <CheckoutAppreciationDialog
+        open={showAppreciationDialog}
+        onOpenChange={setShowAppreciationDialog}
       />
 
       {showPreview && previewData && (
