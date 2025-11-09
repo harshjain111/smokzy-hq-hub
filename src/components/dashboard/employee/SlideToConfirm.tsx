@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -23,12 +23,25 @@ const SlideToConfirm = ({
   const [position, setPosition] = useState(0);
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [shouldShake, setShouldShake] = useState(false);
+  const [maxPosition, setMaxPosition] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const sliderRef = useRef<HTMLDivElement>(null);
 
-  const maxPosition = containerRef.current
-    ? containerRef.current.offsetWidth - (sliderRef.current?.offsetWidth || 0)
-    : 0;
+  // Calculate max position on mount and window resize
+  const calculateMaxPosition = useCallback(() => {
+    if (containerRef.current && sliderRef.current) {
+      const containerWidth = containerRef.current.offsetWidth;
+      const sliderWidth = sliderRef.current.offsetWidth;
+      const padding = 4; // Account for padding (left-1 = 0.25rem = 4px)
+      setMaxPosition(containerWidth - sliderWidth - padding * 2);
+    }
+  }, []);
+
+  useEffect(() => {
+    calculateMaxPosition();
+    window.addEventListener('resize', calculateMaxPosition);
+    return () => window.removeEventListener('resize', calculateMaxPosition);
+  }, [calculateMaxPosition]);
 
   useEffect(() => {
     if (isConfirmed) {
@@ -47,67 +60,76 @@ const SlideToConfirm = ({
     }
   }, [shouldShake]);
 
-  const handleStart = (clientX: number) => {
+  const handleStart = useCallback((clientX: number) => {
     if (disabled || loading) {
-      // Trigger shake animation when trying to interact with disabled slider
       setShouldShake(true);
       if (navigator.vibrate) {
-        navigator.vibrate(50); // Short vibration for feedback
+        navigator.vibrate(50);
       }
       return;
     }
     setIsDragging(true);
-  };
+  }, [disabled, loading]);
 
-  const handleMove = (clientX: number) => {
+  const handleMove = useCallback((clientX: number) => {
     if (!isDragging || disabled || loading || isConfirmed) return;
 
-    const containerRect = containerRef.current?.getBoundingClientRect();
-    const sliderWidth = sliderRef.current?.offsetWidth || 0;
-    if (!containerRect) return;
+    const container = containerRef.current;
+    const slider = sliderRef.current;
+    if (!container || !slider) return;
 
-    const newPosition = Math.min(
-      Math.max(0, clientX - containerRect.left - sliderWidth / 2),
-      maxPosition
-    );
+    const containerRect = container.getBoundingClientRect();
+    const sliderWidth = slider.offsetWidth;
+    
+    // Calculate position relative to container start
+    let newPosition = clientX - containerRect.left - sliderWidth / 2;
+    
+    // Clamp between 0 and maxPosition
+    newPosition = Math.max(0, Math.min(newPosition, maxPosition));
+    
     setPosition(newPosition);
-  };
+  }, [isDragging, disabled, loading, isConfirmed, maxPosition]);
 
-  const handleEnd = () => {
+  const handleEnd = useCallback(() => {
     if (!isDragging) return;
     setIsDragging(false);
 
-    // Reduced threshold from 0.85 to 0.75 for better responsiveness
-    if (position >= maxPosition * 0.75) {
+    // Check if slider is at least 70% to the end (more forgiving for mobile)
+    const threshold = maxPosition * 0.7;
+    
+    if (position >= threshold) {
       setPosition(maxPosition);
       setIsConfirmed(true);
       
       // Haptic feedback on success
       if (navigator.vibrate) {
-        navigator.vibrate([50, 30, 50]); // Short-pause-short vibration pattern
+        navigator.vibrate([50, 30, 50]);
       }
       
       onConfirm();
     } else {
+      // Animate back to start
       setPosition(0);
     }
-  };
+  }, [isDragging, position, maxPosition, onConfirm]);
 
-  const handleTouchStart = (e: React.TouchEvent) => {
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    e.preventDefault(); // Prevent scrolling while dragging
     handleStart(e.touches[0].clientX);
-  };
+  }, [handleStart]);
 
-  const handleTouchMove = (e: React.TouchEvent) => {
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    e.preventDefault(); // Prevent scrolling while dragging
     handleMove(e.touches[0].clientX);
-  };
+  }, [handleMove]);
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
     handleStart(e.clientX);
-  };
+  }, [handleStart]);
 
-  const handleMouseMove = (e: MouseEvent) => {
+  const handleMouseMove = useCallback((e: MouseEvent) => {
     handleMove(e.clientX);
-  };
+  }, [handleMove]);
 
   useEffect(() => {
     if (isDragging) {
@@ -118,7 +140,7 @@ const SlideToConfirm = ({
         window.removeEventListener("mouseup", handleEnd);
       };
     }
-  }, [isDragging, position, maxPosition]);
+  }, [isDragging, handleMouseMove, handleEnd]);
 
   const progressPercentage = maxPosition > 0 ? (position / maxPosition) * 100 : 0;
 
@@ -126,25 +148,27 @@ const SlideToConfirm = ({
     <div
       ref={containerRef}
       className={cn(
-        "relative h-14 rounded-full overflow-hidden select-none transition-opacity",
+        "relative h-14 rounded-full overflow-hidden select-none touch-none",
         disabled && "opacity-50 cursor-not-allowed",
         shouldShake && "animate-shake",
         "bg-muted border-2 border-border"
       )}
     >
+      {/* Progress background */}
       <div
-        className="absolute inset-0 bg-primary transition-all duration-300 ease-out"
+        className="absolute inset-0 bg-gradient-to-r from-primary to-primary/80 transition-all duration-150 ease-out"
         style={{
           width: `${progressPercentage}%`,
           opacity: 0.2,
         }}
       />
 
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+      {/* Text */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-4">
         <span
           className={cn(
-            "text-sm font-medium transition-opacity duration-300",
-            progressPercentage > 50 ? "opacity-0" : "opacity-100",
+            "text-sm font-medium transition-all duration-200",
+            progressPercentage > 50 ? "opacity-0 scale-95" : "opacity-100 scale-100",
             disabled ? "text-muted-foreground" : "text-foreground"
           )}
         >
@@ -152,6 +176,7 @@ const SlideToConfirm = ({
         </span>
       </div>
 
+      {/* Slider button */}
       <div
         ref={sliderRef}
         onMouseDown={handleMouseDown}
@@ -159,21 +184,23 @@ const SlideToConfirm = ({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleEnd}
         className={cn(
-          "absolute top-1 left-1 h-12 w-12 rounded-full transition-all duration-200",
+          "absolute top-1 left-1 h-12 w-12 rounded-full",
           "flex items-center justify-center",
+          "transition-shadow duration-200",
           disabled
             ? "bg-muted-foreground/50 cursor-not-allowed"
             : isConfirmed
-            ? "bg-success cursor-default"
-            : "bg-primary shadow-lg cursor-grab active:cursor-grabbing hover:shadow-xl"
+            ? "bg-success cursor-default shadow-lg"
+            : "bg-primary shadow-lg cursor-grab active:cursor-grabbing active:shadow-xl hover:shadow-xl"
         )}
         style={{
           transform: `translateX(${position}px)`,
           transition: isDragging ? "none" : "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+          willChange: isDragging ? "transform" : "auto",
         }}
       >
         {isConfirmed ? (
-          <div className="text-white text-2xl">✓</div>
+          <div className="text-primary-foreground text-2xl font-bold">✓</div>
         ) : (
           <div className={cn("transition-colors", disabled ? "text-background" : "text-primary-foreground")}>
             {icon}
@@ -181,11 +208,13 @@ const SlideToConfirm = ({
         )}
       </div>
 
+      {/* Arrow indicator */}
       {!disabled && !isConfirmed && (
         <div
-          className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none"
+          className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none transition-all duration-200"
           style={{
-            opacity: Math.max(0, 1 - progressPercentage / 50),
+            opacity: Math.max(0, 1 - progressPercentage / 40),
+            transform: `translateY(-50%) scale(${1 - progressPercentage / 100})`,
           }}
         >
           <ChevronRight className="h-6 w-6 text-muted-foreground" />
