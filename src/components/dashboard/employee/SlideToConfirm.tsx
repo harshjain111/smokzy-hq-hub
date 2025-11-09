@@ -159,17 +159,17 @@ const SlideToConfirm = ({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleEnd}
         className={cn(
-          "absolute top-1 left-1 h-12 w-12 rounded-full transition-colors duration-200",
-          "flex items-center justify-center cursor-grab active:cursor-grabbing",
+          "absolute top-1 left-1 h-12 w-12 rounded-full transition-all duration-200",
+          "flex items-center justify-center",
           disabled
-            ? "bg-muted-foreground/50"
+            ? "bg-muted-foreground/50 cursor-not-allowed"
             : isConfirmed
-            ? "bg-success"
-            : "bg-primary shadow-lg"
+            ? "bg-success cursor-default"
+            : "bg-primary shadow-lg cursor-grab active:cursor-grabbing hover:shadow-xl"
         )}
         style={{
           transform: `translateX(${position}px)`,
-          transition: isDragging ? "none" : "transform 0.3s ease-out",
+          transition: isDragging ? "none" : "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
         }}
       >
         {isConfirmed ? (

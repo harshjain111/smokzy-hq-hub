@@ -1,17 +1,6 @@
 import { MapPin, RotateCcw, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
-import L from "leaflet";
-
-// Fix for default marker icon
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
-  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-});
 
 interface AttendancePreviewProps {
   photoUrl: string;
@@ -32,7 +21,7 @@ const AttendancePreview = ({
     <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex items-center justify-center p-4">
       <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <CardContent className="p-6 space-y-4">
-          <h3 className="text-lg font-semibold text-center">Review Your Check-in</h3>
+          <h3 className="text-lg font-semibold text-center">Review Your Photo</h3>
           
           {/* Photo Preview */}
           <div className="space-y-2">
@@ -46,36 +35,32 @@ const AttendancePreview = ({
             </div>
           </div>
 
-          {/* Location Map */}
+          {/* Location Info */}
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <MapPin className="h-4 w-4 text-muted-foreground" />
-              <p className="text-sm font-medium text-muted-foreground">Your Location</p>
+              <p className="text-sm font-medium text-muted-foreground">Location Captured</p>
             </div>
-            <div className="h-64 w-full overflow-hidden rounded-lg border border-border">
-              <MapContainer
-                key={`${location.lat}-${location.lng}`}
-                center={[location.lat, location.lng]}
-                zoom={15}
-                style={{ height: '100%', width: '100%' }}
-                scrollWheelZoom={false}
+            <div className="p-4 bg-muted/50 rounded-lg border border-border">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Latitude</p>
+                  <p className="font-mono font-medium">{location.lat.toFixed(6)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Longitude</p>
+                  <p className="font-mono font-medium">{location.lng.toFixed(6)}</p>
+                </div>
+              </div>
+              <a
+                href={`https://www.google.com/maps?q=${location.lat},${location.lng}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-primary hover:underline mt-2 inline-block"
               >
-                {(() => (
-                  <>
-                    <TileLayer
-                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    />
-                    <Marker position={[location.lat, location.lng]}>
-                      <Popup>Your check-in location</Popup>
-                    </Marker>
-                  </>
-                )) as unknown as any}
-              </MapContainer>
+                View on Google Maps →
+              </a>
             </div>
-            <p className="text-xs text-muted-foreground text-center">
-              Lat: {location.lat.toFixed(6)}, Lng: {location.lng.toFixed(6)}
-            </p>
           </div>
 
           {/* Action Buttons */}
