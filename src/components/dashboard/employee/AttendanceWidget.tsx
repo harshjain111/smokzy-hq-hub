@@ -7,6 +7,7 @@ import { Camera, MapPin, Clock, LogIn, LogOut } from "lucide-react";
 import { format } from "date-fns";
 import SlideToConfirm from "./SlideToConfirm";
 import TasksCompletionDialog from "./TasksCompletionDialog";
+import AttendancePreview from "./AttendancePreview";
 import { compressImage } from "@/lib/imageCompression";
 
 interface AttendanceWidgetProps {
@@ -30,6 +31,13 @@ const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
     closingPhoto: false,
   });
   const [showTasksDialog, setShowTasksDialog] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewData, setPreviewData] = useState<{
+    photoBlob: Blob;
+    photoUrl: string;
+    location: { lat: number; lng: number };
+    isCheckOut: boolean;
+  } | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
 
@@ -278,21 +286,18 @@ const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
       toast.info("Getting location...");
       const location = await getCurrentLocation();
       
-      toast.info("Uploading photo...");
-      const photoUrl = await uploadPhoto(photoBlob);
-
-      const { error } = await supabase.from("attendance").insert({
-        user_id: user.id,
-        venue_id: venueId,
-        check_in_selfie_url: photoUrl,
-        check_in_lat: location.lat,
-        check_in_lng: location.lng,
+      // Create preview URL
+      const previewUrl = URL.createObjectURL(photoBlob);
+      
+      // Show preview
+      setPreviewData({
+        photoBlob,
+        photoUrl: previewUrl,
+        location,
+        isCheckOut: false,
       });
-
-      if (error) throw error;
-
-      toast.success("Checked in successfully!");
-      fetchTodayAttendance();
+      setShowPreview(true);
+      setLoading(false);
     } catch (error: any) {
       console.error("Check-in error:", error);
       toast.error(error.message || "Failed to check in");
@@ -301,6 +306,48 @@ const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
         stream.getTracks().forEach((track) => track.stop());
         setStream(null);
       }
+      setLoading(false);
+    }
+  };
+
+  const handleRetake = () => {
+    // Clean up preview URL
+    if (previewData?.photoUrl) {
+      URL.revokeObjectURL(previewData.photoUrl);
+    }
+    setShowPreview(false);
+    setPreviewData(null);
+  };
+
+  const handleSubmitCheckIn = async () => {
+    if (!previewData) return;
+    
+    setLoading(true);
+    try {
+      toast.info("Uploading photo...");
+      const photoUrl = await uploadPhoto(previewData.photoBlob);
+
+      const { error } = await supabase.from("attendance").insert({
+        user_id: user.id,
+        venue_id: venueId,
+        check_in_selfie_url: photoUrl,
+        check_in_lat: previewData.location.lat,
+        check_in_lng: previewData.location.lng,
+      });
+
+      if (error) throw error;
+
+      toast.success("Checked in successfully!");
+      
+      // Clean up
+      URL.revokeObjectURL(previewData.photoUrl);
+      setShowPreview(false);
+      setPreviewData(null);
+      
+      fetchTodayAttendance();
+    } catch (error: any) {
+      console.error("Check-in error:", error);
+      toast.error(error.message || "Failed to check in");
     } finally {
       setLoading(false);
     }
@@ -322,23 +369,18 @@ const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
       toast.info("Getting location...");
       const location = await getCurrentLocation();
       
-      toast.info("Uploading photo...");
-      const photoUrl = await uploadPhoto(photoBlob);
-
-      const { error } = await supabase
-        .from("attendance")
-        .update({
-          check_out_selfie_url: photoUrl,
-          check_out_lat: location.lat,
-          check_out_lng: location.lng,
-          check_out_time: new Date().toISOString(),
-        })
-        .eq("id", currentShift.id);
-
-      if (error) throw error;
-
-      toast.success("Checked out successfully!");
-      fetchTodayAttendance();
+      // Create preview URL
+      const previewUrl = URL.createObjectURL(photoBlob);
+      
+      // Show preview
+      setPreviewData({
+        photoBlob,
+        photoUrl: previewUrl,
+        location,
+        isCheckOut: true,
+      });
+      setShowPreview(true);
+      setLoading(false);
     } catch (error: any) {
       console.error("Check-out error:", error);
       toast.error(error.message || "Failed to check out");
@@ -347,6 +389,41 @@ const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
         stream.getTracks().forEach((track) => track.stop());
         setStream(null);
       }
+      setLoading(false);
+    }
+  };
+
+  const handleSubmitCheckOut = async () => {
+    if (!previewData) return;
+    
+    setLoading(true);
+    try {
+      toast.info("Uploading photo...");
+      const photoUrl = await uploadPhoto(previewData.photoBlob);
+
+      const { error } = await supabase
+        .from("attendance")
+        .update({
+          check_out_selfie_url: photoUrl,
+          check_out_lat: previewData.location.lat,
+          check_out_lng: previewData.location.lng,
+          check_out_time: new Date().toISOString(),
+        })
+        .eq("id", currentShift.id);
+
+      if (error) throw error;
+
+      toast.success("Checked out successfully!");
+      
+      // Clean up
+      URL.revokeObjectURL(previewData.photoUrl);
+      setShowPreview(false);
+      setPreviewData(null);
+      
+      fetchTodayAttendance();
+    } catch (error: any) {
+      console.error("Check-out error:", error);
+      toast.error(error.message || "Failed to check out");
     } finally {
       setLoading(false);
     }
@@ -454,6 +531,16 @@ const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
         onOpenChange={setShowTasksDialog}
         tasks={tasks}
       />
+
+      {showPreview && previewData && (
+        <AttendancePreview
+          photoUrl={previewData.photoUrl}
+          location={previewData.location}
+          onRetake={handleRetake}
+          onSubmit={previewData.isCheckOut ? handleSubmitCheckOut : handleSubmitCheckIn}
+          loading={loading}
+        />
+      )}
     </>
   );
 };
