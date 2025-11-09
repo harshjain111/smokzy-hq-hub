@@ -108,7 +108,6 @@ const VenueReports = () => {
     const range = getDateRange();
     const dates = eachDayOfInterval({ start: range.from, end: range.to });
     
-    // Group stock items by item name
     const itemsMap = new Map();
     stockData.forEach(item => {
       if (!itemsMap.has(item.item_name)) {
@@ -150,24 +149,25 @@ const VenueReports = () => {
   };
 
   return (
-    <PageLayout title={`${venueName} - Detailed Reports`} subtitle="Comprehensive venue analytics and leak prevention">
-      <div className="space-y-6">
+    <PageLayout title={`${venueName} - Reports`} subtitle="Detailed analytics">
+      <div className="space-y-4 md:space-y-6">
         <Button
           variant="outline"
           onClick={() => navigate(`/venue/${venueId}`)}
-          className="mb-4"
+          className="w-full md:w-auto"
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Venue
         </Button>
+
         {/* Filters */}
         <Card>
           <CardHeader>
-            <CardTitle>Report Period</CardTitle>
+            <CardTitle className="text-lg md:text-xl">Report Period</CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-wrap gap-4">
+          <CardContent className="flex flex-col md:flex-row gap-3 md:gap-4">
             <Select value={dateRangeType} onValueChange={(v: any) => setDateRangeType(v)}>
-              <SelectTrigger className="w-[200px]">
+              <SelectTrigger className="w-full md:w-[200px]">
                 <SelectValue placeholder="Select period" />
               </SelectTrigger>
               <SelectContent>
@@ -183,22 +183,24 @@ const VenueReports = () => {
                   <Button
                     variant="outline"
                     className={cn(
-                      "w-[300px] justify-start text-left font-normal",
+                      "w-full md:w-[300px] justify-start text-left font-normal",
                       !customRange && "text-muted-foreground"
                     )}
                   >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {customRange?.from ? (
-                      customRange.to ? (
-                        <>
-                          {format(customRange.from, "LLL dd, y")} - {format(customRange.to, "LLL dd, y")}
-                        </>
+                    <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
+                    <span className="truncate">
+                      {customRange?.from ? (
+                        customRange.to ? (
+                          <>
+                            {format(customRange.from, "LLL dd")} - {format(customRange.to, "LLL dd, y")}
+                          </>
+                        ) : (
+                          format(customRange.from, "LLL dd, y")
+                        )
                       ) : (
-                        format(customRange.from, "LLL dd, y")
-                      )
-                    ) : (
-                      <span>Pick a date range</span>
-                    )}
+                        "Pick a date range"
+                      )}
+                    </span>
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -208,7 +210,7 @@ const VenueReports = () => {
                     defaultMonth={customRange?.from}
                     selected={customRange as any}
                     onSelect={(range: any) => setCustomRange(range)}
-                    numberOfMonths={2}
+                    numberOfMonths={1}
                   />
                 </PopoverContent>
               </Popover>
@@ -218,41 +220,43 @@ const VenueReports = () => {
 
         {/* Reports Tabs */}
         <Tabs defaultValue="stock" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="stock">Stock Report</TabsTrigger>
-            <TabsTrigger value="sales">Sales Analysis</TabsTrigger>
-            <TabsTrigger value="attendance">Attendance</TabsTrigger>
-            <TabsTrigger value="breakage">Breakage & Losses</TabsTrigger>
-          </TabsList>
+          <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+            <TabsList className="grid w-full min-w-[500px] md:min-w-0 grid-cols-4">
+              <TabsTrigger value="stock" className="text-xs md:text-sm px-2">Stock</TabsTrigger>
+              <TabsTrigger value="sales" className="text-xs md:text-sm px-2">Sales</TabsTrigger>
+              <TabsTrigger value="attendance" className="text-xs md:text-sm px-2">Attendance</TabsTrigger>
+              <TabsTrigger value="breakage" className="text-xs md:text-sm px-2">Breakage</TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* Stock Report Matrix */}
           <TabsContent value="stock">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Stock Movement Matrix</CardTitle>
-                <Button onClick={exportStockReport} variant="outline" size="sm">
+              <CardHeader className="flex flex-col md:flex-row md:items-center justify-between space-y-2 md:space-y-0 pb-3">
+                <CardTitle className="text-base md:text-xl">Stock Movement</CardTitle>
+                <Button onClick={exportStockReport} variant="outline" size="sm" className="w-full md:w-auto">
                   <Download className="mr-2 h-4 w-4" />
-                  Export CSV
+                  Export
                 </Button>
               </CardHeader>
               <CardContent className="p-0 overflow-hidden">
                 <div className="overflow-x-auto">
                   {loading ? (
-                    <div className="p-8 text-center">Loading stock data...</div>
+                    <div className="p-8 text-center text-sm">Loading...</div>
                   ) : (
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="sticky left-0 bg-background z-20 border-r font-semibold min-w-[150px]">Item Name</TableHead>
-                          <TableHead className="sticky left-[150px] bg-background z-20 border-r font-semibold min-w-[100px]">Category</TableHead>
-                          <TableHead className="sticky left-[250px] bg-background z-20 border-r font-semibold min-w-[80px]">Unit</TableHead>
+                          <TableHead className="sticky left-0 bg-background z-20 border-r font-semibold min-w-[100px] md:min-w-[150px] text-xs">Item</TableHead>
+                          <TableHead className="sticky left-[100px] md:left-[150px] bg-background z-20 border-r font-semibold min-w-[70px] md:min-w-[100px] text-xs">Cat</TableHead>
+                          <TableHead className="sticky left-[170px] md:left-[250px] bg-background z-20 border-r font-semibold min-w-[50px] md:min-w-[80px] text-xs">Unit</TableHead>
                           {getStockMatrix().dates.map((date) => (
-                            <TableHead key={date.toISOString()} className="text-center border-r min-w-[100px] font-semibold">
-                              <div>{format(date, "dd-MM-yyyy")}</div>
-                              <div className="text-[10px] text-muted-foreground font-normal">{format(date, "EEE")}</div>
+                            <TableHead key={date.toISOString()} className="text-center border-r min-w-[70px] md:min-w-[100px] font-semibold">
+                              <div className="text-xs">{format(date, "dd/MM")}</div>
+                              <div className="text-[9px] text-muted-foreground font-normal hidden md:block">{format(date, "EEE")}</div>
                             </TableHead>
                           ))}
-                          <TableHead className="sticky right-0 bg-background z-20 border-l font-semibold text-center min-w-[100px]">Current</TableHead>
+                          <TableHead className="sticky right-0 bg-background z-20 border-l font-semibold text-center min-w-[70px] md:min-w-[100px] text-xs">Now</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -260,15 +264,15 @@ const VenueReports = () => {
                           const currentStock = stockData.find(s => s.item_name === item.name);
                           return (
                             <TableRow key={idx}>
-                              <TableCell className="sticky left-0 bg-background z-10 border-r font-medium">{item.name}</TableCell>
-                              <TableCell className="sticky left-[150px] bg-background z-10 border-r capitalize">{item.category}</TableCell>
-                              <TableCell className="sticky left-[250px] bg-background z-10 border-r">{item.unit}</TableCell>
+                              <TableCell className="sticky left-0 bg-background z-10 border-r font-medium text-xs">{item.name}</TableCell>
+                              <TableCell className="sticky left-[100px] md:left-[150px] bg-background z-10 border-r capitalize text-xs truncate">{item.category.replace('_', ' ')}</TableCell>
+                              <TableCell className="sticky left-[170px] md:left-[250px] bg-background z-10 border-r text-xs">{item.unit}</TableCell>
                               {getStockMatrix().dates.map((date) => (
-                                <TableCell key={date.toISOString()} className="text-center border-r text-muted-foreground">
+                                <TableCell key={date.toISOString()} className="text-center border-r text-muted-foreground text-xs">
                                   -
                                 </TableCell>
                               ))}
-                              <TableCell className="sticky right-0 bg-background z-10 border-l text-center font-semibold">
+                              <TableCell className="sticky right-0 bg-background z-10 border-l text-center font-semibold text-xs">
                                 {currentStock?.quantity || 0}
                               </TableCell>
                             </TableRow>
@@ -286,28 +290,28 @@ const VenueReports = () => {
           <TabsContent value="sales">
             <Card>
               <CardHeader>
-                <CardTitle>Sales Summary</CardTitle>
+                <CardTitle className="text-base md:text-xl">Sales Summary</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="overflow-x-auto p-0">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead className="text-right">Quantity Sold</TableHead>
+                      <TableHead className="text-xs min-w-[100px]">Date</TableHead>
+                      <TableHead className="text-xs min-w-[120px]">Category</TableHead>
+                      <TableHead className="text-right text-xs min-w-[80px]">Qty</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {salesData.map((sale) => (
                       <TableRow key={sale.id}>
-                        <TableCell>{format(new Date(sale.report_date), "MMM dd, yyyy")}</TableCell>
-                        <TableCell>{(sale as any).venue_hookah_categories?.category_name || "N/A"}</TableCell>
-                        <TableCell className="text-right font-medium">{sale.quantity_sold}</TableCell>
+                        <TableCell className="text-xs">{format(new Date(sale.report_date), "MMM dd")}</TableCell>
+                        <TableCell className="text-xs truncate max-w-[150px]">{(sale as any).venue_hookah_categories?.category_name || "N/A"}</TableCell>
+                        <TableCell className="text-right font-medium text-xs">{sale.quantity_sold}</TableCell>
                       </TableRow>
                     ))}
                     {salesData.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={3} className="text-center text-muted-foreground">No sales data</TableCell>
+                        <TableCell colSpan={3} className="text-center text-muted-foreground text-xs py-8">No sales data</TableCell>
                       </TableRow>
                     )}
                   </TableBody>
@@ -320,30 +324,30 @@ const VenueReports = () => {
           <TabsContent value="attendance">
             <Card>
               <CardHeader>
-                <CardTitle>Attendance Records</CardTitle>
+                <CardTitle className="text-base md:text-xl">Attendance</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="overflow-x-auto p-0">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Employee</TableHead>
-                      <TableHead>Check In</TableHead>
-                      <TableHead>Check Out</TableHead>
-                      <TableHead>Tasks</TableHead>
+                      <TableHead className="text-xs min-w-[100px]">Employee</TableHead>
+                      <TableHead className="text-xs min-w-[110px]">Check In</TableHead>
+                      <TableHead className="text-xs min-w-[110px] hidden md:table-cell">Check Out</TableHead>
+                      <TableHead className="text-xs min-w-[60px] text-center">Done</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {attendanceData.map((record) => (
                       <TableRow key={record.id}>
-                        <TableCell>{(record as any).profiles?.full_name || "N/A"}</TableCell>
-                        <TableCell>{format(new Date(record.check_in_time), "MMM dd, hh:mm a")}</TableCell>
-                        <TableCell>{record.check_out_time ? format(new Date(record.check_out_time), "MMM dd, hh:mm a") : "-"}</TableCell>
-                        <TableCell>{record.tasks_completed ? "✓" : "-"}</TableCell>
+                        <TableCell className="text-xs font-medium">{(record as any).profiles?.full_name || "N/A"}</TableCell>
+                        <TableCell className="text-xs whitespace-nowrap">{format(new Date(record.check_in_time), "MMM dd, hh:mm a")}</TableCell>
+                        <TableCell className="text-xs whitespace-nowrap hidden md:table-cell">{record.check_out_time ? format(new Date(record.check_out_time), "hh:mm a") : "-"}</TableCell>
+                        <TableCell className="text-xs text-center">{record.tasks_completed ? "✓" : "-"}</TableCell>
                       </TableRow>
                     ))}
                     {attendanceData.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center text-muted-foreground">No attendance data</TableCell>
+                        <TableCell colSpan={4} className="text-center text-muted-foreground text-xs py-8">No attendance data</TableCell>
                       </TableRow>
                     )}
                   </TableBody>
@@ -356,30 +360,30 @@ const VenueReports = () => {
           <TabsContent value="breakage">
             <Card>
               <CardHeader>
-                <CardTitle>Breakage & Loss Reports</CardTitle>
+                <CardTitle className="text-base md:text-xl">Breakage Reports</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="overflow-x-auto p-0">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Item Type</TableHead>
-                      <TableHead className="text-right">Quantity</TableHead>
-                      <TableHead>Cause</TableHead>
+                      <TableHead className="text-xs min-w-[90px]">Date</TableHead>
+                      <TableHead className="text-xs min-w-[100px]">Item</TableHead>
+                      <TableHead className="text-right text-xs min-w-[50px]">Qty</TableHead>
+                      <TableHead className="text-xs min-w-[150px] hidden md:table-cell">Cause</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {breakageData.map((breakage) => (
                       <TableRow key={breakage.id}>
-                        <TableCell>{format(new Date(breakage.created_at), "MMM dd, yyyy")}</TableCell>
-                        <TableCell>{breakage.item_type}</TableCell>
-                        <TableCell className="text-right font-medium">{breakage.quantity}</TableCell>
-                        <TableCell className="max-w-[300px] truncate">{breakage.cause}</TableCell>
+                        <TableCell className="text-xs whitespace-nowrap">{format(new Date(breakage.created_at), "MMM dd")}</TableCell>
+                        <TableCell className="text-xs">{breakage.item_type}</TableCell>
+                        <TableCell className="text-right font-medium text-xs">{breakage.quantity}</TableCell>
+                        <TableCell className="text-xs max-w-[200px] truncate hidden md:table-cell">{breakage.cause}</TableCell>
                       </TableRow>
                     ))}
                     {breakageData.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center text-muted-foreground">No breakage reports</TableCell>
+                        <TableCell colSpan={4} className="text-center text-muted-foreground text-xs py-8">No breakage reports</TableCell>
                       </TableRow>
                     )}
                   </TableBody>
