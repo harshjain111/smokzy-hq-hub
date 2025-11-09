@@ -31,13 +31,13 @@ const TasksWidget = ({ user, venueId }: TasksWidgetProps) => {
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
           schema: 'public',
           table: 'stock',
           filter: `venue_id=eq.${venueId}`
         },
         () => {
-          console.log('Stock updated - refreshing tasks');
+          console.log('Stock changed - refreshing tasks');
           checkTaskStatus();
         }
       )
@@ -48,13 +48,13 @@ const TasksWidget = ({ user, venueId }: TasksWidgetProps) => {
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*', // Listen to all events
           schema: 'public',
           table: 'sales_reports',
           filter: `venue_id=eq.${venueId}`
         },
         () => {
-          console.log('Sales reported - refreshing tasks');
+          console.log('Sales changed - refreshing tasks');
           checkTaskStatus();
         }
       )
@@ -65,13 +65,13 @@ const TasksWidget = ({ user, venueId }: TasksWidgetProps) => {
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*', // Listen to all events
           schema: 'public',
           table: 'closing_photos',
           filter: `venue_id=eq.${venueId}`
         },
         () => {
-          console.log('Closing photo uploaded - refreshing tasks');
+          console.log('Closing photo changed - refreshing tasks');
           checkTaskStatus();
         }
       )
