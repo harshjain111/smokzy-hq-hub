@@ -65,6 +65,12 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        auth: {
+          background: "hsl(var(--auth-background))",
+          card: "hsl(var(--auth-card))",
+          gold: "hsl(var(--auth-gold))",
+          "gold-muted": "hsl(var(--auth-gold-muted))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Home } from "lucide-react";
 import ProfileMenu from "@/components/ProfileMenu";
 import AdminSettingsMenu from "@/components/AdminSettingsMenu";
+import smokzyLogo from "@/assets/smokzy-logo.png";
 
 interface PageLayoutProps {
   children: React.ReactNode;
@@ -63,22 +64,28 @@ const PageLayout = ({ children, title, subtitle }: PageLayoutProps) => {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-card sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-4">
+      <header className="border-b bg-card sticky top-0 z-10 shadow-sm">
+        <div className="container mx-auto px-4 py-3 flex justify-between items-center">
+          <div className="flex items-center gap-3">
             <Button 
               variant="ghost" 
               size="icon"
               onClick={() => navigate("/dashboard")}
               title="Go to Dashboard"
+              className="hover:bg-secondary"
             >
               <Home className="h-5 w-5" />
             </Button>
-            <div>
-              <h1 className="text-2xl font-bold text-primary">
-                {title || "Smokzy Operations"}
+            <img 
+              src={smokzyLogo} 
+              alt="Smokzy" 
+              className="h-10 w-auto object-contain"
+            />
+            <div className="border-l pl-3 ml-1">
+              <h1 className="text-xl font-semibold text-foreground">
+                {title || "Operations"}
               </h1>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 {subtitle || (userRole?.role === "admin" ? "Multi-Venue Management" : venueName || "Loading...")}
               </p>
             </div>

@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { z } from "zod";
+import loginBackground from "@/assets/login-background.jpg";
+import smokzyLogo from "@/assets/smokzy-logo.png";
 
 const phoneAuthSchema = z.object({
   phone: z.string().regex(/^\d{10}$/, "Phone number must be 10 digits"),
@@ -88,22 +90,44 @@ const Auth = () => {
     }
   };
 
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-accent/5 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">
-            Smokzy Operations
+    <div 
+      className="min-h-screen flex items-center justify-center relative overflow-hidden p-4"
+      style={{
+        backgroundImage: `url(${loginBackground})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundColor: 'hsl(var(--auth-background))',
+      }}
+    >
+      {/* Dark overlay for better contrast */}
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      
+      {/* Golden accent gradient */}
+      <div className="absolute inset-0 bg-gradient-to-br from-auth-gold/10 via-transparent to-auth-gold/5" />
+      
+      <Card className="w-full max-w-md relative z-10 bg-auth-card/95 backdrop-blur-md border-auth-gold/20 shadow-2xl">
+        <CardHeader className="space-y-4 pb-8">
+          <div className="flex justify-center mb-2">
+            <img 
+              src={smokzyLogo} 
+              alt="Smokzy Logo" 
+              className="h-16 w-auto object-contain"
+            />
+          </div>
+          <CardTitle className="text-2xl font-bold text-center text-auth-gold">
+            Welcome Back
           </CardTitle>
-          <CardDescription className="text-center">
-            Sign in to your account
+          <CardDescription className="text-center text-gray-400">
+            Sign in to access Smokzy Operations
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="loginIdentifier">Email or Mobile Number</Label>
+              <Label htmlFor="loginIdentifier" className="text-gray-300">
+                Email or Mobile Number
+              </Label>
               <Input
                 id="loginIdentifier"
                 type="text"
@@ -111,10 +135,13 @@ const Auth = () => {
                 value={loginIdentifier}
                 onChange={(e) => setLoginIdentifier(e.target.value)}
                 required
+                className="bg-auth-background/50 border-auth-gold/30 text-white placeholder:text-gray-500 focus:border-auth-gold focus:ring-auth-gold"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-gray-300">
+                Password
+              </Label>
               <Input
                 id="password"
                 type="password"
@@ -122,9 +149,14 @@ const Auth = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                className="bg-auth-background/50 border-auth-gold/30 text-white placeholder:text-gray-500 focus:border-auth-gold focus:ring-auth-gold"
               />
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button 
+              type="submit" 
+              className="w-full bg-auth-gold hover:bg-auth-gold-muted text-black font-semibold min-h-[48px] shadow-lg shadow-auth-gold/20 transition-all" 
+              disabled={loading}
+            >
               {loading ? "Processing..." : "Sign In"}
             </Button>
           </form>
