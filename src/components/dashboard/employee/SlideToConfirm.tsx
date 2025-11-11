@@ -28,20 +28,31 @@ const SlideToConfirm = ({
   const sliderRef = useRef<HTMLDivElement>(null);
 
   // Calculate max position on mount and window resize
-  const calculateMaxPosition = useCallback(() => {
-    if (containerRef.current && sliderRef.current) {
-      const containerWidth = containerRef.current.offsetWidth;
-      const sliderWidth = sliderRef.current.offsetWidth;
-      const padding = 4; // Account for padding (left-1 = 0.25rem = 4px)
-      setMaxPosition(containerWidth - sliderWidth - padding * 2);
-    }
-  }, []);
-
   useEffect(() => {
+    const calculateMaxPosition = () => {
+      if (containerRef.current && sliderRef.current) {
+        const containerWidth = containerRef.current.offsetWidth;
+        const sliderWidth = sliderRef.current.offsetWidth;
+        const padding = 4; // Account for padding (left-1 = 0.25rem = 4px)
+        const newMaxPosition = containerWidth - sliderWidth - padding * 2;
+        setMaxPosition(newMaxPosition);
+      }
+    };
+
+    // Calculate immediately
     calculateMaxPosition();
+    
+    // Also calculate after a short delay to ensure DOM is ready
+    const timer = setTimeout(calculateMaxPosition, 100);
+    
+    // Recalculate on window resize
     window.addEventListener('resize', calculateMaxPosition);
-    return () => window.removeEventListener('resize', calculateMaxPosition);
-  }, [calculateMaxPosition]);
+    
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', calculateMaxPosition);
+    };
+  }, []);
 
   useEffect(() => {
     if (isConfirmed) {
