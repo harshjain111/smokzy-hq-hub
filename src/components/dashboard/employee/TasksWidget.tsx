@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { CheckCircle, XCircle, Camera, Package, TrendingUp, AlertTriangle } from "lucide-react";
@@ -21,6 +21,51 @@ const TasksWidget = ({ user, venueId }: TasksWidgetProps) => {
     salesReported: false,
     closingPhoto: false,
   });
+
+  const checkTaskStatus = useCallback(async () => {
+    const today = format(new Date(), "yyyy-MM-dd");
+
+    const [stockCheck, salesCheck, closingCheck] = await Promise.all([
+      // Check if ALL stock items have been updated today
+      supabase
+        .from("stock")
+        .select("id, quantity, created_at, updated_at")
+        .eq("venue_id", venueId),
+      supabase
+        .from("sales_reports")
+        .select("id")
+        .eq("venue_id", venueId)
+        .eq("report_date", today)
+        .limit(1),
+      supabase
+        .from("closing_photos")
+        .select("id")
+        .eq("venue_id", venueId)
+        .eq("photo_date", today)
+        .limit(1),
+    ]);
+
+    // Stock is only considered reported if ALL items have been updated today
+    let stockReported = false;
+    if (stockCheck.data && stockCheck.data.length > 0) {
+      const todayDate = format(new Date(), "yyyy-MM-dd");
+      
+      stockReported = stockCheck.data.every(item => {
+        const itemUpdateDate = format(new Date(item.updated_at), "yyyy-MM-dd");
+        const itemCreateDate = format(new Date(item.created_at), "yyyy-MM-dd");
+        
+        // Item must be updated today AND the update must be different from creation
+        // (meaning it was actually updated, not just created today)
+        return itemUpdateDate === todayDate && item.updated_at !== item.created_at;
+      });
+    }
+
+    setTasks({
+      stockReported,
+      salesReported: !!(salesCheck.data && salesCheck.data.length > 0),
+      closingPhoto: !!(closingCheck.data && closingCheck.data.length > 0),
+    });
+  }, [venueId]);
 
   useEffect(() => {
     checkTaskStatus();
@@ -82,52 +127,7 @@ const TasksWidget = ({ user, venueId }: TasksWidgetProps) => {
       supabase.removeChannel(salesChannel);
       supabase.removeChannel(closingPhotoChannel);
     };
-  }, [venueId]);
-
-  const checkTaskStatus = async () => {
-    const today = format(new Date(), "yyyy-MM-dd");
-
-    const [stockCheck, salesCheck, closingCheck] = await Promise.all([
-      // Check if ALL stock items have been updated today
-      supabase
-        .from("stock")
-        .select("id, quantity, created_at, updated_at")
-        .eq("venue_id", venueId),
-      supabase
-        .from("sales_reports")
-        .select("id")
-        .eq("venue_id", venueId)
-        .eq("report_date", today)
-        .limit(1),
-      supabase
-        .from("closing_photos")
-        .select("id")
-        .eq("venue_id", venueId)
-        .eq("photo_date", today)
-        .limit(1),
-    ]);
-
-    // Stock is only considered reported if ALL items have been updated today
-    let stockReported = false;
-    if (stockCheck.data && stockCheck.data.length > 0) {
-      const todayDate = format(new Date(), "yyyy-MM-dd");
-      
-      stockReported = stockCheck.data.every(item => {
-        const itemUpdateDate = format(new Date(item.updated_at), "yyyy-MM-dd");
-        const itemCreateDate = format(new Date(item.created_at), "yyyy-MM-dd");
-        
-        // Item must be updated today AND the update must be different from creation
-        // (meaning it was actually updated, not just created today)
-        return itemUpdateDate === todayDate && item.updated_at !== item.created_at;
-      });
-    }
-
-    setTasks({
-      stockReported,
-      salesReported: !!(salesCheck.data && salesCheck.data.length > 0),
-      closingPhoto: !!(closingCheck.data && closingCheck.data.length > 0),
-    });
-  };
+  }, [venueId, checkTaskStatus]);
 
   const taskList = [
     { name: "Update Stock Inventory", completed: tasks.stockReported, icon: Package },
