@@ -122,10 +122,22 @@ const TasksWidget = ({ user, venueId }: TasksWidgetProps) => {
       )
       .subscribe();
 
+    // Local cross-component event to refresh instantly after actions
+    const onTaskEvent = (e: any) => {
+      try {
+        if (e?.detail?.venueId === venueId) {
+          console.log('Tasks event received - refreshing tasks', e.detail);
+          checkTaskStatus();
+        }
+      } catch (_) {}
+    };
+    window.addEventListener('tasks:updated', onTaskEvent);
+
     return () => {
       supabase.removeChannel(stockChannel);
       supabase.removeChannel(salesChannel);
       supabase.removeChannel(closingPhotoChannel);
+      window.removeEventListener('tasks:updated', onTaskEvent);
     };
   }, [venueId, checkTaskStatus]);
 

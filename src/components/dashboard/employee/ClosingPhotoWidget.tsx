@@ -212,6 +212,8 @@ const ClosingPhotoWidget = ({ user, venueId }: ClosingPhotoWidgetProps) => {
       setPhotoUploaded(true);
       setShowPhotoAppreciation(true);
       checkTaskStatus(); // Refresh task status
+      // Notify other components immediately
+      window.dispatchEvent(new CustomEvent('tasks:updated', { detail: { venueId, source: 'closing_photo' } }));
     } catch (error) {
       toast.error("Failed to upload photo");
       console.error(error);

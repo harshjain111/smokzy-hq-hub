@@ -190,6 +190,9 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
       await fetchStock();
       await checkTaskStatus();
       
+      // Notify other components immediately
+      window.dispatchEvent(new CustomEvent('tasks:updated', { detail: { venueId, source: 'stock_update' } }));
+      
       // Show appreciation if all items were updated
       if (updates.length === stock.length) {
         setShowAppreciation(true);

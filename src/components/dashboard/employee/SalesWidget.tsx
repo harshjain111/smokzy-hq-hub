@@ -136,6 +136,8 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
       await fetchTodaySales();
       await checkTaskStatus();
       setShowSalesAppreciation(true);
+      // Notify other components immediately
+      window.dispatchEvent(new CustomEvent('tasks:updated', { detail: { venueId, source: 'sales_insert' } }));
     }
   };
 
@@ -159,6 +161,8 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
       setEditingSale(null);
       fetchTodaySales();
       checkTaskStatus();
+      // Notify other components immediately
+      window.dispatchEvent(new CustomEvent('tasks:updated', { detail: { venueId, source: 'sales_update' } }));
     }
   };
 
