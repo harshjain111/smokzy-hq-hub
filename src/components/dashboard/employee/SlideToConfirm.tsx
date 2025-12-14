@@ -91,25 +91,37 @@ const SlideToConfirm = ({
 
     const containerRect = container.getBoundingClientRect();
     const sliderWidth = slider.offsetWidth;
+    const padding = 4;
+    const currentMaxPosition = containerRect.width - sliderWidth - padding * 2;
     
     // Calculate position relative to container start
     let newPosition = clientX - containerRect.left - sliderWidth / 2;
     
-    // Clamp between 0 and maxPosition
-    newPosition = Math.max(0, Math.min(newPosition, maxPosition));
-    
+    // Clamp between 0 and current max position
+    newPosition = Math.max(0, Math.min(newPosition, currentMaxPosition));
+
+    setMaxPosition(currentMaxPosition);
     setPosition(newPosition);
-  }, [isDragging, disabled, loading, isConfirmed, maxPosition]);
+  }, [isDragging, disabled, loading, isConfirmed]);
 
   const handleEnd = useCallback(() => {
     if (!isDragging) return;
     setIsDragging(false);
 
+    const container = containerRef.current;
+    const slider = sliderRef.current;
+    if (!container || !slider) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const sliderWidth = slider.offsetWidth;
+    const padding = 4;
+    const currentMaxPosition = containerRect.width - sliderWidth - padding * 2;
+
     // Check if slider is at least 70% to the end (more forgiving for mobile)
-    const threshold = maxPosition * 0.7;
+    const threshold = currentMaxPosition * 0.7;
     
     if (position >= threshold) {
-      setPosition(maxPosition);
+      setPosition(currentMaxPosition);
       setIsConfirmed(true);
       
       // Haptic feedback on success
@@ -122,7 +134,7 @@ const SlideToConfirm = ({
       // Animate back to start
       setPosition(0);
     }
-  }, [isDragging, position, maxPosition, onConfirm]);
+  }, [isDragging, position, onConfirm]);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     e.preventDefault(); // Prevent scrolling while dragging
