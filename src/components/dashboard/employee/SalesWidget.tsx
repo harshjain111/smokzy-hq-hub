@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { TrendingUp, Plus } from "lucide-react";
 import { format } from "date-fns";
 import AppreciationDialog from "./AppreciationDialog";
+import { useBusinessDate } from "@/hooks/useBusinessDate";
 
 interface SalesWidgetProps {
   user: User;
@@ -24,6 +25,7 @@ interface TaskStatus {
 }
 
 const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
+  const { businessDate } = useBusinessDate(user.id, venueId);
   const [open, setOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [categoryId, setCategoryId] = useState("");
@@ -42,11 +44,9 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
     fetchHookahCategories();
     fetchTodaySales();
     checkTaskStatus();
-  }, [venueId]);
+  }, [venueId, businessDate]);
 
   const checkTaskStatus = async () => {
-    const today = format(new Date(), "yyyy-MM-dd");
-
     const [stockCheck, salesCheck, closingCheck] = await Promise.all([
       supabase
         .from("stock")
@@ -56,22 +56,21 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
         .from("sales_reports")
         .select("id")
         .eq("venue_id", venueId)
-        .eq("report_date", today)
+        .eq("report_date", businessDate)
         .limit(1),
       supabase
         .from("closing_photos")
         .select("id")
         .eq("venue_id", venueId)
-        .eq("photo_date", today)
+        .eq("photo_date", businessDate)
         .limit(1),
     ]);
 
     let stockReported = false;
     if (stockCheck.data && stockCheck.data.length > 0) {
-      const todayDate = format(new Date(), "yyyy-MM-dd");
       stockReported = stockCheck.data.every((item: any) => {
         const itemUpdateDate = format(new Date(item.updated_at), "yyyy-MM-dd");
-        return itemUpdateDate === todayDate && item.updated_at !== item.created_at;
+        return itemUpdateDate === businessDate && item.updated_at !== item.created_at;
       });
     }
 
@@ -98,12 +97,11 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
   };
 
   const fetchTodaySales = async () => {
-    const today = format(new Date(), "yyyy-MM-dd");
     const { data } = await supabase
       .from("sales_reports")
       .select("*, venue_hookah_categories(category_name)")
       .eq("venue_id", venueId)
-      .eq("report_date", today);
+      .eq("report_date", businessDate);
 
     setTodaySales(data || []);
   };
@@ -116,12 +114,10 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
       return;
     }
 
-    const today = format(new Date(), "yyyy-MM-dd");
-
     const { error } = await supabase.from("sales_reports").insert({
       venue_id: venueId,
       reported_by: user.id,
-      report_date: today,
+      report_date: businessDate,
       category_id: categoryId,
       quantity_sold: parseInt(quantity),
     });
