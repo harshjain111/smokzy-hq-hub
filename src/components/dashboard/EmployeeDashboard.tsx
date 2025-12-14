@@ -66,7 +66,7 @@ const EmployeeDashboard = ({ user, venueId }: EmployeeDashboardProps) => {
         </TabsContent>
 
         <TabsContent value="stock" className="mt-4">
-          <StockWidget venueId={venueId} />
+          <StockWidget user={user} venueId={venueId} />
         </TabsContent>
 
         <TabsContent value="sales" className="mt-4">

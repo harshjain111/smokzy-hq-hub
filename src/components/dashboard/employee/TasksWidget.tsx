@@ -3,6 +3,7 @@ import { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { CheckCircle, XCircle, Camera, Package, TrendingUp, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
+import { useBusinessDate } from "@/hooks/useBusinessDate";
 
 interface TasksWidgetProps {
   user: User;
@@ -16,6 +17,7 @@ interface TaskStatus {
 }
 
 const TasksWidget = ({ user, venueId }: TasksWidgetProps) => {
+  const { businessDate } = useBusinessDate(user.id, venueId);
   const [tasks, setTasks] = useState<TaskStatus>({
     stockReported: false,
     salesReported: false,
@@ -23,10 +25,8 @@ const TasksWidget = ({ user, venueId }: TasksWidgetProps) => {
   });
 
   const checkTaskStatus = useCallback(async () => {
-    const today = format(new Date(), "yyyy-MM-dd");
-
     const [stockCheck, salesCheck, closingCheck] = await Promise.all([
-      // Check if ALL stock items have been updated today
+      // Check if ALL stock items have been updated today (using business date)
       supabase
         .from("stock")
         .select("id, quantity, created_at, updated_at")
@@ -35,28 +35,24 @@ const TasksWidget = ({ user, venueId }: TasksWidgetProps) => {
         .from("sales_reports")
         .select("id")
         .eq("venue_id", venueId)
-        .eq("report_date", today)
+        .eq("report_date", businessDate)
         .limit(1),
       supabase
         .from("closing_photos")
         .select("id")
         .eq("venue_id", venueId)
-        .eq("photo_date", today)
+        .eq("photo_date", businessDate)
         .limit(1),
     ]);
 
-    // Stock is only considered reported if ALL items have been updated today
+    // Stock is only considered reported if ALL items have been updated for the business date
     let stockReported = false;
     if (stockCheck.data && stockCheck.data.length > 0) {
-      const todayDate = format(new Date(), "yyyy-MM-dd");
-      
       stockReported = stockCheck.data.every(item => {
         const itemUpdateDate = format(new Date(item.updated_at), "yyyy-MM-dd");
-        const itemCreateDate = format(new Date(item.created_at), "yyyy-MM-dd");
         
-        // Item must be updated today AND the update must be different from creation
-        // (meaning it was actually updated, not just created today)
-        return itemUpdateDate === todayDate && item.updated_at !== item.created_at;
+        // Item must be updated on or after business date AND the update must be different from creation
+        return itemUpdateDate === businessDate && item.updated_at !== item.created_at;
       });
     }
 
@@ -65,7 +61,7 @@ const TasksWidget = ({ user, venueId }: TasksWidgetProps) => {
       salesReported: !!(salesCheck.data && salesCheck.data.length > 0),
       closingPhoto: !!(closingCheck.data && closingCheck.data.length > 0),
     });
-  }, [venueId]);
+  }, [venueId, businessDate]);
 
   useEffect(() => {
     checkTaskStatus();

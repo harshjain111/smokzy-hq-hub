@@ -10,6 +10,7 @@ import TasksCompletionDialog from "./TasksCompletionDialog";
 import AttendancePreview from "./AttendancePreview";
 import CheckoutAppreciationDialog from "./CheckoutAppreciationDialog";
 import { compressImage } from "@/lib/imageCompression";
+import { useBusinessDate } from "@/hooks/useBusinessDate";
 
 interface AttendanceWidgetProps {
   user: User;
@@ -23,6 +24,7 @@ interface TaskStatus {
 }
 
 const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
+  const { businessDate, currentShift: activeShiftFromHook } = useBusinessDate(user.id, venueId);
   const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
   const [currentShift, setCurrentShift] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -42,6 +44,11 @@ const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
   } | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
+
+  // Sync current shift from hook
+  useEffect(() => {
+    setCurrentShift(activeShiftFromHook);
+  }, [activeShiftFromHook]);
 
   useEffect(() => {
     fetchTodayAttendance();
@@ -104,7 +111,7 @@ const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
       supabase.removeChannel(salesChannel);
       supabase.removeChannel(closingPhotoChannel);
     };
-  }, [venueId]);
+  }, [venueId, businessDate]);
 
   const fetchTodayAttendance = async () => {
     // Fetch all attendance records from the last 24 hours
@@ -125,8 +132,6 @@ const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
   };
 
   const checkTaskStatus = async () => {
-    const today = format(new Date(), "yyyy-MM-dd");
-
     const [stockCheck, salesCheck, closingCheck] = await Promise.all([
       supabase
         .from("stock")
@@ -136,22 +141,21 @@ const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
         .from("sales_reports")
         .select("id")
         .eq("venue_id", venueId)
-        .eq("report_date", today)
+        .eq("report_date", businessDate)
         .limit(1),
       supabase
         .from("closing_photos")
         .select("id")
         .eq("venue_id", venueId)
-        .eq("photo_date", today)
+        .eq("photo_date", businessDate)
         .limit(1),
     ]);
 
     let stockReported = false;
     if (stockCheck.data && stockCheck.data.length > 0) {
-      const todayDate = format(new Date(), "yyyy-MM-dd");
       stockReported = stockCheck.data.every((item) => {
         const itemUpdateDate = format(new Date(item.updated_at), "yyyy-MM-dd");
-        return itemUpdateDate === todayDate && item.updated_at !== item.created_at;
+        return itemUpdateDate === businessDate && item.updated_at !== item.created_at;
       });
     }
 

@@ -9,6 +9,7 @@ import { Camera } from "lucide-react";
 import AppreciationDialog from "./AppreciationDialog";
 import { compressImage } from "@/lib/imageCompression";
 import { format } from "date-fns";
+import { useBusinessDate } from "@/hooks/useBusinessDate";
 
 interface ClosingPhotoWidgetProps {
   user: User;
@@ -22,6 +23,7 @@ interface TaskStatus {
 }
 
 const ClosingPhotoWidget = ({ user, venueId }: ClosingPhotoWidgetProps) => {
+  const { businessDate } = useBusinessDate(user.id, venueId);
   const [photoOpen, setPhotoOpen] = useState(false);
   const [photoBlob, setPhotoBlob] = useState<Blob | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -39,23 +41,20 @@ const ClosingPhotoWidget = ({ user, venueId }: ClosingPhotoWidgetProps) => {
   useEffect(() => {
     checkTaskStatus();
     checkPhotoStatus();
-  }, [venueId]);
+  }, [venueId, businessDate]);
 
   const checkPhotoStatus = async () => {
-    const today = format(new Date(), "yyyy-MM-dd");
     const { data } = await supabase
       .from("closing_photos")
       .select("id")
       .eq("venue_id", venueId)
-      .eq("photo_date", today)
+      .eq("photo_date", businessDate)
       .limit(1);
 
     setPhotoUploaded(!!(data && data.length > 0));
   };
 
   const checkTaskStatus = async () => {
-    const today = format(new Date(), "yyyy-MM-dd");
-
     const [stockCheck, salesCheck, closingCheck] = await Promise.all([
       supabase
         .from("stock")
@@ -65,22 +64,21 @@ const ClosingPhotoWidget = ({ user, venueId }: ClosingPhotoWidgetProps) => {
         .from("sales_reports")
         .select("id")
         .eq("venue_id", venueId)
-        .eq("report_date", today)
+        .eq("report_date", businessDate)
         .limit(1),
       supabase
         .from("closing_photos")
         .select("id")
         .eq("venue_id", venueId)
-        .eq("photo_date", today)
+        .eq("photo_date", businessDate)
         .limit(1),
     ]);
 
     let stockReported = false;
     if (stockCheck.data && stockCheck.data.length > 0) {
-      const todayDate = format(new Date(), "yyyy-MM-dd");
       stockReported = stockCheck.data.every((item: any) => {
         const itemUpdateDate = format(new Date(item.updated_at), "yyyy-MM-dd");
-        return itemUpdateDate === todayDate && item.updated_at !== item.created_at;
+        return itemUpdateDate === businessDate && item.updated_at !== item.created_at;
       });
     }
 
@@ -201,6 +199,7 @@ const ClosingPhotoWidget = ({ user, venueId }: ClosingPhotoWidgetProps) => {
         venue_id: venueId,
         uploaded_by: user.id,
         photo_url: publicUrl,
+        photo_date: businessDate,
       });
 
       if (error) throw error;

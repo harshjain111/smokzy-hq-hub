@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,8 +12,10 @@ import { toast } from "sonner";
 import { Package, Plus, AlertTriangle, Save } from "lucide-react";
 import { format } from "date-fns";
 import AppreciationDialog from "./AppreciationDialog";
+import { useBusinessDate } from "@/hooks/useBusinessDate";
 
 interface StockWidgetProps {
+  user: User;
   venueId: string;
 }
 
@@ -31,7 +34,8 @@ interface TaskStatus {
   closingPhoto: boolean;
 }
 
-const StockWidget = ({ venueId }: StockWidgetProps) => {
+const StockWidget = ({ user, venueId }: StockWidgetProps) => {
+  const { businessDate } = useBusinessDate(user.id, venueId);
   const [stock, setStock] = useState<StockItem[]>([]);
   const [addItemOpen, setAddItemOpen] = useState(false);
   const [updateStockOpen, setUpdateStockOpen] = useState(false);
@@ -54,11 +58,9 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
   useEffect(() => {
     fetchStock();
     checkTaskStatus();
-  }, [venueId]);
+  }, [venueId, businessDate]);
 
   const checkTaskStatus = async () => {
-    const today = format(new Date(), "yyyy-MM-dd");
-
     const [stockCheck, salesCheck, closingCheck] = await Promise.all([
       supabase
         .from("stock")
@@ -68,22 +70,21 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
         .from("sales_reports")
         .select("id")
         .eq("venue_id", venueId)
-        .eq("report_date", today)
+        .eq("report_date", businessDate)
         .limit(1),
       supabase
         .from("closing_photos")
         .select("id")
         .eq("venue_id", venueId)
-        .eq("photo_date", today)
+        .eq("photo_date", businessDate)
         .limit(1),
     ]);
 
     let stockReported = false;
     if (stockCheck.data && stockCheck.data.length > 0) {
-      const todayDate = format(new Date(), "yyyy-MM-dd");
       stockReported = stockCheck.data.every((item: any) => {
         const itemUpdateDate = format(new Date(item.updated_at), "yyyy-MM-dd");
-        return itemUpdateDate === todayDate && item.updated_at !== item.created_at;
+        return itemUpdateDate === businessDate && item.updated_at !== item.created_at;
       });
     }
 
@@ -115,11 +116,9 @@ const StockWidget = ({ venueId }: StockWidgetProps) => {
       return;
     }
 
-    const today = format(new Date(), "yyyy-MM-dd");
     const allUpdated = stockData.every((item: any) => {
       const itemUpdateDate = format(new Date(item.updated_at), "yyyy-MM-dd");
-      const itemCreateDate = format(new Date(item.created_at), "yyyy-MM-dd");
-      return itemUpdateDate === today && item.updated_at !== item.created_at;
+      return itemUpdateDate === businessDate && item.updated_at !== item.created_at;
     });
 
     setAllItemsUpdatedToday(allUpdated);
