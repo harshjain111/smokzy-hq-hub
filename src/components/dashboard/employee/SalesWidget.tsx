@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,10 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { TrendingUp, Plus } from "lucide-react";
+import { TrendingUp, Plus, Camera, Image, X } from "lucide-react";
 import { format } from "date-fns";
 import AppreciationDialog from "./AppreciationDialog";
 import { useBusinessDate } from "@/hooks/useBusinessDate";
+import { compressImage } from "@/lib/imageCompression";
 
 interface SalesWidgetProps {
   user: User;
@@ -34,6 +35,10 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
   const [hookahCategories, setHookahCategories] = useState<{ id: string; name: string }[]>([]);
   const [showSalesAppreciation, setShowSalesAppreciation] = useState(false);
   const [editingSale, setEditingSale] = useState<any>(null);
+  const [kotPhoto, setKotPhoto] = useState<File | null>(null);
+  const [kotPhotoPreview, setKotPhotoPreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [taskStatus, setTaskStatus] = useState<TaskStatus>({
     stockReported: false,
     salesReported: false,
@@ -106,6 +111,57 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
     setTodaySales(data || []);
   };
 
+  const handleKotPhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const compressed = await compressImage(file, {
+        maxWidth: 1280,
+        maxHeight: 1280,
+        quality: 0.85,
+      });
+      setKotPhoto(compressed);
+      setKotPhotoPreview(URL.createObjectURL(compressed));
+    } catch (error) {
+      toast.error("Failed to process image");
+    }
+  };
+
+  const clearKotPhoto = () => {
+    if (kotPhotoPreview) {
+      URL.revokeObjectURL(kotPhotoPreview);
+    }
+    setKotPhoto(null);
+    setKotPhotoPreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const uploadKotPhoto = async (): Promise<string | null> => {
+    if (!kotPhoto) return null;
+
+    const fileName = `${user.id}/${Date.now()}.jpg`;
+    
+    const { error } = await supabase.storage
+      .from("kot-photos")
+      .upload(fileName, kotPhoto, {
+        contentType: "image/jpeg",
+      });
+
+    if (error) {
+      console.error("KOT upload error:", error);
+      throw error;
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from("kot-photos")
+      .getPublicUrl(fileName);
+
+    return publicUrl;
+  };
+
   const handleSubmitSales = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -114,26 +170,42 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
       return;
     }
 
-    const { error } = await supabase.from("sales_reports").insert({
-      venue_id: venueId,
-      reported_by: user.id,
-      report_date: businessDate,
-      category_id: categoryId,
-      quantity_sold: parseInt(quantity),
-    });
+    setUploading(true);
+    try {
+      // Upload KOT photo if provided
+      let kotPhotoUrl: string | null = null;
+      if (kotPhoto) {
+        kotPhotoUrl = await uploadKotPhoto();
+      }
 
-    if (error) {
-      toast.error("Failed to submit sales");
+      const { error } = await supabase.from("sales_reports").insert({
+        venue_id: venueId,
+        reported_by: user.id,
+        report_date: businessDate,
+        category_id: categoryId,
+        quantity_sold: parseInt(quantity),
+        kot_photo_url: kotPhotoUrl,
+      });
+
+      if (error) {
+        toast.error("Failed to submit sales");
+        console.error(error);
+      } else {
+        toast.success("Sales reported successfully");
+        setQuantity("");
+        clearKotPhoto();
+        setOpen(false);
+        await fetchTodaySales();
+        await checkTaskStatus();
+        setShowSalesAppreciation(true);
+        // Notify other components immediately
+        window.dispatchEvent(new CustomEvent('tasks:updated', { detail: { venueId, source: 'sales_insert' } }));
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to submit sales");
       console.error(error);
-    } else {
-      toast.success("Sales reported successfully");
-      setQuantity("");
-      setOpen(false);
-      await fetchTodaySales();
-      await checkTaskStatus();
-      setShowSalesAppreciation(true);
-      // Notify other components immediately
-      window.dispatchEvent(new CustomEvent('tasks:updated', { detail: { venueId, source: 'sales_insert' } }));
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -187,9 +259,17 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
               <div className="space-y-2">
                 {todaySales.map((sale) => (
                   <div key={sale.id} className="flex items-center justify-between p-2 border rounded-lg">
-                    <div>
+                    <div className="flex-1">
                       <div className="font-medium">{sale.venue_hookah_categories?.category_name}</div>
-                      <div className="text-sm text-muted-foreground">{sale.quantity_sold} sold</div>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span>{sale.quantity_sold} sold</span>
+                        {sale.kot_photo_url && (
+                          <span className="flex items-center gap-1 text-primary">
+                            <Image className="h-3 w-3" />
+                            KOT
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <Button
                       variant="outline"
@@ -246,7 +326,48 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
                       required
                     />
                   </div>
-                  <Button type="submit" className="w-full">Submit Sales</Button>
+                  <div className="space-y-2">
+                    <Label>KOT Photo (Optional)</Label>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={handleKotPhotoSelect}
+                      className="hidden"
+                    />
+                    {kotPhotoPreview ? (
+                      <div className="relative">
+                        <img
+                          src={kotPhotoPreview}
+                          alt="KOT Preview"
+                          className="w-full h-32 object-cover rounded-lg"
+                        />
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="icon"
+                          className="absolute top-2 right-2 h-8 w-8"
+                          onClick={clearKotPhoto}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <Camera className="mr-2 h-4 w-4" />
+                        Add KOT Photo
+                      </Button>
+                    )}
+                  </div>
+                  <Button type="submit" className="w-full" disabled={uploading}>
+                    {uploading ? "Uploading..." : "Submit Sales"}
+                  </Button>
                 </form>
               </DialogContent>
             </Dialog>
@@ -306,8 +427,47 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
                       required
                     />
                   </div>
-                  <Button type="submit" className="w-full" disabled={hookahCategories.length === 0}>
-                    Submit Sales
+                  <div className="space-y-2">
+                    <Label>KOT Photo (Optional)</Label>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={handleKotPhotoSelect}
+                      className="hidden"
+                    />
+                    {kotPhotoPreview ? (
+                      <div className="relative">
+                        <img
+                          src={kotPhotoPreview}
+                          alt="KOT Preview"
+                          className="w-full h-32 object-cover rounded-lg"
+                        />
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="icon"
+                          className="absolute top-2 right-2 h-8 w-8"
+                          onClick={clearKotPhoto}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <Camera className="mr-2 h-4 w-4" />
+                        Add KOT Photo
+                      </Button>
+                    )}
+                  </div>
+                  <Button type="submit" className="w-full" disabled={hookahCategories.length === 0 || uploading}>
+                    {uploading ? "Uploading..." : "Submit Sales"}
                   </Button>
                 </form>
               </DialogContent>

@@ -9,6 +9,7 @@ import SlideToConfirm from "./SlideToConfirm";
 import TasksCompletionDialog from "./TasksCompletionDialog";
 import AttendancePreview from "./AttendancePreview";
 import CheckoutAppreciationDialog from "./CheckoutAppreciationDialog";
+import ShiftDuration from "./ShiftDuration";
 import { compressImage } from "@/lib/imageCompression";
 import { useBusinessDate } from "@/hooks/useBusinessDate";
 
@@ -462,7 +463,7 @@ const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
         <CardContent className="space-y-4">
           {/* Current Active Shift */}
           {currentShift && (
-            <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg space-y-2">
+            <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-primary">Current Shift</span>
                 <span className="text-xs text-muted-foreground">
@@ -475,6 +476,7 @@ const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
                   {format(new Date(currentShift.check_in_time), "hh:mm a")}
                 </span>
               </div>
+              <ShiftDuration checkInTime={currentShift.check_in_time} />
             </div>
           )}
 
