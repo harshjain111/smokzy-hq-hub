@@ -2,13 +2,15 @@ import { useState, useEffect, useRef } from "react";
 import { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Camera, MapPin, Clock, LogIn, LogOut } from "lucide-react";
+import { Camera, MapPin, Clock, LogIn, LogOut, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 import SlideToConfirm from "./SlideToConfirm";
 import TasksCompletionDialog from "./TasksCompletionDialog";
 import AttendancePreview from "./AttendancePreview";
 import CheckoutAppreciationDialog from "./CheckoutAppreciationDialog";
+import EarlyCheckoutDialog from "./EarlyCheckoutDialog";
 import ShiftDuration from "./ShiftDuration";
 import { compressImage } from "@/lib/imageCompression";
 import { useBusinessDate } from "@/hooks/useBusinessDate";
@@ -36,6 +38,8 @@ const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
   });
   const [showTasksDialog, setShowTasksDialog] = useState(false);
   const [showAppreciationDialog, setShowAppreciationDialog] = useState(false);
+  const [showEarlyCheckoutDialog, setShowEarlyCheckoutDialog] = useState(false);
+  const [earlyCheckoutLoading, setEarlyCheckoutLoading] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [previewData, setPreviewData] = useState<{
     photoBlob: Blob;
@@ -442,6 +446,76 @@ const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
     }
   };
 
+  const handleEarlyCheckout = async (reason: string) => {
+    if (!currentShift) return;
+    
+    setEarlyCheckoutLoading(true);
+    try {
+      toast.info("Starting camera...");
+      const photoBlob = await startCamera();
+      
+      toast.info("Getting location...");
+      const location = await getCurrentLocation();
+      
+      toast.info("Uploading photo...");
+      const photoUrl = await uploadPhoto(photoBlob);
+
+      // Update attendance with early checkout
+      const { error: attendanceError } = await supabase
+        .from("attendance")
+        .update({
+          check_out_selfie_url: photoUrl,
+          check_out_lat: location.lat,
+          check_out_lng: location.lng,
+          check_out_time: new Date().toISOString(),
+          tasks_completed: false,
+          early_checkout: true,
+          early_checkout_reason: reason,
+        })
+        .eq("id", currentShift.id);
+
+      if (attendanceError) throw attendanceError;
+
+      // Get user's profile name for the notification
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", user.id)
+        .single();
+
+      // Create admin notification
+      const { error: notificationError } = await supabase
+        .from("admin_notifications")
+        .insert({
+          type: "early_checkout",
+          title: "Early Checkout Alert",
+          message: `${profile?.full_name || "Employee"} checked out early. Reason: ${reason}`,
+          venue_id: venueId,
+          user_id: user.id,
+          attendance_id: currentShift.id,
+        });
+
+      if (notificationError) {
+        console.error("Failed to create notification:", notificationError);
+      }
+
+      toast.success("Early checkout completed");
+      setShowEarlyCheckoutDialog(false);
+      setCurrentShift(null);
+      await fetchTodayAttendance();
+    } catch (error: any) {
+      console.error("Early checkout error:", error);
+      toast.error(error.message || "Failed to complete early checkout");
+      // Stop camera on error
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+        setStream(null);
+      }
+    } finally {
+      setEarlyCheckoutLoading(false);
+    }
+  };
+
   const allTasksComplete = tasks.stockReported && tasks.salesReported && tasks.closingPhoto;
 
   return (
@@ -520,10 +594,19 @@ const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
             ) : (
               <>
                 {!allTasksComplete && (
-                  <div className="p-3 bg-warning/10 rounded-lg border border-warning/20">
+                  <div className="p-3 bg-warning/10 rounded-lg border border-warning/20 space-y-3">
                     <p className="text-sm text-warning text-center">
                       Complete all tasks to enable check-out
                     </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full border-amber-500 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950"
+                      onClick={() => setShowEarlyCheckoutDialog(true)}
+                    >
+                      <AlertTriangle className="h-4 w-4 mr-2" />
+                      Early Checkout (Morning Shift)
+                    </Button>
                   </div>
                 )}
                 <SlideToConfirm
@@ -549,6 +632,13 @@ const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
       <CheckoutAppreciationDialog
         open={showAppreciationDialog}
         onOpenChange={setShowAppreciationDialog}
+      />
+
+      <EarlyCheckoutDialog
+        open={showEarlyCheckoutDialog}
+        onOpenChange={setShowEarlyCheckoutDialog}
+        onConfirm={handleEarlyCheckout}
+        loading={earlyCheckoutLoading}
       />
 
       {showPreview && previewData && (

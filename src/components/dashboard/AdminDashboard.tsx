@@ -13,6 +13,7 @@ import SalesReports from "./admin/SalesReports";
 import AttendanceOverview from "./admin/AttendanceOverview";
 import HookahCategoryManagement from "./admin/HookahCategoryManagement";
 import EmployeeActivityReport from "./admin/EmployeeActivityReport";
+import AdminNotifications from "./admin/AdminNotifications";
 
 interface AdminDashboardProps {
   user: User;
@@ -178,6 +179,9 @@ const AdminDashboard = ({ user }: AdminDashboardProps) => {
 
   return (
     <div className="space-y-6">
+      {/* Admin Notifications - Early Checkout Alerts */}
+      <AdminNotifications />
+
       {/* Hero Section - Quick Stats Grid */}
       <div className="grid gap-3 md:gap-4 grid-cols-2 lg:grid-cols-4">
         <Card className="bg-gradient-to-br from-success/10 to-success/5 border-success/20">
