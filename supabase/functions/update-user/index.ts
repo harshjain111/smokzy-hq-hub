@@ -51,21 +51,32 @@ serve(async (req) => {
 
     console.log('Profile updated');
 
-    // Update user role
-    const { error: roleError } = await supabaseAdmin
+    // First, delete existing role for this user (to handle role changes properly)
+    const { error: deleteError } = await supabaseAdmin
       .from('user_roles')
-      .update({
-        role,
-        venue_id: role === 'employee' ? venueId : null,
-      })
+      .delete()
       .eq('user_id', userId);
 
+    if (deleteError) {
+      console.error('Delete role error:', deleteError);
+      throw deleteError;
+    }
+
+    // Insert new role
+    const { error: roleError } = await supabaseAdmin
+      .from('user_roles')
+      .insert({
+        user_id: userId,
+        role,
+        venue_id: role === 'employee' ? venueId : null,
+      });
+
     if (roleError) {
-      console.error('Role error:', roleError);
+      console.error('Role insert error:', roleError);
       throw roleError;
     }
 
-    console.log('User role updated');
+    console.log('User role updated to:', role);
 
     return new Response(
       JSON.stringify({ success: true }),
