@@ -14,6 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_notifications: {
+        Row: {
+          attendance_id: string | null
+          created_at: string
+          id: string
+          is_read: boolean | null
+          message: string
+          title: string
+          type: string
+          user_id: string
+          venue_id: string | null
+        }
+        Insert: {
+          attendance_id?: string | null
+          created_at?: string
+          id?: string
+          is_read?: boolean | null
+          message: string
+          title: string
+          type: string
+          user_id: string
+          venue_id?: string | null
+        }
+        Update: {
+          attendance_id?: string | null
+          created_at?: string
+          id?: string
+          is_read?: boolean | null
+          message?: string
+          title?: string
+          type?: string
+          user_id?: string
+          venue_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_notifications_attendance_id_fkey"
+            columns: ["attendance_id"]
+            isOneToOne: false
+            referencedRelation: "attendance"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_notifications_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       attendance: {
         Row: {
           check_in_lat: number
@@ -25,6 +76,8 @@ export type Database = {
           check_out_selfie_url: string | null
           check_out_time: string | null
           created_at: string
+          early_checkout: boolean | null
+          early_checkout_reason: string | null
           id: string
           tasks_completed: boolean
           user_id: string
@@ -40,6 +93,8 @@ export type Database = {
           check_out_selfie_url?: string | null
           check_out_time?: string | null
           created_at?: string
+          early_checkout?: boolean | null
+          early_checkout_reason?: string | null
           id?: string
           tasks_completed?: boolean
           user_id: string
@@ -55,6 +110,8 @@ export type Database = {
           check_out_selfie_url?: string | null
           check_out_time?: string | null
           created_at?: string
+          early_checkout?: boolean | null
+          early_checkout_reason?: string | null
           id?: string
           tasks_completed?: boolean
           user_id?: string
