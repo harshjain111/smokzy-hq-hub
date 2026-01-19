@@ -395,72 +395,104 @@ const AttendanceModule = ({
     const canConfirm = !!location && !locationLoading;
     
     return (
-      <div className="fixed inset-0 z-[60] bg-black flex flex-col">
-        <div className="flex-1 relative">
-          {photoPreview && (
-            <img
-              src={photoPreview}
-              alt="Preview"
-              className="w-full h-full object-cover"
-            />
-          )}
-          
-          {/* Location badge */}
-          <div className="absolute bottom-4 left-4 right-4 bg-black/70 rounded-xl p-3 flex items-center gap-2">
-            {locationLoading ? (
-              <>
-                <Loader2 className="w-4 h-4 text-primary animate-spin" />
-                <span className="text-white text-sm">Getting location...</span>
-              </>
-            ) : location ? (
-              <>
-                <MapPin className="w-4 h-4 text-success" />
-                <span className="text-white text-sm">
-                  Location: {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
-                </span>
-              </>
-            ) : (
-              <>
-                <MapPin className="w-4 h-4 text-destructive" />
-                <span className="text-white text-sm">Location unavailable - tap Retake</span>
-              </>
+      <>
+        <div className="fixed inset-0 z-[60] bg-black flex flex-col">
+          <div className="flex-1 relative">
+            {photoPreview && (
+              <img
+                src={photoPreview}
+                alt="Preview"
+                className="w-full h-full object-cover"
+              />
             )}
+            
+            {/* Location badge */}
+            <div className="absolute bottom-4 left-4 right-4 bg-black/70 rounded-xl p-3 flex items-center gap-2">
+              {locationLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 text-primary animate-spin" />
+                  <span className="text-white text-sm">Getting location...</span>
+                </>
+              ) : location ? (
+                <>
+                  <MapPin className="w-4 h-4 text-success" />
+                  <span className="text-white text-sm">
+                    Location: {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <MapPin className="w-4 h-4 text-destructive" />
+                  <span className="text-white text-sm">Location unavailable - tap Retake</span>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="p-6 bg-black/80 flex items-center justify-center gap-4">
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={handleRetake}
+              className="flex-1 h-14 bg-white text-black border-white hover:bg-white/90"
+            >
+              <Camera className="w-5 h-5 mr-2" />
+              Retake
+            </Button>
+            <Button
+              size="lg"
+              onClick={handleConfirmPreview}
+              disabled={!canConfirm}
+              className={cn(
+                "flex-1 h-14 text-white",
+                canConfirm ? "bg-success hover:bg-success/90" : "bg-muted opacity-50"
+              )}
+            >
+              {locationLoading ? (
+                <>
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  Wait...
+                </>
+              ) : (
+                <>
+                  <Check className="w-5 h-5 mr-2" />
+                  Confirm
+                </>
+              )}
+            </Button>
           </div>
         </div>
 
-        <div className="p-6 bg-black/80 flex items-center justify-center gap-4">
-          <Button
-            variant="outline"
-            size="lg"
-            onClick={handleRetake}
-            className="flex-1 h-14 bg-white text-black border-white hover:bg-white/90"
-          >
-            <Camera className="w-5 h-5 mr-2" />
-            Retake
-          </Button>
-          <Button
-            size="lg"
-            onClick={handleConfirmPreview}
-            disabled={!canConfirm}
-            className={cn(
-              "flex-1 h-14 text-white",
-              canConfirm ? "bg-success hover:bg-success/90" : "bg-muted opacity-50"
-            )}
-          >
-            {locationLoading ? (
-              <>
-                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                Wait...
-              </>
-            ) : (
-              <>
+        {/* Duty completion dialog - must be rendered here for checkout flow */}
+        <AlertDialog open={showDutyDialog} onOpenChange={setShowDutyDialog}>
+          <AlertDialogContent className="max-w-sm">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-center text-xl">
+                Is your duty completed for today?
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-center">
+                This helps us track your shift status correctly
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="flex-col gap-3 sm:flex-col">
+              <AlertDialogAction
+                onClick={() => handleDutyResponse(true)}
+                className="w-full h-14 text-lg bg-success hover:bg-success/90"
+              >
                 <Check className="w-5 h-5 mr-2" />
-                Confirm
-              </>
-            )}
-          </Button>
-        </div>
-      </div>
+                YES - Duty Complete
+              </AlertDialogAction>
+              <AlertDialogCancel
+                onClick={() => handleDutyResponse(false)}
+                className="w-full h-14 text-lg"
+              >
+                <X className="w-5 h-5 mr-2" />
+                NO - I Will Return
+              </AlertDialogCancel>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </>
     );
   }
 
@@ -476,39 +508,7 @@ const AttendanceModule = ({
     );
   }
 
-  return (
-    <>
-      {/* Duty completion dialog */}
-      <AlertDialog open={showDutyDialog} onOpenChange={setShowDutyDialog}>
-        <AlertDialogContent className="max-w-sm">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-center text-xl">
-              Is your duty completed for today?
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-center">
-              This helps us track your shift status correctly
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col gap-3 sm:flex-col">
-            <AlertDialogAction
-              onClick={() => handleDutyResponse(true)}
-              className="w-full h-14 text-lg bg-success hover:bg-success/90"
-            >
-              <Check className="w-5 h-5 mr-2" />
-              YES - Duty Complete
-            </AlertDialogAction>
-            <AlertDialogCancel
-              onClick={() => handleDutyResponse(false)}
-              className="w-full h-14 text-lg"
-            >
-              <X className="w-5 h-5 mr-2" />
-              NO - I Will Return
-            </AlertDialogCancel>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
-  );
+  return null;
 };
 
 export default AttendanceModule;
