@@ -47,13 +47,39 @@ const AttendanceModule = ({
   const [photoBlob, setPhotoBlob] = useState<Blob | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationLoading, setLocationLoading] = useState(false);
   const [showDutyDialog, setShowDutyDialog] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
+  // Fetch location in parallel when starting camera
+  const fetchLocation = useCallback(async () => {
+    setLocationLoading(true);
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 15000,
+        });
+      });
+      setLocation({
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+      });
+    } catch (error) {
+      console.error("Location error:", error);
+      toast.error("Failed to get location. Please enable location access.");
+    } finally {
+      setLocationLoading(false);
+    }
+  }, []);
+
   const startCamera = async () => {
     try {
+      // Start fetching location in parallel
+      fetchLocation();
+      
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "user" },
         audio: false,
@@ -67,7 +93,7 @@ const AttendanceModule = ({
       setFlowState('capturing');
     } catch (error) {
       console.error("Camera error:", error);
-      toast.error("Failed to access camera");
+      toast.error("Failed to access camera. Please allow camera access.");
       setFlowState('idle');
     }
   };
@@ -91,36 +117,24 @@ const AttendanceModule = ({
       if (!ctx) throw new Error("Could not get canvas context");
       
       ctx.drawImage(videoRef.current, 0, 0);
+      stopCamera();
       
       canvas.toBlob(async (blob) => {
         if (blob) {
-          const file = new File([blob], "selfie.jpg", { type: "image/jpeg" });
-          const compressed = await compressImage(file, {
-            maxWidth: 1280,
-            maxHeight: 1280,
-            quality: 0.85,
-          });
-          
-          setPhotoBlob(compressed);
-          setPhotoPreview(URL.createObjectURL(compressed));
-          stopCamera();
-          
-          // Get location
-          toast.info("Getting location...");
           try {
-            const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-              navigator.geolocation.getCurrentPosition(resolve, reject, {
-                enableHighAccuracy: true,
-                timeout: 10000,
-              });
+            const file = new File([blob], "selfie.jpg", { type: "image/jpeg" });
+            const compressed = await compressImage(file, {
+              maxWidth: 1280,
+              maxHeight: 1280,
+              quality: 0.85,
             });
-            setLocation({
-              lat: position.coords.latitude,
-              lng: position.coords.longitude,
-            });
+            
+            setPhotoBlob(compressed);
+            setPhotoPreview(URL.createObjectURL(compressed));
             setFlowState('preview');
-          } catch (locError) {
-            toast.error("Failed to get location");
+          } catch (compressError) {
+            console.error("Compression error:", compressError);
+            toast.error("Failed to process photo");
             setFlowState('idle');
           }
         }
@@ -128,6 +142,7 @@ const AttendanceModule = ({
     } catch (error) {
       console.error("Capture error:", error);
       toast.error("Failed to capture photo");
+      setFlowState('idle');
     }
   };
 
@@ -369,6 +384,8 @@ const AttendanceModule = ({
 
   // Preview screen
   if (flowState === 'preview') {
+    const canConfirm = !!location && !locationLoading;
+    
     return (
       <div className="fixed inset-0 z-50 bg-black flex flex-col">
         <div className="flex-1 relative">
@@ -381,14 +398,26 @@ const AttendanceModule = ({
           )}
           
           {/* Location badge */}
-          {location && (
-            <div className="absolute bottom-4 left-4 right-4 bg-black/70 rounded-xl p-3 flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-success" />
-              <span className="text-white text-sm">
-                Location captured: {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
-              </span>
-            </div>
-          )}
+          <div className="absolute bottom-4 left-4 right-4 bg-black/70 rounded-xl p-3 flex items-center gap-2">
+            {locationLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 text-primary animate-spin" />
+                <span className="text-white text-sm">Getting location...</span>
+              </>
+            ) : location ? (
+              <>
+                <MapPin className="w-4 h-4 text-success" />
+                <span className="text-white text-sm">
+                  Location: {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
+                </span>
+              </>
+            ) : (
+              <>
+                <MapPin className="w-4 h-4 text-destructive" />
+                <span className="text-white text-sm">Location unavailable - tap Retake</span>
+              </>
+            )}
+          </div>
         </div>
 
         <div className="p-6 bg-black/80 flex items-center justify-center gap-4">
@@ -404,10 +433,23 @@ const AttendanceModule = ({
           <Button
             size="lg"
             onClick={handleConfirmPreview}
-            className="flex-1 h-14 bg-success hover:bg-success/90 text-white"
+            disabled={!canConfirm}
+            className={cn(
+              "flex-1 h-14 text-white",
+              canConfirm ? "bg-success hover:bg-success/90" : "bg-muted opacity-50"
+            )}
           >
-            <Check className="w-5 h-5 mr-2" />
-            Confirm
+            {locationLoading ? (
+              <>
+                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                Wait...
+              </>
+            ) : (
+              <>
+                <Check className="w-5 h-5 mr-2" />
+                Confirm
+              </>
+            )}
           </Button>
         </div>
       </div>
