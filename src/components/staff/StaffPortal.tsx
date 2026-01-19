@@ -11,6 +11,7 @@ import ClosingModule from "./ClosingModule";
 import ProfileMenu from "@/components/ProfileMenu";
 import { Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 interface StaffPortalProps {
   user: User;
@@ -30,6 +31,13 @@ const StaffPortal = ({ user, venueId }: StaffPortalProps) => {
     checkOut,
     updateSessionTask,
     getCheckoutEligibility,
+    // Break management
+    staffStatus,
+    currentBreak,
+    totalBreakMinutes,
+    startBreak,
+    endBreak,
+    isLongBreak,
   } = useClubSession(user.id, venueId);
 
   const checkoutEligibility = getCheckoutEligibility();
@@ -72,6 +80,12 @@ const StaffPortal = ({ user, venueId }: StaffPortalProps) => {
             checkIn={checkIn}
             checkOut={checkOut}
             checkoutEligibility={checkoutEligibility}
+            staffStatus={staffStatus}
+            currentBreak={currentBreak}
+            totalBreakMinutes={totalBreakMinutes}
+            startBreak={startBreak}
+            endBreak={endBreak}
+            isLongBreak={isLongBreak}
           />
         );
       case 'stock':
@@ -168,9 +182,14 @@ const StaffPortal = ({ user, venueId }: StaffPortalProps) => {
                 <motion.span
                   initial={{ scale: 0.8, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
-                  className="text-xs bg-success/15 text-success px-3 py-1.5 rounded-full font-semibold border border-success/20"
+                  className={cn(
+                    "text-xs px-3 py-1.5 rounded-full font-semibold border",
+                    staffStatus === 'on_break' 
+                      ? "bg-warning/15 text-warning border-warning/20"
+                      : "bg-success/15 text-success border-success/20"
+                  )}
                 >
-                  On Duty
+                  {staffStatus === 'on_break' ? 'On Break' : 'On Duty'}
                 </motion.span>
               )}
               <ProfileMenu user={user} role="employee" />
