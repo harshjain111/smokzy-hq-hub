@@ -234,7 +234,7 @@ const PhotoModule = ({ user, venueId, session, updateSessionTask }: PhotoModuleP
   // Capturing state
   if (flowState === 'capturing') {
     return (
-      <div className="fixed inset-0 z-50 bg-black flex flex-col">
+      <div className="fixed inset-0 z-[60] bg-black flex flex-col">
         <div className="flex-1 relative">
           <video
             ref={videoRef}
@@ -279,7 +279,7 @@ const PhotoModule = ({ user, venueId, session, updateSessionTask }: PhotoModuleP
   // Preview state
   if (flowState === 'preview') {
     return (
-      <div className="fixed inset-0 z-50 bg-black flex flex-col">
+      <div className="fixed inset-0 z-[60] bg-black flex flex-col">
         <div className="flex-1 relative">
           {photoPreview && (
             <img
@@ -316,7 +316,7 @@ const PhotoModule = ({ user, venueId, session, updateSessionTask }: PhotoModuleP
   // Uploading state
   if (flowState === 'uploading') {
     return (
-      <div className="fixed inset-0 z-50 bg-background flex flex-col items-center justify-center gap-4">
+      <div className="fixed inset-0 z-[60] bg-background flex flex-col items-center justify-center gap-4">
         <Loader2 className="w-12 h-12 text-primary animate-spin" />
         <p className="text-lg font-medium text-foreground">Uploading photo...</p>
       </div>

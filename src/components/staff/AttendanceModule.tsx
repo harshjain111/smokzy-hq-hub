@@ -353,7 +353,7 @@ const AttendanceModule = ({
   // Camera capture screen
   if (flowState === 'capturing') {
     return (
-      <div className="fixed inset-0 z-50 bg-black flex flex-col">
+      <div className="fixed inset-0 z-[60] bg-black flex flex-col">
         <div className="flex-1 relative overflow-hidden">
           <video
             ref={videoRef}
@@ -395,7 +395,7 @@ const AttendanceModule = ({
     const canConfirm = !!location && !locationLoading;
     
     return (
-      <div className="fixed inset-0 z-50 bg-black flex flex-col">
+      <div className="fixed inset-0 z-[60] bg-black flex flex-col">
         <div className="flex-1 relative">
           {photoPreview && (
             <img
@@ -467,7 +467,7 @@ const AttendanceModule = ({
   // Processing state
   if (flowState === 'processing') {
     return (
-      <div className="fixed inset-0 z-50 bg-background flex flex-col items-center justify-center gap-4">
+      <div className="fixed inset-0 z-[60] bg-background flex flex-col items-center justify-center gap-4">
         <Loader2 className="w-12 h-12 text-primary animate-spin" />
         <p className="text-lg font-medium text-foreground">
           {isCheckingOut ? "Checking out..." : "Checking in..."}
