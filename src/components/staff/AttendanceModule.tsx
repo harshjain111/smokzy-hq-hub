@@ -464,8 +464,15 @@ const AttendanceModule = ({
         </div>
 
         {/* Duty completion dialog - must be rendered here for checkout flow */}
-        <AlertDialog open={showDutyDialog} onOpenChange={setShowDutyDialog}>
-          <AlertDialogContent className="max-w-sm">
+        <AlertDialog open={showDutyDialog} onOpenChange={(open) => {
+          // Only allow closing via our handlers, not via backdrop click or escape
+          if (!open && flowState === 'preview') {
+            // User tried to close without selecting - keep it open
+            return;
+          }
+          setShowDutyDialog(open);
+        }}>
+          <AlertDialogContent className="max-w-sm z-[70]">
             <AlertDialogHeader>
               <AlertDialogTitle className="text-center text-xl">
                 Is your duty completed for today?
@@ -475,20 +482,21 @@ const AttendanceModule = ({
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="flex-col gap-3 sm:flex-col">
-              <AlertDialogAction
+              <Button
                 onClick={() => handleDutyResponse(true)}
-                className="w-full h-14 text-lg bg-success hover:bg-success/90"
+                className="w-full h-14 text-lg bg-success hover:bg-success/90 text-white"
               >
                 <Check className="w-5 h-5 mr-2" />
                 YES - Duty Complete
-              </AlertDialogAction>
-              <AlertDialogCancel
+              </Button>
+              <Button
+                variant="outline"
                 onClick={() => handleDutyResponse(false)}
                 className="w-full h-14 text-lg"
               >
                 <X className="w-5 h-5 mr-2" />
                 NO - I Will Return
-              </AlertDialogCancel>
+              </Button>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
