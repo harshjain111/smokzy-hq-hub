@@ -104,6 +104,11 @@ const Dashboard = () => {
     );
   }
 
+  // For employees, render StaffPortal directly (it has its own full layout)
+  if (userRole.role === "employee" && userRole.venueId) {
+    return <EmployeeDashboard user={user!} venueId={userRole.venueId} />;
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card">
@@ -122,11 +127,7 @@ const Dashboard = () => {
       </header>
 
       <main className="container mx-auto px-4 py-6">
-        {userRole.role === "admin" ? (
-          <AdminDashboard user={user!} />
-        ) : (
-          <EmployeeDashboard user={user!} venueId={userRole.venueId!} />
-        )}
+        <AdminDashboard user={user!} />
       </main>
     </div>
   );

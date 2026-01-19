@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { User } from "@supabase/supabase-js";
+import { supabase } from "@/integrations/supabase/client";
 import { useClubSession } from "@/hooks/useClubSession";
 import BottomNav, { TabId } from "./BottomNav";
 import AttendanceModule from "./AttendanceModule";
@@ -7,6 +8,7 @@ import StockModule from "./StockModule";
 import SalesModule from "./SalesModule";
 import PhotoModule from "./PhotoModule";
 import ClosingModule from "./ClosingModule";
+import ProfileMenu from "@/components/ProfileMenu";
 import { Loader2 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -17,6 +19,7 @@ interface StaffPortalProps {
 
 const StaffPortal = ({ user, venueId }: StaffPortalProps) => {
   const [activeTab, setActiveTab] = useState<TabId>('attendance');
+  const [venueName, setVenueName] = useState<string>("");
   
   const {
     session,
@@ -30,6 +33,20 @@ const StaffPortal = ({ user, venueId }: StaffPortalProps) => {
   } = useClubSession(user.id, venueId);
 
   const checkoutEligibility = getCheckoutEligibility();
+
+  useEffect(() => {
+    const fetchVenueName = async () => {
+      const { data } = await supabase
+        .from("venues")
+        .select("name")
+        .eq("id", venueId)
+        .single();
+      if (data?.name) {
+        setVenueName(data.name);
+      }
+    };
+    fetchVenueName();
+  }, [venueId]);
 
   // Loading state
   if (loading) {
@@ -99,15 +116,13 @@ const StaffPortal = ({ user, venueId }: StaffPortalProps) => {
   return (
     <div className="h-screen bg-background pb-16 flex flex-col overflow-hidden">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border px-4 py-3">
+      <header className="shrink-0 z-40 bg-background border-b border-border px-4 py-3">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-semibold text-foreground">Smokzy</h1>
-            {session && (
-              <p className="text-xs text-muted-foreground">
-                Session: {format(new Date(session.session_date), "MMM d, yyyy")}
-              </p>
-            )}
+            <h1 className="text-lg font-bold text-primary">Smokzy Operations</h1>
+            <p className="text-xs text-muted-foreground">
+              {venueName || "Loading..."}
+            </p>
           </div>
           <div className="flex items-center gap-2">
             {isCheckedIn && (
@@ -115,6 +130,7 @@ const StaffPortal = ({ user, venueId }: StaffPortalProps) => {
                 On Duty
               </span>
             )}
+            <ProfileMenu user={user} role="employee" />
           </div>
         </div>
       </header>
