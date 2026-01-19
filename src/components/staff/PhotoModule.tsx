@@ -51,7 +51,7 @@ const PhotoModule = ({ user, venueId, session, updateSessionTask }: PhotoModuleP
     }
   }, [session, fetchSubmitterInfo]);
 
-  const startCamera = async () => {
+  const initCamera = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment" }, // Back camera for counter photos
@@ -63,13 +63,27 @@ const PhotoModule = ({ user, venueId, session, updateSessionTask }: PhotoModuleP
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
-      setFlowState('capturing');
     } catch (error) {
       console.error("Camera error:", error);
       toast.error("Failed to access camera");
       setFlowState('idle');
     }
+  }, []);
+
+  const startCamera = () => {
+    setFlowState('capturing');
   };
+
+  // Initialize camera when flowState changes to 'capturing'
+  useEffect(() => {
+    if (flowState === 'capturing') {
+      // Small delay to ensure video element is mounted
+      const timer = setTimeout(() => {
+        initCamera();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [flowState, initCamera]);
 
   const stopCamera = () => {
     if (streamRef.current) {
@@ -116,7 +130,7 @@ const PhotoModule = ({ user, venueId, session, updateSessionTask }: PhotoModuleP
     if (photoPreview) URL.revokeObjectURL(photoPreview);
     setPhotoBlob(null);
     setPhotoPreview(null);
-    startCamera();
+    setFlowState('capturing'); // This will trigger the useEffect to init camera
   };
 
   const handleUpload = async () => {
