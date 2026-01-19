@@ -433,7 +433,7 @@ const AttendanceModule = ({
             variant="outline"
             size="lg"
             onClick={handleRetake}
-            className="flex-1 h-14 text-white border-white/30 hover:bg-white/10"
+            className="flex-1 h-14 bg-white text-black border-white hover:bg-white/90"
           >
             <Camera className="w-5 h-5 mr-2" />
             Retake
