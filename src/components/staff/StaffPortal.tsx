@@ -10,7 +10,7 @@ import PhotoModule from "./PhotoModule";
 import ClosingModule from "./ClosingModule";
 import ProfileMenu from "@/components/ProfileMenu";
 import { Loader2 } from "lucide-react";
-import { format } from "date-fns";
+import { motion } from "framer-motion";
 
 interface StaffPortalProps {
   user: User;
@@ -115,25 +115,63 @@ const StaffPortal = ({ user, venueId }: StaffPortalProps) => {
 
   return (
     <div className="h-screen bg-background flex flex-col overflow-hidden">
-      {/* Header with gradient hero */}
+      {/* Header with animated gradient hero */}
       <header className="shrink-0 z-40 relative overflow-hidden">
-        {/* Gradient background with blur effect */}
-        <div className="absolute inset-0 bg-gradient-to-br from-gradient-start/20 via-gradient-end/10 to-transparent" />
-        <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-bl from-gradient-start/40 via-gradient-end/30 to-transparent rounded-full blur-3xl -translate-y-1/2 translate-x-1/4" />
+        {/* Animated gradient background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-gradient-start/15 via-gradient-end/10 to-transparent" />
+        
+        {/* Animated floating gradient orbs */}
+        <motion.div
+          className="absolute top-0 right-0 w-56 h-56 bg-gradient-to-bl from-gradient-start/30 via-gradient-end/25 to-transparent rounded-full blur-3xl"
+          animate={{
+            x: [0, 10, 0],
+            y: [0, -8, 0],
+            scale: [1, 1.05, 1],
+          }}
+          transition={{
+            duration: 8,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          style={{ transform: "translate(25%, -50%)" }}
+        />
+        <motion.div
+          className="absolute top-1/2 left-0 w-32 h-32 bg-gradient-to-r from-gradient-end/20 to-transparent rounded-full blur-2xl"
+          animate={{
+            x: [0, 15, 0],
+            y: [0, 10, 0],
+            opacity: [0.5, 0.8, 0.5],
+          }}
+          transition={{
+            duration: 6,
+            repeat: Infinity,
+            ease: "easeInOut",
+            delay: 1,
+          }}
+          style={{ transform: "translate(-50%, -50%)" }}
+        />
         
         <div className="relative px-5 py-6">
           <div className="flex items-center justify-between">
-            <div>
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+            >
               <p className="text-sm font-medium text-muted-foreground">
                 {venueName || "Loading..."}
               </p>
               <h1 className="text-2xl font-bold text-foreground">Staff Portal</h1>
-            </div>
+            </motion.div>
             <div className="flex items-center gap-3">
               {isCheckedIn && (
-                <span className="text-xs bg-success/15 text-success px-3 py-1.5 rounded-full font-semibold border border-success/20">
+                <motion.span
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  className="text-xs bg-success/15 text-success px-3 py-1.5 rounded-full font-semibold border border-success/20"
+                >
                   On Duty
-                </span>
+                </motion.span>
               )}
               <ProfileMenu user={user} role="employee" />
             </div>

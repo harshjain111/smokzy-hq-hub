@@ -5,14 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Check, Package, Loader2, Plus, Search } from "lucide-react";
+import { Check, Package, Loader2, Plus, Search, ChevronDown, ChevronUp, Pencil, Trash2, MoreVertical } from "lucide-react";
 import { ClubSession } from "@/hooks/useClubSession";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -21,6 +23,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface StockModuleProps {
   user: User;
@@ -53,6 +71,8 @@ const CATEGORY_DISPLAY: Record<string, string> = {
   accessories: 'Accessories',
 };
 
+const UNIT_OPTIONS = ['grams', 'pcs', 'kg', 'ml', 'liters', 'boxes', 'packs'];
+
 const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleProps) => {
   const [stock, setStock] = useState<StockItem[]>([]);
   const [quantities, setQuantities] = useState<Record<string, string>>({});
@@ -62,11 +82,26 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
   const [submitterName, setSubmitterName] = useState<string | null>(null);
   const [submittedAt, setSubmittedAt] = useState<string | null>(null);
   
+  // Collapsed categories state
+  const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
+  
   // Add item state
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [newItemName, setNewItemName] = useState("");
   const [newItemCategory, setNewItemCategory] = useState<StockCategory | "">("");
   const [addingItem, setAddingItem] = useState(false);
+  
+  // Edit item state
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<StockItem | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editUnit, setEditUnit] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  
+  // Delete item state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingItem, setDeletingItem] = useState<StockItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchStock = useCallback(async () => {
     setLoading(true);
@@ -117,8 +152,14 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
     }
   }, [session, fetchSubmitterInfo]);
 
+  const toggleCategory = (category: string) => {
+    setCollapsedCategories(prev => ({
+      ...prev,
+      [category]: !prev[category],
+    }));
+  };
+
   const handleQuantityChange = (itemId: string, value: string) => {
-    // Allow empty string for clearing, otherwise only allow numbers
     if (value === '' || /^\d+$/.test(value)) {
       setQuantities(prev => ({
         ...prev,
@@ -151,7 +192,6 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
 
       if (error) throw error;
 
-      // Add to local state with pending flag
       const newItem: StockItem = {
         ...data,
         isPending: true,
@@ -163,7 +203,7 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
       setNewItemName("");
       setNewItemCategory("");
       setAddDialogOpen(false);
-      toast.success("Item added. Enter the current stock quantity.");
+      toast.success("Item added successfully");
     } catch (error: any) {
       console.error("Add item error:", error);
       toast.error(error.message || "Failed to add item");
@@ -172,10 +212,84 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
     }
   };
 
+  const openEditDialog = (item: StockItem) => {
+    setEditingItem(item);
+    setEditName(item.item_name);
+    setEditUnit(item.unit);
+    setEditDialogOpen(true);
+  };
+
+  const handleEditItem = async () => {
+    if (!editingItem || !editName.trim() || !editUnit) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+
+    setSavingEdit(true);
+    try {
+      const { error } = await supabase
+        .from("stock")
+        .update({
+          item_name: editName.trim(),
+          unit: editUnit,
+        })
+        .eq("id", editingItem.id);
+
+      if (error) throw error;
+
+      setStock(prev => prev.map(item => 
+        item.id === editingItem.id 
+          ? { ...item, item_name: editName.trim(), unit: editUnit }
+          : item
+      ));
+      
+      setEditDialogOpen(false);
+      setEditingItem(null);
+      toast.success("Item updated successfully");
+    } catch (error: any) {
+      console.error("Edit item error:", error);
+      toast.error(error.message || "Failed to update item");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const openDeleteDialog = (item: StockItem) => {
+    setDeletingItem(item);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteItem = async () => {
+    if (!deletingItem) return;
+
+    setDeleting(true);
+    try {
+      const { error } = await supabase
+        .from("stock")
+        .delete()
+        .eq("id", deletingItem.id);
+
+      if (error) throw error;
+
+      setStock(prev => prev.filter(item => item.id !== deletingItem.id));
+      const newQuantities = { ...quantities };
+      delete newQuantities[deletingItem.id];
+      setQuantities(newQuantities);
+      
+      setDeleteDialogOpen(false);
+      setDeletingItem(null);
+      toast.success("Item deleted successfully");
+    } catch (error: any) {
+      console.error("Delete item error:", error);
+      toast.error(error.message || "Failed to delete item");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
-      // Validate all quantities are entered
       const hasEmpty = stock.some(item => quantities[item.id] === '' || quantities[item.id] === undefined);
       if (hasEmpty) {
         toast.error("Please enter quantities for all items");
@@ -183,7 +297,6 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
         return;
       }
 
-      // Update all stock items
       for (const [itemId, qty] of Object.entries(quantities)) {
         const { error } = await supabase
           .from("stock")
@@ -193,7 +306,6 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
         if (error) throw error;
       }
 
-      // Update session
       await updateSessionTask('stock', user.id);
       
       toast.success("Stock locked for today. Good control! ✓");
@@ -205,12 +317,10 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
     }
   };
 
-  // Filter items by search
   const filteredItems = stock.filter(item =>
     item.item_name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Group by category
   const groupedItems = ['flavour', 'hookah_pots', 'accessories']
     .map(category => ({
       category,
@@ -231,10 +341,19 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
   // Already submitted state
   if (session?.stock_submitted) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] px-8">
-        <div className="w-24 h-24 rounded-full bg-gradient-to-br from-gradient-start to-gradient-end flex items-center justify-center mb-6">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="flex flex-col items-center justify-center min-h-[60vh] px-8"
+      >
+        <motion.div 
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+          className="w-24 h-24 rounded-full bg-gradient-to-br from-gradient-start to-gradient-end flex items-center justify-center mb-6"
+        >
           <Check className="w-12 h-12 text-white" />
-        </div>
+        </motion.div>
         <h2 className="text-2xl font-bold text-foreground mb-2">Stock Submitted</h2>
         {submitterName && submittedAt && (
           <p className="text-muted-foreground mb-6">
@@ -246,13 +365,17 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
             Stock locked for today. Good control.
           </p>
         </div>
-      </div>
+      </motion.div>
     );
   }
 
   if (stock.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] px-8">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col items-center justify-center min-h-[60vh] px-8"
+      >
         <Package className="w-16 h-16 text-muted-foreground/40 mb-4" />
         <h2 className="text-xl font-semibold text-foreground mb-2">No Stock Items</h2>
         <p className="text-muted-foreground text-sm text-center mb-6">
@@ -305,14 +428,18 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
             </div>
           </DialogContent>
         </Dialog>
-      </div>
+      </motion.div>
     );
   }
 
   return (
     <div className="flex flex-col h-full pb-32">
       {/* Header with search and add */}
-      <div className="px-5 pt-4 pb-3 space-y-4">
+      <motion.div 
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="px-5 pt-4 pb-3 space-y-4"
+      >
         <div className="flex items-center gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -376,63 +503,135 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
         </div>
         
         <p className="text-sm text-muted-foreground">
-          Enter current quantities. Changes save automatically.
+          Enter current quantities. Tap category to collapse.
         </p>
-      </div>
+      </motion.div>
 
       {/* Stock items by category */}
       <div className="flex-1 overflow-auto px-5 pb-4">
-        <div className="space-y-8">
-          {groupedItems.map(group => (
-            <div key={group.category} className="space-y-3">
-              <div className="flex items-center gap-2 px-1">
-                <div className="w-1 h-4 bg-gradient-to-b from-gradient-start to-gradient-end rounded-full" />
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                  {group.label}
-                </h3>
-              </div>
-              <div className="space-y-2">
-                {group.items.map(item => (
-                  <div
-                    key={item.id}
-                    className="flex items-center justify-between py-4 px-5 bg-card rounded-2xl border border-border/50 shadow-sm"
+        <div className="space-y-6">
+          {groupedItems.map((group, groupIndex) => (
+            <motion.div 
+              key={group.category} 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: groupIndex * 0.1 }}
+              className="space-y-3"
+            >
+              {/* Collapsible category header */}
+              <button
+                onClick={() => toggleCategory(group.category)}
+                className="flex items-center justify-between w-full px-1 py-2 group"
+              >
+                <div className="flex items-center gap-2">
+                  <div className="w-1 h-4 bg-gradient-to-b from-gradient-start to-gradient-end rounded-full" />
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                    {group.label}
+                  </h3>
+                  <span className="text-xs text-muted-foreground/60">
+                    ({group.items.length})
+                  </span>
+                </div>
+                <motion.div
+                  animate={{ rotate: collapsedCategories[group.category] ? 0 : 180 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <ChevronUp className="w-5 h-5 text-muted-foreground/60 group-hover:text-muted-foreground transition-colors" />
+                </motion.div>
+              </button>
+              
+              {/* Items list with animation */}
+              <AnimatePresence>
+                {!collapsedCategories[group.category] && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.25, ease: "easeInOut" }}
+                    className="overflow-hidden"
                   >
-                    <div className="flex-1 min-w-0 pr-4">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-foreground truncate">{item.item_name}</p>
-                        {item.isPending && (
-                          <span className="text-xs px-2 py-0.5 bg-gradient-to-r from-gradient-start/20 to-gradient-end/20 text-primary rounded-full shrink-0 font-medium">
-                            New
-                          </span>
-                        )}
-                      </div>
+                    <div className="space-y-2">
+                      {group.items.map((item, itemIndex) => (
+                        <motion.div
+                          key={item.id}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: itemIndex * 0.03 }}
+                          className="flex items-center justify-between py-4 px-5 bg-card rounded-2xl border border-border/50 shadow-sm"
+                        >
+                          <div className="flex-1 min-w-0 pr-2">
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium text-foreground truncate">{item.item_name}</p>
+                              {item.isPending && (
+                                <span className="text-xs px-2 py-0.5 bg-gradient-to-r from-gradient-start/20 to-gradient-end/20 text-primary rounded-full shrink-0 font-medium">
+                                  New
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {/* Quantity input with unit */}
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Input
+                              type="text"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              value={quantities[item.id] ?? ''}
+                              onChange={(e) => handleQuantityChange(item.id, e.target.value)}
+                              className="w-20 h-12 text-center text-lg font-semibold rounded-xl bg-muted/50 border border-border/50 focus:border-primary/50 focus:ring-primary/20"
+                              placeholder="0"
+                            />
+                            <span className="text-xs text-muted-foreground w-10 text-center">
+                              {item.unit}
+                            </span>
+                            
+                            {/* Actions dropdown */}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-10 w-10 text-muted-foreground hover:text-foreground shrink-0"
+                                >
+                                  <MoreVertical className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="rounded-xl">
+                                <DropdownMenuItem 
+                                  onClick={() => openEditDialog(item)}
+                                  className="gap-2 py-3"
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                  Edit Item
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  onClick={() => openDeleteDialog(item)}
+                                  className="gap-2 py-3 text-destructive focus:text-destructive"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                  Delete Item
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </motion.div>
+                      ))}
                     </div>
-                    
-                    {/* Quantity input with unit */}
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Input
-                        type="text"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        value={quantities[item.id] ?? ''}
-                        onChange={(e) => handleQuantityChange(item.id, e.target.value)}
-                        className="w-24 h-14 text-center text-xl font-semibold rounded-xl bg-muted/50 border border-border/50 focus:border-primary/50 focus:ring-primary/20"
-                        placeholder="0"
-                      />
-                      <span className="text-sm text-muted-foreground w-12">
-                        {item.unit}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
           ))}
         </div>
       </div>
 
       {/* Submit button - fixed at bottom */}
-      <div className="fixed bottom-20 left-0 right-0 px-5 py-4 bg-gradient-to-t from-background via-background to-transparent">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+        className="fixed bottom-20 left-0 right-0 px-5 py-4 bg-gradient-to-t from-background via-background to-transparent"
+      >
         <Button
           onClick={handleSubmit}
           disabled={submitting || stock.length === 0}
@@ -447,7 +646,75 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
             "Submit Final Stock"
           )}
         </Button>
-      </div>
+      </motion.div>
+
+      {/* Edit Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="mx-4 rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl">Edit Item</DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Update the item name or unit of measurement.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6 pt-4">
+            <div className="space-y-2">
+              <Label htmlFor="editName" className="text-sm font-medium">Item Name</Label>
+              <Input
+                id="editName"
+                placeholder="e.g., Mint, Blueberry Mix"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="h-14 text-base rounded-xl"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editUnit" className="text-sm font-medium">Unit</Label>
+              <Select value={editUnit} onValueChange={setEditUnit}>
+                <SelectTrigger className="h-14 text-base rounded-xl">
+                  <SelectValue placeholder="Select unit" />
+                </SelectTrigger>
+                <SelectContent>
+                  {UNIT_OPTIONS.map(unit => (
+                    <SelectItem key={unit} value={unit} className="h-12">
+                      {unit}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              onClick={handleEditItem}
+              disabled={savingEdit || !editName.trim() || !editUnit}
+              className="w-full h-14 text-base font-semibold rounded-2xl bg-gradient-to-r from-gradient-start to-gradient-end hover:opacity-90"
+            >
+              {savingEdit ? <Loader2 className="w-5 h-5 animate-spin" /> : "Save Changes"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent className="mx-4 rounded-3xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Item</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{deletingItem?.item_name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-3">
+            <AlertDialogCancel className="h-12 rounded-xl">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteItem}
+              disabled={deleting}
+              className="h-12 rounded-xl bg-destructive hover:bg-destructive/90"
+            >
+              {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
