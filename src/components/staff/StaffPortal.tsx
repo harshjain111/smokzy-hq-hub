@@ -114,29 +114,33 @@ const StaffPortal = ({ user, venueId }: StaffPortalProps) => {
   };
 
   return (
-    <div className="h-screen bg-background pb-16 flex flex-col overflow-hidden">
-      {/* Header */}
-      <header className="shrink-0 z-40 bg-background border-b border-border px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-bold text-primary">Smokzy Operations</h1>
-            <p className="text-xs text-muted-foreground">
-              {venueName || "Loading..."}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            {isCheckedIn && (
-              <span className="text-xs bg-success/10 text-success px-2 py-1 rounded-full font-medium">
-                On Duty
-              </span>
-            )}
-            <ProfileMenu user={user} role="employee" />
+    <div className="h-screen bg-background flex flex-col overflow-hidden">
+      {/* Header with gradient accent */}
+      <header className="shrink-0 z-40">
+        {/* Gradient accent bar */}
+        <div className="h-1 bg-gradient-to-r from-gradient-start to-gradient-end" />
+        <div className="bg-background px-5 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">
+                {venueName || "Loading..."}
+              </p>
+              <h1 className="text-xl font-bold text-foreground">Staff Portal</h1>
+            </div>
+            <div className="flex items-center gap-3">
+              {isCheckedIn && (
+                <span className="text-xs bg-success/10 text-success px-3 py-1.5 rounded-full font-medium">
+                  On Duty
+                </span>
+              )}
+              <ProfileMenu user={user} role="employee" />
+            </div>
           </div>
         </div>
       </header>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto pb-20">
         {renderModule()}
       </main>
 
