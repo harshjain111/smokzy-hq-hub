@@ -200,6 +200,77 @@ export type Database = {
           },
         ]
       }
+      club_sessions: {
+        Row: {
+          closed_at: string | null
+          created_at: string
+          force_close_reason: string | null
+          id: string
+          photo_uploaded: boolean
+          photo_uploaded_at: string | null
+          photo_uploaded_by: string | null
+          sales_submitted: boolean
+          sales_submitted_at: string | null
+          sales_submitted_by: string | null
+          session_date: string
+          started_at: string
+          status: string
+          stock_submitted: boolean
+          stock_submitted_at: string | null
+          stock_submitted_by: string | null
+          updated_at: string
+          venue_id: string
+        }
+        Insert: {
+          closed_at?: string | null
+          created_at?: string
+          force_close_reason?: string | null
+          id?: string
+          photo_uploaded?: boolean
+          photo_uploaded_at?: string | null
+          photo_uploaded_by?: string | null
+          sales_submitted?: boolean
+          sales_submitted_at?: string | null
+          sales_submitted_by?: string | null
+          session_date: string
+          started_at?: string
+          status?: string
+          stock_submitted?: boolean
+          stock_submitted_at?: string | null
+          stock_submitted_by?: string | null
+          updated_at?: string
+          venue_id: string
+        }
+        Update: {
+          closed_at?: string | null
+          created_at?: string
+          force_close_reason?: string | null
+          id?: string
+          photo_uploaded?: boolean
+          photo_uploaded_at?: string | null
+          photo_uploaded_by?: string | null
+          sales_submitted?: boolean
+          sales_submitted_at?: string | null
+          sales_submitted_by?: string | null
+          session_date?: string
+          started_at?: string
+          status?: string
+          stock_submitted?: boolean
+          stock_submitted_at?: string | null
+          stock_submitted_by?: string | null
+          updated_at?: string
+          venue_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_sessions_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hookah_pots: {
         Row: {
           created_at: string
@@ -310,6 +381,75 @@ export type Database = {
           },
         ]
       }
+      staff_attendance_blocks: {
+        Row: {
+          check_in_lat: number
+          check_in_lng: number
+          check_in_selfie_url: string
+          check_in_time: string
+          check_out_lat: number | null
+          check_out_lng: number | null
+          check_out_selfie_url: string | null
+          check_out_time: string | null
+          created_at: string
+          duty_completed: boolean | null
+          id: string
+          is_break: boolean
+          session_id: string
+          user_id: string
+          venue_id: string
+        }
+        Insert: {
+          check_in_lat: number
+          check_in_lng: number
+          check_in_selfie_url: string
+          check_in_time?: string
+          check_out_lat?: number | null
+          check_out_lng?: number | null
+          check_out_selfie_url?: string | null
+          check_out_time?: string | null
+          created_at?: string
+          duty_completed?: boolean | null
+          id?: string
+          is_break?: boolean
+          session_id: string
+          user_id: string
+          venue_id: string
+        }
+        Update: {
+          check_in_lat?: number
+          check_in_lng?: number
+          check_in_selfie_url?: string
+          check_in_time?: string
+          check_out_lat?: number | null
+          check_out_lng?: number | null
+          check_out_selfie_url?: string | null
+          check_out_time?: string | null
+          created_at?: string
+          duty_completed?: boolean | null
+          id?: string
+          is_break?: boolean
+          session_id?: string
+          user_id?: string
+          venue_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_attendance_blocks_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "club_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_attendance_blocks_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stock: {
         Row: {
           category: Database["public"]["Enums"]["stock_category"]
@@ -413,6 +553,47 @@ export type Database = {
             foreignKeyName: "venue_hookah_categories_venue_id_fkey"
             columns: ["venue_id"]
             isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      venue_settings: {
+        Row: {
+          core_hours_end: number
+          core_hours_start: number
+          created_at: string
+          force_close_hour: number
+          id: string
+          morning_cutoff_hour: number
+          updated_at: string
+          venue_id: string
+        }
+        Insert: {
+          core_hours_end?: number
+          core_hours_start?: number
+          created_at?: string
+          force_close_hour?: number
+          id?: string
+          morning_cutoff_hour?: number
+          updated_at?: string
+          venue_id: string
+        }
+        Update: {
+          core_hours_end?: number
+          core_hours_start?: number
+          created_at?: string
+          force_close_hour?: number
+          id?: string
+          morning_cutoff_hour?: number
+          updated_at?: string
+          venue_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venue_settings_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: true
             referencedRelation: "venues"
             referencedColumns: ["id"]
           },
