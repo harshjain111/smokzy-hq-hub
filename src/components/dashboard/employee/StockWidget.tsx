@@ -35,7 +35,7 @@ interface TaskStatus {
 }
 
 const StockWidget = ({ user, venueId }: StockWidgetProps) => {
-  const { businessDate } = useBusinessDate(user.id, venueId);
+  const { businessDate, loading: dateLoading } = useBusinessDate(user.id, venueId);
   const [stock, setStock] = useState<StockItem[]>([]);
   const [addItemOpen, setAddItemOpen] = useState(false);
   const [updateStockOpen, setUpdateStockOpen] = useState(false);
@@ -56,11 +56,15 @@ const StockWidget = ({ user, venueId }: StockWidgetProps) => {
   });
 
   useEffect(() => {
+    if (!businessDate) return;
+    
     fetchStock();
     checkTaskStatus();
   }, [venueId, businessDate]);
 
   const checkTaskStatus = async () => {
+    if (!businessDate) return;
+    
     const [stockCheck, salesCheck, closingCheck] = await Promise.all([
       supabase
         .from("stock")
