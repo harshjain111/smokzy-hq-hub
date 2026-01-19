@@ -72,8 +72,8 @@ const BottomNav = ({ activeTab, onTabChange, session, isCheckedIn }: BottomNavPr
   };
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border safe-area-pb">
-      <div className="grid grid-cols-5 h-16">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-sm border-t border-border safe-area-pb">
+      <div className="grid grid-cols-5 h-[68px]">
         {tabs.map((tab) => {
           const status = getTabStatus(tab.id);
           const isActive = activeTab === tab.id;
@@ -86,16 +86,21 @@ const BottomNav = ({ activeTab, onTabChange, session, isCheckedIn }: BottomNavPr
               onClick={() => !isLocked && onTabChange(tab.id)}
               disabled={isLocked}
               className={cn(
-                "flex flex-col items-center justify-center gap-0.5 relative transition-colors",
+                "flex flex-col items-center justify-center gap-1 relative transition-all",
                 isActive 
-                  ? "text-primary bg-primary/5" 
+                  ? "text-primary" 
                   : isLocked 
-                    ? "text-muted-foreground/50 cursor-not-allowed" 
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                    ? "text-muted-foreground/40 cursor-not-allowed" 
+                    : "text-muted-foreground active:scale-95",
               )}
             >
               <div className="relative">
-                <Icon className={cn("w-5 h-5", isActive && "text-primary")} />
+                <div className={cn(
+                  "p-1.5 rounded-xl transition-colors",
+                  isActive && "bg-primary/10"
+                )}>
+                  <Icon className={cn("w-5 h-5", isActive && "text-primary")} />
+                </div>
                 {getStatusIndicator(status)}
               </div>
               <span className={cn(

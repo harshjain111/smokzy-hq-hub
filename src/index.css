@@ -8,56 +8,61 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 10%;
+    --background: 0 0% 99%;
+    --foreground: 220 20% 10%;
 
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 10%;
+    --card-foreground: 220 20% 10%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 10%;
+    --popover-foreground: 220 20% 10%;
 
-    --primary: 45 100% 51%;
-    --primary-foreground: 0 0% 0%;
+    --primary: 252 85% 60%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 0 0% 98%;
-    --secondary-foreground: 0 0% 10%;
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 220 20% 10%;
 
-    --muted: 0 0% 96%;
-    --muted-foreground: 0 0% 45%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 10% 45%;
 
-    --accent: 45 100% 51%;
-    --accent-foreground: 0 0% 0%;
+    --accent: 252 85% 60%;
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 142 76% 36%;
+    --success: 152 69% 40%;
     --success-foreground: 0 0% 100%;
 
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
 
-    --border: 0 0% 90%;
-    --input: 0 0% 90%;
-    --ring: 45 100% 51%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 252 85% 60%;
 
-    --radius: 0.75rem;
+    --radius: 1rem;
 
     --sidebar-background: 0 0% 99%;
-    --sidebar-foreground: 0 0% 20%;
-    --sidebar-primary: 0 0% 10%;
+    --sidebar-foreground: 220 10% 20%;
+    --sidebar-primary: 220 20% 10%;
     --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 0 0% 96%;
-    --sidebar-accent-foreground: 0 0% 10%;
-    --sidebar-border: 0 0% 92%;
-    --sidebar-ring: 45 100% 51%;
+    --sidebar-accent: 220 14% 96%;
+    --sidebar-accent-foreground: 220 20% 10%;
+    --sidebar-border: 220 13% 92%;
+    --sidebar-ring: 252 85% 60%;
     
     /* Login page specific colors */
     --auth-background: 0 0% 5%;
     --auth-card: 0 0% 8%;
     --auth-gold: 45 100% 51%;
     --auth-gold-muted: 45 80% 40%;
+    
+    /* Gradient theme tokens */
+    --gradient-start: 252 85% 60%;
+    --gradient-end: 200 90% 55%;
+    --gradient-primary: linear-gradient(135deg, hsl(252 85% 60%), hsl(200 90% 55%));
   }
 
   .dark {

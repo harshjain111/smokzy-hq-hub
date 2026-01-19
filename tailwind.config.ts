@@ -71,6 +71,10 @@ export default {
           gold: "hsl(var(--auth-gold))",
           "gold-muted": "hsl(var(--auth-gold-muted))",
         },
+        gradient: {
+          start: "hsl(var(--gradient-start))",
+          end: "hsl(var(--gradient-end))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
