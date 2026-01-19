@@ -1,17 +1,15 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { LogIn, LogOut, Clock, MapPin, Camera, Loader2, Check, X } from "lucide-react";
-import { format } from "date-fns";
-import { ClubSession, AttendanceBlock } from "@/hooks/useClubSession";
+import { LogIn, LogOut, Clock, MapPin, Camera, Loader2, Check, X, Coffee, Play } from "lucide-react";
+import { format, differenceInMinutes } from "date-fns";
+import { ClubSession, AttendanceBlock, StaffBreak, StaffStatus } from "@/hooks/useClubSession";
 import { compressImage } from "@/lib/imageCompression";
 import { cn } from "@/lib/utils";
 import {
   AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
@@ -28,6 +26,13 @@ interface AttendanceModuleProps {
   checkIn: (photoUrl: string, lat: number, lng: number) => Promise<void>;
   checkOut: (photoUrl: string, lat: number, lng: number, dutyCompleted: boolean) => Promise<void>;
   checkoutEligibility: { canCheckout: boolean; reason: string; isMorningShift: boolean };
+  // Break management
+  staffStatus: StaffStatus;
+  currentBreak: StaffBreak | null;
+  totalBreakMinutes: number;
+  startBreak: () => Promise<void>;
+  endBreak: () => Promise<void>;
+  isLongBreak: () => boolean;
 }
 
 type FlowState = 'idle' | 'capturing' | 'preview' | 'processing';
@@ -41,6 +46,12 @@ const AttendanceModule = ({
   checkIn,
   checkOut,
   checkoutEligibility,
+  staffStatus,
+  currentBreak,
+  totalBreakMinutes,
+  startBreak,
+  endBreak,
+  isLongBreak,
 }: AttendanceModuleProps) => {
   const [flowState, setFlowState] = useState<FlowState>('idle');
   const [isCheckingOut, setIsCheckingOut] = useState(false);
@@ -49,9 +60,58 @@ const AttendanceModule = ({
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
   const [showDutyDialog, setShowDutyDialog] = useState(false);
+  const [breakLoading, setBreakLoading] = useState(false);
+  const [breakDuration, setBreakDuration] = useState(0);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+
+  // Update break duration every minute
+  useEffect(() => {
+    if (currentBreak && staffStatus === 'on_break') {
+      const updateDuration = () => {
+        const startTime = new Date(currentBreak.break_start_time);
+        const minutes = differenceInMinutes(new Date(), startTime);
+        setBreakDuration(minutes);
+      };
+      updateDuration();
+      const interval = setInterval(updateDuration, 60000);
+      return () => clearInterval(interval);
+    } else {
+      setBreakDuration(0);
+    }
+  }, [currentBreak, staffStatus]);
+
+  // Break handlers
+  const handleStartBreak = async () => {
+    setBreakLoading(true);
+    try {
+      await startBreak();
+      toast.success("Break started. Please resume duty after your break.", {
+        icon: "☕",
+      });
+    } catch (error: any) {
+      console.error("Start break error:", error);
+      toast.error(error.message || "Failed to start break");
+    } finally {
+      setBreakLoading(false);
+    }
+  };
+
+  const handleEndBreak = async () => {
+    setBreakLoading(true);
+    try {
+      await endBreak();
+      toast.success("Welcome back! You're back on duty.", {
+        icon: "💪",
+      });
+    } catch (error: any) {
+      console.error("End break error:", error);
+      toast.error(error.message || "Failed to end break");
+    } finally {
+      setBreakLoading(false);
+    }
+  };
 
   // Fetch location in parallel when starting camera
   const fetchLocation = useCallback(async () => {
@@ -254,39 +314,109 @@ const AttendanceModule = ({
 
   // Render check-in/out buttons (idle state)
   if (flowState === 'idle') {
+    // On Break state
+    if (staffStatus === 'on_break') {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[60vh] px-6 space-y-8">
+          {/* On Break status */}
+          <div className="text-center space-y-3">
+            <div className="w-24 h-24 rounded-full bg-warning/15 flex items-center justify-center mx-auto border-4 border-warning/30">
+              <Coffee className="w-12 h-12 text-warning" />
+            </div>
+            <h2 className="text-2xl font-bold text-warning">You're On Break</h2>
+            <p className="text-muted-foreground">
+              Break started at {currentBreak && format(new Date(currentBreak.break_start_time), "h:mm a")}
+            </p>
+            <div className="text-3xl font-mono font-bold text-foreground">
+              {breakDuration} min
+            </div>
+            {isLongBreak() && (
+              <p className="text-sm text-warning bg-warning/10 px-3 py-1.5 rounded-full">
+                Break duration is longer than usual
+              </p>
+            )}
+          </div>
+
+          {/* Resume Duty button */}
+          <Button
+            size="lg"
+            onClick={handleEndBreak}
+            disabled={breakLoading}
+            className="w-full max-w-xs h-16 text-lg font-semibold rounded-2xl bg-success hover:bg-success/90 shadow-lg text-white"
+          >
+            {breakLoading ? (
+              <Loader2 className="w-6 h-6 mr-3 animate-spin" />
+            ) : (
+              <Play className="w-6 h-6 mr-3" />
+            )}
+            Resume Duty
+          </Button>
+
+          <p className="text-sm text-muted-foreground text-center max-w-xs">
+            Resume your duty to continue working or checkout
+          </p>
+        </div>
+      );
+    }
+
+    // On Duty or Checked Out states
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] px-6 space-y-8">
+      <div className="flex flex-col items-center justify-center min-h-[60vh] px-6 space-y-6">
         {isCheckedIn ? (
           <>
-            {/* Checked in status */}
+            {/* Checked in / On Duty status */}
             <div className="text-center space-y-3">
-              <div className="w-20 h-20 rounded-full bg-success/10 flex items-center justify-center mx-auto">
+              <div className="w-20 h-20 rounded-full bg-success/15 flex items-center justify-center mx-auto border-4 border-success/30">
                 <Check className="w-10 h-10 text-success" />
               </div>
-              <h2 className="text-2xl font-bold text-foreground">You're On Duty</h2>
+              <h2 className="text-2xl font-bold text-success">You're On Duty</h2>
               {myAttendanceBlock && (
                 <p className="text-muted-foreground">
                   Since {format(new Date(myAttendanceBlock.check_in_time), "h:mm a")}
                 </p>
               )}
+              {totalBreakMinutes > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Total break time today: {totalBreakMinutes} min
+                </p>
+              )}
             </div>
 
-            {/* Checkout button */}
-            <Button
-              size="lg"
-              variant={checkoutEligibility.canCheckout ? "default" : "outline"}
-              onClick={handleCheckOutStart}
-              disabled={!checkoutEligibility.canCheckout}
-              className={cn(
-                "w-full max-w-xs h-16 text-lg font-semibold rounded-2xl shadow-lg",
-                checkoutEligibility.canCheckout 
-                  ? "bg-primary hover:bg-primary/90" 
-                  : "opacity-60"
-              )}
-            >
-              <LogOut className="w-6 h-6 mr-3" />
-              Check Out
-            </Button>
+            {/* Action buttons */}
+            <div className="w-full max-w-xs space-y-3">
+              {/* Start Break button */}
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={handleStartBreak}
+                disabled={breakLoading}
+                className="w-full h-14 text-base font-semibold rounded-2xl border-2 border-warning/50 text-warning hover:bg-warning/10"
+              >
+                {breakLoading ? (
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                ) : (
+                  <Coffee className="w-5 h-5 mr-2" />
+                )}
+                Start Break
+              </Button>
+
+              {/* Checkout button */}
+              <Button
+                size="lg"
+                variant={checkoutEligibility.canCheckout ? "default" : "outline"}
+                onClick={handleCheckOutStart}
+                disabled={!checkoutEligibility.canCheckout}
+                className={cn(
+                  "w-full h-14 text-base font-semibold rounded-2xl shadow-lg",
+                  checkoutEligibility.canCheckout 
+                    ? "bg-primary hover:bg-primary/90" 
+                    : "opacity-60"
+                )}
+              >
+                <LogOut className="w-5 h-5 mr-2" />
+                Check Out
+              </Button>
+            </div>
 
             {!checkoutEligibility.canCheckout && (
               <p className="text-sm text-muted-foreground text-center max-w-xs">
@@ -296,7 +426,7 @@ const AttendanceModule = ({
 
             {/* Session info */}
             {session && (
-              <div className="w-full max-w-xs space-y-2 pt-4">
+              <div className="w-full max-w-xs space-y-2 pt-2">
                 <p className="text-xs text-muted-foreground text-center uppercase tracking-wide">
                   Session Tasks
                 </p>
@@ -327,8 +457,8 @@ const AttendanceModule = ({
           <>
             {/* Not checked in */}
             <div className="text-center space-y-3">
-              <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
-                <Clock className="w-10 h-10 text-primary" />
+              <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center mx-auto border-4 border-muted-foreground/20">
+                <Clock className="w-10 h-10 text-muted-foreground" />
               </div>
               <h2 className="text-2xl font-bold text-foreground">Ready to Start?</h2>
               <p className="text-muted-foreground">

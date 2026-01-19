@@ -450,6 +450,64 @@ export type Database = {
           },
         ]
       }
+      staff_breaks: {
+        Row: {
+          attendance_block_id: string
+          break_end_time: string | null
+          break_start_time: string
+          created_at: string
+          duration_minutes: number | null
+          id: string
+          session_id: string
+          user_id: string
+          venue_id: string
+        }
+        Insert: {
+          attendance_block_id: string
+          break_end_time?: string | null
+          break_start_time?: string
+          created_at?: string
+          duration_minutes?: number | null
+          id?: string
+          session_id: string
+          user_id: string
+          venue_id: string
+        }
+        Update: {
+          attendance_block_id?: string
+          break_end_time?: string | null
+          break_start_time?: string
+          created_at?: string
+          duration_minutes?: number | null
+          id?: string
+          session_id?: string
+          user_id?: string
+          venue_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_breaks_attendance_block_id_fkey"
+            columns: ["attendance_block_id"]
+            isOneToOne: false
+            referencedRelation: "staff_attendance_blocks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_breaks_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "club_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_breaks_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stock: {
         Row: {
           category: Database["public"]["Enums"]["stock_category"]

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { format } from "date-fns";
+import { format, differenceInMinutes } from "date-fns";
 
 export interface ClubSession {
   id: string;
@@ -45,12 +45,28 @@ export interface AttendanceBlock {
   duty_completed: boolean | null;
 }
 
+export interface StaffBreak {
+  id: string;
+  attendance_block_id: string;
+  user_id: string;
+  venue_id: string;
+  session_id: string;
+  break_start_time: string;
+  break_end_time: string | null;
+  duration_minutes: number | null;
+}
+
+export type StaffStatus = 'checked_out' | 'on_duty' | 'on_break';
+
 const DEFAULT_SETTINGS: VenueSettings = {
   morning_cutoff_hour: 10,
   force_close_hour: 7,
   core_hours_start: 18,
   core_hours_end: 4,
 };
+
+// Warning threshold for long breaks (in minutes)
+const LONG_BREAK_WARNING_MINUTES = 30;
 
 /**
  * Hook to manage club sessions for a venue.
@@ -63,6 +79,9 @@ export const useClubSession = (userId: string, venueId: string) => {
   const [myAttendanceBlock, setMyAttendanceBlock] = useState<AttendanceBlock | null>(null);
   const [loading, setLoading] = useState(true);
   const [isCheckedIn, setIsCheckedIn] = useState(false);
+  const [currentBreak, setCurrentBreak] = useState<StaffBreak | null>(null);
+  const [staffStatus, setStaffStatus] = useState<StaffStatus>('checked_out');
+  const [totalBreakMinutes, setTotalBreakMinutes] = useState(0);
 
   // Get today's business date (or yesterday if before force_close_hour)
   const getSessionDate = useCallback(() => {
@@ -170,8 +189,106 @@ export const useClubSession = (userId: string, venueId: string) => {
     } else {
       setMyAttendanceBlock(null);
       setIsCheckedIn(false);
+      setStaffStatus('checked_out');
+      setCurrentBreak(null);
     }
   }, [userId, session]);
+
+  // Fetch current break status and total break time
+  const fetchBreakStatus = useCallback(async () => {
+    if (!myAttendanceBlock || !session) {
+      setCurrentBreak(null);
+      setTotalBreakMinutes(0);
+      return;
+    }
+
+    // Check for active break (no end time)
+    const { data: activeBreak } = await supabase
+      .from("staff_breaks")
+      .select("*")
+      .eq("attendance_block_id", myAttendanceBlock.id)
+      .eq("user_id", userId)
+      .is("break_end_time", null)
+      .single();
+
+    if (activeBreak) {
+      setCurrentBreak(activeBreak as StaffBreak);
+      setStaffStatus('on_break');
+    } else {
+      setCurrentBreak(null);
+      setStaffStatus('on_duty');
+    }
+
+    // Calculate total break time for this attendance block
+    const { data: allBreaks } = await supabase
+      .from("staff_breaks")
+      .select("duration_minutes")
+      .eq("attendance_block_id", myAttendanceBlock.id)
+      .not("break_end_time", "is", null);
+
+    if (allBreaks) {
+      const total = allBreaks.reduce((sum, b) => sum + (b.duration_minutes || 0), 0);
+      setTotalBreakMinutes(total);
+    }
+  }, [myAttendanceBlock, session, userId]);
+
+  // Start a break
+  const startBreak = useCallback(async (): Promise<void> => {
+    if (!myAttendanceBlock || !session) {
+      throw new Error("Not checked in");
+    }
+
+    if (staffStatus === 'on_break') {
+      throw new Error("Already on break");
+    }
+
+    const { error } = await supabase
+      .from("staff_breaks")
+      .insert({
+        attendance_block_id: myAttendanceBlock.id,
+        user_id: userId,
+        venue_id: venueId,
+        session_id: session.id,
+      });
+
+    if (error) throw error;
+    
+    await fetchBreakStatus();
+  }, [myAttendanceBlock, session, userId, venueId, staffStatus, fetchBreakStatus]);
+
+  // End a break
+  const endBreak = useCallback(async (): Promise<void> => {
+    if (!currentBreak) {
+      throw new Error("Not on break");
+    }
+
+    const breakStartTime = new Date(currentBreak.break_start_time);
+    const now = new Date();
+    const durationMinutes = differenceInMinutes(now, breakStartTime);
+
+    const { error } = await supabase
+      .from("staff_breaks")
+      .update({
+        break_end_time: now.toISOString(),
+        duration_minutes: durationMinutes,
+      })
+      .eq("id", currentBreak.id);
+
+    if (error) throw error;
+    
+    await fetchBreakStatus();
+  }, [currentBreak, fetchBreakStatus]);
+
+  // Check if break is unusually long
+  const isLongBreak = useCallback((): boolean => {
+    if (!currentBreak) return false;
+    
+    const breakStartTime = new Date(currentBreak.break_start_time);
+    const now = new Date();
+    const durationMinutes = differenceInMinutes(now, breakStartTime);
+    
+    return durationMinutes >= LONG_BREAK_WARNING_MINUTES;
+  }, [currentBreak]);
 
   // Create or join a session when staff checks in
   const getOrCreateSession = useCallback(async (): Promise<ClubSession> => {
@@ -324,7 +441,7 @@ export const useClubSession = (userId: string, venueId: string) => {
     }
   }, [session, fetchSession]);
 
-  // Check if user can checkout (morning shift logic)
+  // Check if user can checkout (morning shift logic + break check)
   const getCheckoutEligibility = useCallback((): { 
     canCheckout: boolean; 
     reason: string;
@@ -332,6 +449,11 @@ export const useClubSession = (userId: string, venueId: string) => {
   } => {
     if (!myAttendanceBlock || !session) {
       return { canCheckout: false, reason: "Not checked in", isMorningShift: false };
+    }
+
+    // Cannot checkout while on break
+    if (staffStatus === 'on_break') {
+      return { canCheckout: false, reason: "Resume duty before checkout", isMorningShift: false };
     }
 
     const checkInTime = new Date(myAttendanceBlock.check_in_time);
@@ -373,7 +495,7 @@ export const useClubSession = (userId: string, venueId: string) => {
       reason: `Pending: ${pendingTasks.join(", ")}`,
       isMorningShift 
     };
-  }, [myAttendanceBlock, session, settings]);
+  }, [myAttendanceBlock, session, settings, staffStatus]);
 
   // Setup realtime subscriptions
   useEffect(() => {
@@ -391,6 +513,13 @@ export const useClubSession = (userId: string, venueId: string) => {
       fetchMyAttendance();
     }
   }, [session, fetchMyAttendance]);
+
+  // Fetch break status when attendance block changes
+  useEffect(() => {
+    if (myAttendanceBlock) {
+      fetchBreakStatus();
+    }
+  }, [myAttendanceBlock, fetchBreakStatus]);
 
   // Realtime subscription for session updates
   useEffect(() => {
@@ -428,11 +557,29 @@ export const useClubSession = (userId: string, venueId: string) => {
       )
       .subscribe();
 
+    // Subscribe to breaks table for realtime updates
+    const breaksChannel = supabase
+      .channel(`staff-breaks-${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'staff_breaks',
+          filter: `user_id=eq.${userId}`
+        },
+        () => {
+          fetchBreakStatus();
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(sessionChannel);
       supabase.removeChannel(attendanceChannel);
+      supabase.removeChannel(breaksChannel);
     };
-  }, [venueId, userId, fetchSession, fetchMyAttendance]);
+  }, [venueId, userId, fetchSession, fetchMyAttendance, fetchBreakStatus]);
 
   return {
     session,
@@ -445,5 +592,12 @@ export const useClubSession = (userId: string, venueId: string) => {
     updateSessionTask,
     getCheckoutEligibility,
     refresh: fetchSession,
+    // Break management
+    staffStatus,
+    currentBreak,
+    totalBreakMinutes,
+    startBreak,
+    endBreak,
+    isLongBreak,
   };
 };
