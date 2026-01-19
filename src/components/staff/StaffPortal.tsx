@@ -115,21 +115,23 @@ const StaffPortal = ({ user, venueId }: StaffPortalProps) => {
 
   return (
     <div className="h-screen bg-background flex flex-col overflow-hidden">
-      {/* Header with gradient accent */}
-      <header className="shrink-0 z-40">
-        {/* Gradient accent bar */}
-        <div className="h-1 bg-gradient-to-r from-gradient-start to-gradient-end" />
-        <div className="bg-background px-5 py-4">
+      {/* Header with gradient hero */}
+      <header className="shrink-0 z-40 relative overflow-hidden">
+        {/* Gradient background with blur effect */}
+        <div className="absolute inset-0 bg-gradient-to-br from-gradient-start/20 via-gradient-end/10 to-transparent" />
+        <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-bl from-gradient-start/40 via-gradient-end/30 to-transparent rounded-full blur-3xl -translate-y-1/2 translate-x-1/4" />
+        
+        <div className="relative px-5 py-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-muted-foreground">
                 {venueName || "Loading..."}
               </p>
-              <h1 className="text-xl font-bold text-foreground">Staff Portal</h1>
+              <h1 className="text-2xl font-bold text-foreground">Staff Portal</h1>
             </div>
             <div className="flex items-center gap-3">
               {isCheckedIn && (
-                <span className="text-xs bg-success/10 text-success px-3 py-1.5 rounded-full font-medium">
+                <span className="text-xs bg-success/15 text-success px-3 py-1.5 rounded-full font-semibold border border-success/20">
                   On Duty
                 </span>
               )}
@@ -137,6 +139,8 @@ const StaffPortal = ({ user, venueId }: StaffPortalProps) => {
             </div>
           </div>
         </div>
+        {/* Bottom gradient line */}
+        <div className="h-0.5 bg-gradient-to-r from-gradient-start via-gradient-end to-transparent" />
       </header>
 
       {/* Main content */}

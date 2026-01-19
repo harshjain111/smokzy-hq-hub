@@ -385,20 +385,23 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
         <div className="space-y-8">
           {groupedItems.map(group => (
             <div key={group.category} className="space-y-3">
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider px-1">
-                {group.label}
-              </h3>
+              <div className="flex items-center gap-2 px-1">
+                <div className="w-1 h-4 bg-gradient-to-b from-gradient-start to-gradient-end rounded-full" />
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                  {group.label}
+                </h3>
+              </div>
               <div className="space-y-2">
                 {group.items.map(item => (
                   <div
                     key={item.id}
-                    className="flex items-center justify-between py-4 px-5 bg-card rounded-2xl"
+                    className="flex items-center justify-between py-4 px-5 bg-card rounded-2xl border border-border/50 shadow-sm"
                   >
                     <div className="flex-1 min-w-0 pr-4">
                       <div className="flex items-center gap-2">
                         <p className="font-medium text-foreground truncate">{item.item_name}</p>
                         {item.isPending && (
-                          <span className="text-xs px-2 py-0.5 bg-warning/10 text-warning rounded-full shrink-0">
+                          <span className="text-xs px-2 py-0.5 bg-gradient-to-r from-gradient-start/20 to-gradient-end/20 text-primary rounded-full shrink-0 font-medium">
                             New
                           </span>
                         )}
@@ -413,7 +416,7 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
                         pattern="[0-9]*"
                         value={quantities[item.id] ?? ''}
                         onChange={(e) => handleQuantityChange(item.id, e.target.value)}
-                        className="w-24 h-14 text-center text-xl font-semibold rounded-xl bg-muted/50 border-0"
+                        className="w-24 h-14 text-center text-xl font-semibold rounded-xl bg-muted/50 border border-border/50 focus:border-primary/50 focus:ring-primary/20"
                         placeholder="0"
                       />
                       <span className="text-sm text-muted-foreground w-12">
