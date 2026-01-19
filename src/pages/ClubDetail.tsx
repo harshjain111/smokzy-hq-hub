@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, RefreshCw, Users, ChevronDown } from "lucide-react";
+import { ArrowLeft, RefreshCw, Users } from "lucide-react";
 import {
   Accordion,
   AccordionContent,
@@ -15,6 +15,8 @@ import { ClubSalesSection } from "@/components/admin/club/ClubSalesSection";
 import { ClubStockSection } from "@/components/admin/club/ClubStockSection";
 import { ClubAttendanceSection } from "@/components/admin/club/ClubAttendanceSection";
 import { ClubActivitySection } from "@/components/admin/club/ClubActivitySection";
+import { SessionHistoryList } from "@/components/admin/club/SessionHistoryList";
+import { HistoricalSessionDetail } from "@/components/admin/club/HistoricalSessionDetail";
 import { format } from "date-fns";
 
 export interface ClubSession {
@@ -33,6 +35,23 @@ export interface ClubSession {
   force_close_reason: string | null;
 }
 
+interface HistoricalSession {
+  id: string;
+  session_date: string;
+  started_at: string;
+  closed_at: string | null;
+  status: string;
+  stock_submitted: boolean;
+  stock_submitted_at: string | null;
+  sales_submitted: boolean;
+  sales_submitted_at: string | null;
+  photo_uploaded: boolean;
+  photo_uploaded_at: string | null;
+  force_close_reason: string | null;
+}
+
+type ViewMode = "live" | "history";
+
 const ClubDetail = () => {
   const { clubId } = useParams();
   const navigate = useNavigate();
@@ -42,6 +61,8 @@ const ClubDetail = () => {
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
   const [expandedSection, setExpandedSection] = useState<string>("overview");
+  const [viewMode, setViewMode] = useState<ViewMode>("live");
+  const [selectedHistoricalSession, setSelectedHistoricalSession] = useState<HistoricalSession | null>(null);
 
   useEffect(() => {
     if (clubId) {
@@ -88,6 +109,14 @@ const ClubDetail = () => {
     return <Badge className="bg-success/20 text-success border-success/30 text-[10px] font-medium">Active</Badge>;
   };
 
+  const handleSelectHistoricalSession = (session: HistoricalSession) => {
+    setSelectedHistoricalSession(session);
+  };
+
+  const handleBackFromHistoricalDetail = () => {
+    setSelectedHistoricalSession(null);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Fixed Compact Header */}
@@ -112,67 +141,105 @@ const ClubDetail = () => {
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>
         </div>
+
+        {/* Live/History Toggle */}
+        <div className="flex border-t border-border">
+          <button
+            onClick={() => { setViewMode("live"); setSelectedHistoricalSession(null); }}
+            className={`flex-1 py-2.5 text-xs font-medium transition-colors ${
+              viewMode === "live" 
+                ? "bg-primary text-primary-foreground" 
+                : "bg-muted/50 text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            LIVE SESSION
+          </button>
+          <button
+            onClick={() => setViewMode("history")}
+            className={`flex-1 py-2.5 text-xs font-medium transition-colors ${
+              viewMode === "history" 
+                ? "bg-primary text-primary-foreground" 
+                : "bg-muted/50 text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            HISTORY
+          </button>
+        </div>
       </div>
 
-      {/* Expandable Sections (Accordion) */}
+      {/* Content */}
       <div className="p-3 pb-8">
-        <Accordion
-          type="single"
-          collapsible
-          value={expandedSection}
-          onValueChange={(value) => setExpandedSection(value)}
-          className="space-y-2"
-        >
-          {/* Overview Section */}
-          <AccordionItem value="overview" className="border rounded-lg overflow-hidden bg-card">
-            <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
-              <span className="text-sm font-medium">Overview</span>
-            </AccordionTrigger>
-            <AccordionContent className="px-4 pb-4">
-              <ClubOverviewSection clubId={clubId!} session={currentSession} loading={loading} />
-            </AccordionContent>
-          </AccordionItem>
+        {viewMode === "live" ? (
+          /* Live Session View */
+          <Accordion
+            type="single"
+            collapsible
+            value={expandedSection}
+            onValueChange={(value) => setExpandedSection(value)}
+            className="space-y-2"
+          >
+            <AccordionItem value="overview" className="border rounded-lg overflow-hidden bg-card">
+              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
+                <span className="text-sm font-medium">Overview</span>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4">
+                <ClubOverviewSection clubId={clubId!} session={currentSession} loading={loading} />
+              </AccordionContent>
+            </AccordionItem>
 
-          {/* Sales Section */}
-          <AccordionItem value="sales" className="border rounded-lg overflow-hidden bg-card">
-            <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
-              <span className="text-sm font-medium">Sales</span>
-            </AccordionTrigger>
-            <AccordionContent className="px-4 pb-4">
-              <ClubSalesSection clubId={clubId!} clubName={clubName} session={currentSession} />
-            </AccordionContent>
-          </AccordionItem>
+            <AccordionItem value="sales" className="border rounded-lg overflow-hidden bg-card">
+              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
+                <span className="text-sm font-medium">Sales</span>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4">
+                <ClubSalesSection clubId={clubId!} clubName={clubName} session={currentSession} />
+              </AccordionContent>
+            </AccordionItem>
 
-          {/* Stock Section */}
-          <AccordionItem value="stock" className="border rounded-lg overflow-hidden bg-card">
-            <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
-              <span className="text-sm font-medium">Stock</span>
-            </AccordionTrigger>
-            <AccordionContent className="px-4 pb-4">
-              <ClubStockSection clubId={clubId!} clubName={clubName} session={currentSession} />
-            </AccordionContent>
-          </AccordionItem>
+            <AccordionItem value="stock" className="border rounded-lg overflow-hidden bg-card">
+              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
+                <span className="text-sm font-medium">Stock</span>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4">
+                <ClubStockSection clubId={clubId!} clubName={clubName} session={currentSession} />
+              </AccordionContent>
+            </AccordionItem>
 
-          {/* Attendance Section */}
-          <AccordionItem value="attendance" className="border rounded-lg overflow-hidden bg-card">
-            <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
-              <span className="text-sm font-medium">Attendance</span>
-            </AccordionTrigger>
-            <AccordionContent className="px-4 pb-4">
-              <ClubAttendanceSection clubId={clubId!} />
-            </AccordionContent>
-          </AccordionItem>
+            <AccordionItem value="attendance" className="border rounded-lg overflow-hidden bg-card">
+              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
+                <span className="text-sm font-medium">Attendance</span>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4">
+                <ClubAttendanceSection clubId={clubId!} />
+              </AccordionContent>
+            </AccordionItem>
 
-          {/* Activity Section */}
-          <AccordionItem value="activity" className="border rounded-lg overflow-hidden bg-card">
-            <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
-              <span className="text-sm font-medium">Activity Log</span>
-            </AccordionTrigger>
-            <AccordionContent className="px-4 pb-4">
-              <ClubActivitySection clubId={clubId!} />
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
+            <AccordionItem value="activity" className="border rounded-lg overflow-hidden bg-card">
+              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
+                <span className="text-sm font-medium">Activity Log</span>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4">
+                <ClubActivitySection clubId={clubId!} />
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        ) : (
+          /* History View */
+          selectedHistoricalSession ? (
+            <HistoricalSessionDetail
+              session={selectedHistoricalSession}
+              clubId={clubId!}
+              clubName={clubName}
+              onBack={handleBackFromHistoricalDetail}
+            />
+          ) : (
+            <SessionHistoryList
+              clubId={clubId!}
+              clubName={clubName}
+              onSelectSession={handleSelectHistoricalSession}
+            />
+          )
+        )}
       </div>
     </div>
   );
