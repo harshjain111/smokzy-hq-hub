@@ -80,17 +80,24 @@ const AttendanceModule = ({
       // Start fetching location in parallel
       fetchLocation();
       
+      // Set flow state first so video element renders
+      setFlowState('capturing');
+      
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user" },
+        video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: false,
       });
       streamRef.current = stream;
       
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-      setFlowState('capturing');
+      // Wait for next tick to ensure video element is mounted
+      setTimeout(() => {
+        if (videoRef.current && streamRef.current) {
+          videoRef.current.srcObject = streamRef.current;
+          videoRef.current.play().catch(err => {
+            console.error("Video play error:", err);
+          });
+        }
+      }, 100);
     } catch (error) {
       console.error("Camera error:", error);
       toast.error("Failed to access camera. Please allow camera access.");
@@ -347,12 +354,13 @@ const AttendanceModule = ({
   if (flowState === 'capturing') {
     return (
       <div className="fixed inset-0 z-50 bg-black flex flex-col">
-        <div className="flex-1 relative">
+        <div className="flex-1 relative overflow-hidden">
           <video
             ref={videoRef}
             className="w-full h-full object-cover"
             playsInline
             muted
+            autoPlay
           />
           
           {/* Overlay guide */}
@@ -361,7 +369,7 @@ const AttendanceModule = ({
           </div>
         </div>
 
-        <div className="p-6 bg-black/80 flex items-center justify-center gap-6">
+        <div className="p-6 bg-black/80 flex items-center justify-center gap-6 safe-area-pb">
           <Button
             variant="ghost"
             size="lg"
@@ -370,13 +378,13 @@ const AttendanceModule = ({
           >
             Cancel
           </Button>
-          <Button
-            size="lg"
+          <button
+            type="button"
             onClick={capturePhoto}
-            className="h-16 w-16 rounded-full bg-white hover:bg-white/90 text-black"
+            className="h-16 w-16 rounded-full bg-white hover:bg-white/90 text-black flex items-center justify-center active:scale-95 transition-transform"
           >
             <Camera className="w-8 h-8" />
-          </Button>
+          </button>
         </div>
       </div>
     );
