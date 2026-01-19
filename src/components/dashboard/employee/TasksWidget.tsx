@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { CheckCircle, XCircle, Camera, Package, TrendingUp, AlertTriangle } from "lucide-react";
+import { CheckCircle, Camera, Package, TrendingUp, AlertTriangle, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { useBusinessDate } from "@/hooks/useBusinessDate";
 
@@ -17,58 +17,68 @@ interface TaskStatus {
 }
 
 const TasksWidget = ({ user, venueId }: TasksWidgetProps) => {
-  const { businessDate } = useBusinessDate(user.id, venueId);
+  const { businessDate, loading: dateLoading } = useBusinessDate(user.id, venueId);
   const [tasks, setTasks] = useState<TaskStatus>({
     stockReported: false,
     salesReported: false,
     closingPhoto: false,
   });
+  const [loading, setLoading] = useState(true);
 
   const checkTaskStatus = useCallback(async () => {
-    const [stockCheck, salesCheck, closingCheck] = await Promise.all([
-      // Check if ALL stock items have been updated today (using business date)
-      supabase
-        .from("stock")
-        .select("id, quantity, created_at, updated_at")
-        .eq("venue_id", venueId),
-      supabase
-        .from("sales_reports")
-        .select("id")
-        .eq("venue_id", venueId)
-        .eq("report_date", businessDate)
-        .limit(1),
-      supabase
-        .from("closing_photos")
-        .select("id")
-        .eq("venue_id", venueId)
-        .eq("photo_date", businessDate)
-        .limit(1),
-    ]);
+    if (!businessDate) return;
+    
+    try {
+      const [stockCheck, salesCheck, closingCheck] = await Promise.all([
+        // Check if ALL stock items have been updated today (using business date)
+        supabase
+          .from("stock")
+          .select("id, quantity, created_at, updated_at")
+          .eq("venue_id", venueId),
+        supabase
+          .from("sales_reports")
+          .select("id")
+          .eq("venue_id", venueId)
+          .eq("report_date", businessDate)
+          .limit(1),
+        supabase
+          .from("closing_photos")
+          .select("id")
+          .eq("venue_id", venueId)
+          .eq("photo_date", businessDate)
+          .limit(1),
+      ]);
 
-    // Stock is only considered reported if ALL items have been updated for the business date
-    let stockReported = false;
-    if (stockCheck.data && stockCheck.data.length > 0) {
-      stockReported = stockCheck.data.every(item => {
-        const itemUpdateDate = format(new Date(item.updated_at), "yyyy-MM-dd");
-        
-        // Item must be updated on or after business date AND the update must be different from creation
-        return itemUpdateDate === businessDate && item.updated_at !== item.created_at;
+      // Stock is only considered reported if ALL items have been updated for the business date
+      let stockReported = false;
+      if (stockCheck.data && stockCheck.data.length > 0) {
+        stockReported = stockCheck.data.every(item => {
+          const itemUpdateDate = format(new Date(item.updated_at), "yyyy-MM-dd");
+          
+          // Item must be updated on or after business date AND the update must be different from creation
+          return itemUpdateDate === businessDate && item.updated_at !== item.created_at;
+        });
+      }
+
+      setTasks({
+        stockReported,
+        salesReported: !!(salesCheck.data && salesCheck.data.length > 0),
+        closingPhoto: !!(closingCheck.data && closingCheck.data.length > 0),
       });
+    } finally {
+      setLoading(false);
     }
-
-    setTasks({
-      stockReported,
-      salesReported: !!(salesCheck.data && salesCheck.data.length > 0),
-      closingPhoto: !!(closingCheck.data && closingCheck.data.length > 0),
-    });
   }, [venueId, businessDate]);
 
   useEffect(() => {
+    if (!businessDate) return;
+    
+    setLoading(true);
     checkTaskStatus();
     
     // Set up realtime subscriptions for all task-related tables
     const stockChannel = supabase
-      .channel('stock-updates-tasks')
+      .channel(`stock-updates-tasks-${venueId}`)
       .on(
         'postgres_changes',
         {
@@ -85,7 +95,7 @@ const TasksWidget = ({ user, venueId }: TasksWidgetProps) => {
       .subscribe();
 
     const salesChannel = supabase
-      .channel('sales-updates-tasks')
+      .channel(`sales-updates-tasks-${venueId}`)
       .on(
         'postgres_changes',
         {
@@ -102,7 +112,7 @@ const TasksWidget = ({ user, venueId }: TasksWidgetProps) => {
       .subscribe();
 
     const closingPhotoChannel = supabase
-      .channel('closing-photo-updates-tasks')
+      .channel(`closing-photo-updates-tasks-${venueId}`)
       .on(
         'postgres_changes',
         {
@@ -123,7 +133,8 @@ const TasksWidget = ({ user, venueId }: TasksWidgetProps) => {
       try {
         if (e?.detail?.venueId === venueId) {
           console.log('Tasks event received - refreshing tasks', e.detail);
-          checkTaskStatus();
+          // Small delay to ensure database write is complete
+          setTimeout(() => checkTaskStatus(), 300);
         }
       } catch (_) {}
     };
@@ -135,7 +146,7 @@ const TasksWidget = ({ user, venueId }: TasksWidgetProps) => {
       supabase.removeChannel(closingPhotoChannel);
       window.removeEventListener('tasks:updated', onTaskEvent);
     };
-  }, [venueId, checkTaskStatus]);
+  }, [venueId, businessDate, checkTaskStatus]);
 
   const taskList = [
     { name: "Update Stock Inventory", completed: tasks.stockReported, icon: Package },
@@ -145,6 +156,15 @@ const TasksWidget = ({ user, venueId }: TasksWidgetProps) => {
 
   const completedCount = Object.values(tasks).filter(Boolean).length;
   const totalTasks = Object.keys(tasks).length;
+
+  // Show loading state while business date is being fetched
+  if (dateLoading || loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3">

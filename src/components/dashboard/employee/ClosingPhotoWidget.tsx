@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Camera } from "lucide-react";
+import { Camera, Loader2 } from "lucide-react";
 import AppreciationDialog from "./AppreciationDialog";
 import { compressImage } from "@/lib/imageCompression";
 import { format } from "date-fns";
@@ -23,13 +23,14 @@ interface TaskStatus {
 }
 
 const ClosingPhotoWidget = ({ user, venueId }: ClosingPhotoWidgetProps) => {
-  const { businessDate } = useBusinessDate(user.id, venueId);
+  const { businessDate, loading: dateLoading } = useBusinessDate(user.id, venueId);
   const [photoOpen, setPhotoOpen] = useState(false);
   const [photoBlob, setPhotoBlob] = useState<Blob | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [showPhotoAppreciation, setShowPhotoAppreciation] = useState(false);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [photoUploaded, setPhotoUploaded] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [taskStatus, setTaskStatus] = useState<TaskStatus>({
@@ -39,11 +40,38 @@ const ClosingPhotoWidget = ({ user, venueId }: ClosingPhotoWidgetProps) => {
   });
 
   useEffect(() => {
-    checkTaskStatus();
+    if (!businessDate) return;
+    
     checkPhotoStatus();
+    checkTaskStatus();
+
+    // Set up realtime subscription for closing photos
+    const channel = supabase
+      .channel(`closing-photo-status-${venueId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'closing_photos',
+          filter: `venue_id=eq.${venueId}`
+        },
+        () => {
+          console.log('Closing photo changed - refreshing status');
+          checkPhotoStatus();
+          checkTaskStatus();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [venueId, businessDate]);
 
   const checkPhotoStatus = async () => {
+    if (!businessDate) return;
+    
     const { data } = await supabase
       .from("closing_photos")
       .select("id")
@@ -51,10 +79,14 @@ const ClosingPhotoWidget = ({ user, venueId }: ClosingPhotoWidgetProps) => {
       .eq("photo_date", businessDate)
       .limit(1);
 
-    setPhotoUploaded(!!(data && data.length > 0));
+    const hasPhoto = !!(data && data.length > 0);
+    console.log('Photo status check:', { businessDate, hasPhoto, data });
+    setPhotoUploaded(hasPhoto);
   };
 
   const checkTaskStatus = async () => {
+    if (!businessDate) return;
+    
     const [stockCheck, salesCheck, closingCheck] = await Promise.all([
       supabase
         .from("stock")
@@ -177,13 +209,14 @@ const ClosingPhotoWidget = ({ user, venueId }: ClosingPhotoWidgetProps) => {
   };
 
   const handleUploadClosingPhoto = async () => {
-    if (!photoBlob) {
+    if (!photoBlob || !businessDate) {
       toast.error("Please capture a photo");
       return;
     }
 
+    setIsUploading(true);
     try {
-      const fileName = `${venueId}/${Date.now()}.jpg`;
+      const fileName = `${venueId}/${businessDate}-${Date.now()}.jpg`;
 
       const { error: uploadError } = await supabase.storage
         .from("closing-photos")
@@ -205,19 +238,52 @@ const ClosingPhotoWidget = ({ user, venueId }: ClosingPhotoWidgetProps) => {
       if (error) throw error;
 
       toast.success("Closing photo uploaded successfully");
+      
+      // Reset state
       setPhotoBlob(null);
       setPhotoPreview(null);
       setPhotoOpen(false);
+      
+      // Immediately update local state
       setPhotoUploaded(true);
+      
+      // Refresh task status
+      await checkTaskStatus();
+      
+      // Notify other components with a small delay to ensure DB write is complete
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('tasks:updated', { detail: { venueId, source: 'closing_photo' } }));
+      }, 300);
+      
+      // Show appreciation dialog
       setShowPhotoAppreciation(true);
-      checkTaskStatus(); // Refresh task status
-      // Notify other components immediately
-      window.dispatchEvent(new CustomEvent('tasks:updated', { detail: { venueId, source: 'closing_photo' } }));
     } catch (error) {
       toast.error("Failed to upload photo");
       console.error(error);
+    } finally {
+      setIsUploading(false);
     }
   };
+
+  // Show loading state while business date is being fetched
+  if (dateLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Camera className="h-5 w-5" />
+            Closing Photo
+          </CardTitle>
+          <CardDescription>Loading...</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center py-6">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <>
@@ -292,12 +358,24 @@ const ClosingPhotoWidget = ({ user, venueId }: ClosingPhotoWidgetProps) => {
                         variant="outline" 
                         onClick={handleRetakePhoto}
                         className="flex-1 border-2 min-h-[52px] text-base"
+                        disabled={isUploading}
                       >
                         <Camera className="mr-2 h-5 w-5" />
                         Retake
                       </Button>
-                      <Button onClick={handleUploadClosingPhoto} className="flex-1 border-2 border-primary/20 min-h-[52px] text-base">
-                        Confirm & Upload
+                      <Button 
+                        onClick={handleUploadClosingPhoto} 
+                        className="flex-1 border-2 border-primary/20 min-h-[52px] text-base"
+                        disabled={isUploading}
+                      >
+                        {isUploading ? (
+                          <>
+                            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                            Uploading...
+                          </>
+                        ) : (
+                          "Confirm & Upload"
+                        )}
                       </Button>
                     </div>
                   </div>

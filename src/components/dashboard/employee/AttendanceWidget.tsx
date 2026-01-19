@@ -27,7 +27,7 @@ interface TaskStatus {
 }
 
 const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
-  const { businessDate, currentShift: activeShiftFromHook } = useBusinessDate(user.id, venueId);
+  const { businessDate, currentShift: activeShiftFromHook, loading: dateLoading } = useBusinessDate(user.id, venueId);
   const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
   const [currentShift, setCurrentShift] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -56,12 +56,14 @@ const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
   }, [activeShiftFromHook]);
 
   useEffect(() => {
+    if (!businessDate) return;
+    
     fetchTodayAttendance();
     checkTaskStatus();
 
     // Set up realtime subscriptions to refresh task status
     const stockChannel = supabase
-      .channel('stock-updates-attendance')
+      .channel(`stock-updates-attendance-${venueId}`)
       .on(
         'postgres_changes',
         {
@@ -78,7 +80,7 @@ const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
       .subscribe();
 
     const salesChannel = supabase
-      .channel('sales-updates-attendance')
+      .channel(`sales-updates-attendance-${venueId}`)
       .on(
         'postgres_changes',
         {
@@ -95,7 +97,7 @@ const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
       .subscribe();
 
     const closingPhotoChannel = supabase
-      .channel('closing-photo-updates-attendance')
+      .channel(`closing-photo-updates-attendance-${venueId}`)
       .on(
         'postgres_changes',
         {
@@ -111,10 +113,22 @@ const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
       )
       .subscribe();
 
+    // Listen for task updates from other widgets
+    const onTaskEvent = (e: any) => {
+      try {
+        if (e?.detail?.venueId === venueId) {
+          console.log('Tasks event received in attendance - refreshing', e.detail);
+          setTimeout(() => checkTaskStatus(), 300);
+        }
+      } catch (_) {}
+    };
+    window.addEventListener('tasks:updated', onTaskEvent);
+
     return () => {
       supabase.removeChannel(stockChannel);
       supabase.removeChannel(salesChannel);
       supabase.removeChannel(closingPhotoChannel);
+      window.removeEventListener('tasks:updated', onTaskEvent);
     };
   }, [venueId, businessDate]);
 
@@ -137,6 +151,8 @@ const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
   };
 
   const checkTaskStatus = async () => {
+    if (!businessDate) return;
+    
     const [stockCheck, salesCheck, closingCheck] = await Promise.all([
       supabase
         .from("stock")

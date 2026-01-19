@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { TrendingUp, Plus, Camera, Image, X } from "lucide-react";
+import { TrendingUp, Plus, Camera, Image, X, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import AppreciationDialog from "./AppreciationDialog";
 import { useBusinessDate } from "@/hooks/useBusinessDate";
@@ -26,7 +26,7 @@ interface TaskStatus {
 }
 
 const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
-  const { businessDate } = useBusinessDate(user.id, venueId);
+  const { businessDate, loading: dateLoading } = useBusinessDate(user.id, venueId);
   const [open, setOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [categoryId, setCategoryId] = useState("");
@@ -46,12 +46,16 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
   });
 
   useEffect(() => {
+    if (!businessDate) return;
+    
     fetchHookahCategories();
     fetchTodaySales();
     checkTaskStatus();
   }, [venueId, businessDate]);
 
   const checkTaskStatus = async () => {
+    if (!businessDate) return;
+    
     const [stockCheck, salesCheck, closingCheck] = await Promise.all([
       supabase
         .from("stock")
@@ -102,6 +106,8 @@ const SalesWidget = ({ user, venueId }: SalesWidgetProps) => {
   };
 
   const fetchTodaySales = async () => {
+    if (!businessDate) return;
+    
     const { data } = await supabase
       .from("sales_reports")
       .select("*, venue_hookah_categories(category_name)")
