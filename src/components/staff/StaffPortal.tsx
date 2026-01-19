@@ -97,7 +97,7 @@ const StaffPortal = ({ user, venueId }: StaffPortalProps) => {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-16">
+    <div className="h-screen bg-background pb-16 flex flex-col overflow-hidden">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border px-4 py-3">
         <div className="flex items-center justify-between">
@@ -120,7 +120,7 @@ const StaffPortal = ({ user, venueId }: StaffPortalProps) => {
       </header>
 
       {/* Main content */}
-      <main className="relative">
+      <main className="flex-1 overflow-auto">
         {renderModule()}
       </main>
 
