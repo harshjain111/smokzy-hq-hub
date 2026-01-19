@@ -15,6 +15,7 @@ import ManageEmployees from "./pages/ManageEmployees";
 import ManageCategories from "./pages/ManageCategories";
 import AttendanceReport from "./pages/AttendanceReport";
 import CounterPictures from "./pages/CounterPictures";
+import ClubDetail from "./pages/ClubDetail";
 
 const queryClient = new QueryClient();
 
@@ -28,6 +29,7 @@ const App = () => (
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/auth" element={<Auth />} />
+          <Route path="/club/:clubId" element={<ProtectedRoute><ClubDetail /></ProtectedRoute>} />
           <Route path="/venue/:venueId" element={<ProtectedRoute><VenueDetail /></ProtectedRoute>} />
           <Route path="/venue/:venueId/reports" element={<ProtectedRoute><VenueReports /></ProtectedRoute>} />
           <Route path="/manage-venues" element={<ProtectedRoute><ManageVenues /></ProtectedRoute>} />
