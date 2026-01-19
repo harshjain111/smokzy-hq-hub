@@ -137,12 +137,18 @@ const SlideToConfirm = ({
   }, [isDragging, position, onConfirm]);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    e.preventDefault(); // Prevent scrolling while dragging
+    if (e.cancelable) {
+      e.preventDefault();
+    }
+    e.stopPropagation();
     handleStart(e.touches[0].clientX);
   }, [handleStart]);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    e.preventDefault(); // Prevent scrolling while dragging
+    if (e.cancelable) {
+      e.preventDefault();
+    }
+    e.stopPropagation();
     handleMove(e.touches[0].clientX);
   }, [handleMove]);
 
@@ -171,11 +177,12 @@ const SlideToConfirm = ({
     <div
       ref={containerRef}
       className={cn(
-        "relative h-14 rounded-full overflow-hidden select-none touch-none",
+        "relative h-14 rounded-full overflow-hidden select-none",
         disabled && "opacity-50 cursor-not-allowed",
         shouldShake && "animate-shake",
         "bg-muted border-2 border-border"
       )}
+      style={{ touchAction: "none" }}
     >
       {/* Progress background */}
       <div
@@ -220,6 +227,7 @@ const SlideToConfirm = ({
           transform: `translateX(${position}px)`,
           transition: isDragging ? "none" : "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
           willChange: isDragging ? "transform" : "auto",
+          touchAction: "none",
         }}
       >
         {isConfirmed ? (
