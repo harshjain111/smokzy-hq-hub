@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Minus, Plus, Check, TrendingUp, Loader2 } from "lucide-react";
+import { Minus, Plus, Check, TrendingUp, Loader2, Pencil } from "lucide-react";
 import { ClubSession } from "@/hooks/useClubSession";
 import { format } from "date-fns";
 import { haptic } from "@/lib/haptics";
@@ -31,6 +31,7 @@ const SalesModule = ({ user, venueId, session, updateSessionTask }: SalesModuleP
   const [submitterName, setSubmitterName] = useState<string | null>(null);
   const [submittedAt, setSubmittedAt] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
+  const [isEditing, setIsEditing] = useState(false);
 
   const fetchCategories = useCallback(async () => {
     setLoading(true);
@@ -70,6 +71,32 @@ const SalesModule = ({ user, venueId, session, updateSessionTask }: SalesModuleP
       }));
     }
   }, [session]);
+
+  // Fetch existing sales when entering edit mode
+  const fetchExistingSales = useCallback(async () => {
+    if (!session?.session_date) return;
+    
+    const { data } = await supabase
+      .from("sales_reports")
+      .select("category_id, quantity_sold")
+      .eq("venue_id", venueId)
+      .eq("report_date", session.session_date);
+    
+    if (data) {
+      const existingQuantities: Record<string, number | null> = {};
+      categories.forEach(cat => {
+        const found = data.find(d => d.category_id === cat.id);
+        existingQuantities[cat.id] = found ? found.quantity_sold : null;
+      });
+      setQuantities(existingQuantities);
+    }
+  }, [session, venueId, categories]);
+
+  const handleEnterEditMode = async () => {
+    haptic('selection');
+    setIsEditing(true);
+    await fetchExistingSales();
+  };
 
   useEffect(() => {
     fetchCategories();
@@ -141,27 +168,48 @@ const SalesModule = ({ user, venueId, session, updateSessionTask }: SalesModuleP
     try {
       const sessionDate = session?.session_date || format(new Date(), "yyyy-MM-dd");
 
-      // Insert sales for ALL categories (including 0 values)
+      // Insert or update sales for ALL categories (including 0 values)
       for (const [categoryId, qty] of Object.entries(quantities)) {
         // qty is guaranteed to be a number at this point (validated above)
         const quantity = qty as number;
         
-        const { error } = await supabase.from("sales_reports").insert({
-          venue_id: venueId,
-          reported_by: user.id,
-          report_date: sessionDate,
-          category_id: categoryId,
-          quantity_sold: quantity,
-        });
+        if (isEditing) {
+          // Update existing records when editing
+          const { error } = await supabase
+            .from("sales_reports")
+            .update({
+              quantity_sold: quantity,
+              reported_by: user.id,
+            })
+            .eq("venue_id", venueId)
+            .eq("report_date", sessionDate)
+            .eq("category_id", categoryId);
 
-        if (error) throw error;
+          if (error) throw error;
+        } else {
+          // Insert new records for initial submission
+          const { error } = await supabase.from("sales_reports").insert({
+            venue_id: venueId,
+            reported_by: user.id,
+            report_date: sessionDate,
+            category_id: categoryId,
+            quantity_sold: quantity,
+          });
+
+          if (error) throw error;
+        }
       }
 
       // Update session
       await updateSessionTask('sales', user.id);
       
       haptic('success');
-      toast.success("Sales logged. Session is on track! 📊");
+      if (isEditing) {
+        toast.success("Sales updated successfully! 📊");
+        setIsEditing(false);
+      } else {
+        toast.success("Sales logged. Session is on track! 📊");
+      }
     } catch (error: any) {
       haptic('error');
       console.error("Sales submit error:", error);
@@ -180,8 +228,8 @@ const SalesModule = ({ user, venueId, session, updateSessionTask }: SalesModuleP
     );
   }
 
-  // Already submitted state
-  if (session?.sales_submitted) {
+  // Already submitted state (and not editing)
+  if (session?.sales_submitted && !isEditing) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] px-6 space-y-6">
         <div className="w-20 h-20 rounded-full bg-success/10 flex items-center justify-center">
@@ -200,6 +248,14 @@ const SalesModule = ({ user, venueId, session, updateSessionTask }: SalesModuleP
             Session is on track!
           </p>
         </div>
+        <Button
+          onClick={handleEnterEditMode}
+          variant="outline"
+          className="mt-4 gap-2"
+        >
+          <Pencil className="w-4 h-4" />
+          Edit Sales
+        </Button>
       </div>
     );
   }
@@ -307,12 +363,12 @@ const SalesModule = ({ user, venueId, session, updateSessionTask }: SalesModuleP
           {submitting ? (
             <>
               <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-              Submitting...
+              {isEditing ? 'Updating...' : 'Submitting...'}
             </>
           ) : (
             <>
               <Check className="w-5 h-5 mr-2" />
-              Log Sales
+              {isEditing ? 'Update Sales' : 'Log Sales'}
             </>
           )}
         </Button>

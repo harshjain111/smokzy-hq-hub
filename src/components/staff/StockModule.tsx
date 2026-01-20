@@ -83,6 +83,7 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
   const [submitting, setSubmitting] = useState(false);
   const [submitterName, setSubmitterName] = useState<string | null>(null);
   const [submittedAt, setSubmittedAt] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
   
   // Collapsed categories state
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
@@ -338,7 +339,12 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
       await updateSessionTask('stock', user.id);
       
       haptic('success');
-      toast.success("Stock locked for today. Good control! ✓");
+      if (isEditing) {
+        toast.success("Stock updated successfully! ✓");
+        setIsEditing(false);
+      } else {
+        toast.success("Stock locked for today. Good control! ✓");
+      }
     } catch (error: any) {
       haptic('error');
       console.error("Stock update error:", error);
@@ -369,8 +375,13 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
     );
   }
 
-  // Already submitted state
-  if (session?.stock_submitted) {
+  const handleEnterEditMode = () => {
+    haptic('selection');
+    setIsEditing(true);
+  };
+
+  // Already submitted state (and not editing)
+  if (session?.stock_submitted && !isEditing) {
     return (
       <motion.div 
         initial={{ opacity: 0, scale: 0.95 }}
@@ -396,6 +407,14 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
             Stock locked for today. Good control.
           </p>
         </div>
+        <Button
+          onClick={handleEnterEditMode}
+          variant="outline"
+          className="mt-6 gap-2"
+        >
+          <Pencil className="w-4 h-4" />
+          Edit Stock
+        </Button>
       </motion.div>
     );
   }
@@ -694,10 +713,10 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
           {submitting ? (
             <>
               <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-              Submitting...
+              {isEditing ? 'Updating...' : 'Submitting...'}
             </>
           ) : (
-            "Submit Final Stock"
+            isEditing ? "Update Stock" : "Submit Final Stock"
           )}
         </Button>
       </motion.div>
