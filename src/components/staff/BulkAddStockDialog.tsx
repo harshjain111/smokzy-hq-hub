@@ -213,7 +213,7 @@ const BulkAddStockDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-2xl mx-4 rounded-3xl max-h-[85vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-2xl sm:max-w-xl">
         <DialogHeader className="shrink-0">
           <DialogTitle className="flex items-center gap-2 text-xl">
             <Grid3X3 className="w-5 h-5 text-primary" />

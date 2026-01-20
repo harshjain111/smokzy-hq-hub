@@ -290,7 +290,7 @@ const KotProofSection = ({ user, venueId, sessionId }: KotProofSectionProps) => 
 
       {/* No KOT Declaration Dialog */}
       <Dialog open={showNoKotDialog} onOpenChange={setShowNoKotDialog}>
-        <DialogContent className="mx-4 rounded-3xl max-w-md">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileX className="w-5 h-5 text-warning" />

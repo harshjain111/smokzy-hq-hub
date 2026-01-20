@@ -662,7 +662,7 @@ const AttendanceModule = ({
           }
           setShowDutyDialog(open);
         }}>
-          <AlertDialogContent className="max-w-sm z-[70]">
+          <AlertDialogContent className="z-[70]">
             <AlertDialogHeader>
               <AlertDialogTitle className="text-center text-xl">
                 Is your duty completed for today?

@@ -64,7 +64,7 @@ const WelcomeDialog = ({ userName, role }: WelcomeDialogProps) => {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-center">
             Welcome Back, {userName}! 🎉

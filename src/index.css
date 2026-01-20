@@ -115,7 +115,32 @@ All colors MUST be HSL.
     @apply border-border;
   }
 
+  html {
+    /* Prevent horizontal overflow globally */
+    overflow-x: hidden;
+  }
+
   body {
     @apply bg-background text-foreground;
+    /* Prevent horizontal overflow */
+    overflow-x: hidden;
+    /* Ensure proper sizing */
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  /* Prevent body scroll when modal/dialog is open */
+  body[data-scroll-locked] {
+    overflow: hidden !important;
+    touch-action: none;
+  }
+}
+
+/* Global modal safety - ensure modals don't cause horizontal scroll */
+@layer utilities {
+  .dialog-content-safe {
+    max-width: calc(100vw - 2rem);
+    max-height: 90vh;
+    max-height: 90dvh;
   }
 }

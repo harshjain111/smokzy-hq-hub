@@ -295,7 +295,7 @@ export const ReportsSection = () => {
               </div>
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-sm mx-auto rounded-xl">
+          <DialogContent>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-3 text-base">
                 <div className="p-2 rounded-lg bg-primary/10 shrink-0">

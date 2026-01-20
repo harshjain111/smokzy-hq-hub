@@ -54,7 +54,7 @@ const AppreciationDialog = ({ open, onOpenChange, taskType, taskStatus }: Apprec
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="max-w-md">
+      <AlertDialogContent>
         <AlertDialogHeader className="items-center text-center">
           <div className="mb-4 p-4 rounded-full bg-success/10 w-fit">
             <Icon className="h-12 w-12 text-success" />

@@ -89,7 +89,7 @@ const KotViewModal = ({ open, onOpenChange, sessionId, sessionDate }: KotViewMod
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Image className="w-5 h-5 text-primary" />
@@ -195,7 +195,7 @@ const KotViewModal = ({ open, onOpenChange, sessionId, sessionDate }: KotViewMod
 
       {/* Full Image View Dialog */}
       <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
-        <DialogContent className="max-w-4xl p-0 overflow-hidden">
+        <DialogContent className="max-w-4xl">
           <div className="relative">
             <img
               src={selectedImage || ''}
