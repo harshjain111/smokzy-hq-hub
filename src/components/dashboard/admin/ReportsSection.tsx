@@ -284,14 +284,14 @@ export const ReportsSection = () => {
           <DialogTrigger asChild>
             <Button 
               variant="outline" 
-              className="w-full justify-start gap-3 h-auto py-4 px-4 min-h-[64px] rounded-xl border-border/60 hover:bg-muted/50 active:scale-[0.98] transition-all"
+              className="w-full justify-start gap-3 h-auto py-4 px-4 min-h-[64px] rounded-xl border-border/60 hover:bg-muted/50 active:scale-[0.98] transition-all overflow-hidden"
             >
               <div className="p-2 rounded-lg bg-primary/10 shrink-0">
                 {report.icon}
               </div>
-              <div className="text-left flex-1 min-w-0">
-                <div className="font-medium text-sm">{report.title}</div>
-                <div className="text-xs text-muted-foreground line-clamp-1">{report.description}</div>
+              <div className="text-left flex-1 min-w-0 overflow-hidden">
+                <div className="font-medium text-sm truncate">{report.title}</div>
+                <div className="text-xs text-muted-foreground truncate">{report.description}</div>
               </div>
             </Button>
           </DialogTrigger>
