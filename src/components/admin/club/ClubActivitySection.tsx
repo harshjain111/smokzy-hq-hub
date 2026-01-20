@@ -3,10 +3,11 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
-import { Search, Clock, User, Package, TrendingUp, Camera, AlertTriangle, Activity } from "lucide-react";
+import { Search, Clock, User, Package, TrendingUp, Camera, Activity } from "lucide-react";
 
 interface ClubActivitySectionProps {
   clubId: string;
+  currentSession?: { id: string; session_date: string } | null;
 }
 
 interface ActivityItem {
@@ -17,7 +18,7 @@ interface ActivityItem {
   description: string;
 }
 
-export const ClubActivitySection = ({ clubId }: ClubActivitySectionProps) => {
+export const ClubActivitySection = ({ clubId, currentSession }: ClubActivitySectionProps) => {
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [filteredActivities, setFilteredActivities] = useState<ActivityItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -25,7 +26,7 @@ export const ClubActivitySection = ({ clubId }: ClubActivitySectionProps) => {
 
   useEffect(() => {
     fetchActivity();
-  }, [clubId]);
+  }, [clubId, currentSession?.id]);
 
   useEffect(() => {
     if (searchQuery.trim()) {
@@ -43,19 +44,36 @@ export const ClubActivitySection = ({ clubId }: ClubActivitySectionProps) => {
 
   const fetchActivity = async () => {
     setLoading(true);
-    const today = format(new Date(), "yyyy-MM-dd");
     const allActivities: ActivityItem[] = [];
 
     try {
+      // If no current session, show nothing - activity is session-based
+      if (!currentSession) {
+        setActivities([]);
+        setFilteredActivities([]);
+        setLoading(false);
+        return;
+      }
+
+      // Fetch attendance blocks for THIS SESSION (not by date)
       const { data: blocks } = await supabase
         .from("staff_attendance_blocks")
-        .select("*, profiles:user_id(full_name)")
-        .eq("venue_id", clubId)
-        .gte("check_in_time", `${today}T00:00:00`)
+        .select("*")
+        .eq("session_id", currentSession.id)
         .order("check_in_time", { ascending: false });
 
-      blocks?.forEach((block: any) => {
-        const name = block.profiles?.full_name || "Unknown";
+      // Fetch profiles for names
+      const userIds = [...new Set(blocks?.map(b => b.user_id) || [])];
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", userIds.length > 0 ? userIds : ['00000000-0000-0000-0000-000000000000']);
+
+      const profileMap: Record<string, string> = {};
+      profiles?.forEach(p => { profileMap[p.id] = p.full_name; });
+
+      blocks?.forEach((block) => {
+        const name = profileMap[block.user_id] || "Unknown";
         allActivities.push({
           id: `checkin-${block.id}`,
           timestamp: block.check_in_time,
@@ -74,14 +92,14 @@ export const ClubActivitySection = ({ clubId }: ClubActivitySectionProps) => {
         }
       });
 
+      // Fetch breaks for THIS SESSION
       const { data: breaks } = await supabase
         .from("staff_breaks")
-        .select("*, profiles:user_id(full_name)")
-        .eq("venue_id", clubId)
-        .gte("break_start_time", `${today}T00:00:00`);
+        .select("*")
+        .eq("session_id", currentSession.id);
 
-      breaks?.forEach((brk: any) => {
-        const name = brk.profiles?.full_name || "Unknown";
+      breaks?.forEach((brk) => {
+        const name = profileMap[brk.user_id] || "Unknown";
         allActivities.push({
           id: `break-start-${brk.id}`,
           timestamp: brk.break_start_time,
@@ -100,19 +118,20 @@ export const ClubActivitySection = ({ clubId }: ClubActivitySectionProps) => {
         }
       });
 
-      const { data: sessions } = await supabase
+      // Fetch the session itself
+      const { data: session } = await supabase
         .from("club_sessions")
         .select("*")
-        .eq("venue_id", clubId)
-        .eq("session_date", today);
+        .eq("id", currentSession.id)
+        .maybeSingle();
 
-      sessions?.forEach(session => {
+      if (session) {
         allActivities.push({
           id: `session-${session.id}`,
           timestamp: session.started_at,
           type: 'session',
           actor: "System",
-          description: "Session started",
+          description: `Session started (${session.session_date})`,
         });
         if (session.stock_submitted_at) {
           allActivities.push({
@@ -141,7 +160,7 @@ export const ClubActivitySection = ({ clubId }: ClubActivitySectionProps) => {
             description: "Counter photo uploaded",
           });
         }
-      });
+      }
 
       allActivities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
       setActivities(allActivities);
@@ -195,6 +214,14 @@ export const ClubActivitySection = ({ clubId }: ClubActivitySectionProps) => {
     );
   }
 
+  if (!currentSession) {
+    return (
+      <div className="py-8 text-center text-muted-foreground text-sm">
+        No active session. Activity log will appear once a session starts.
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3">
       {/* Search */}
@@ -210,14 +237,16 @@ export const ClubActivitySection = ({ clubId }: ClubActivitySectionProps) => {
 
       {/* Activity Count */}
       <div className="flex items-center justify-between">
-        <span className="text-xs text-muted-foreground">Today's Activity</span>
+        <span className="text-xs text-muted-foreground">
+          Session Activity ({currentSession.session_date})
+        </span>
         <Badge variant="secondary" className="text-[10px]">{filteredActivities.length}</Badge>
       </div>
 
       {/* Activity Log */}
       {filteredActivities.length === 0 ? (
         <div className="py-8 text-center text-muted-foreground text-sm">
-          No activity recorded today
+          No activity recorded for this session
         </div>
       ) : (
         <div className="divide-y max-h-[350px] overflow-y-auto rounded-lg border bg-card">
@@ -229,7 +258,7 @@ export const ClubActivitySection = ({ clubId }: ClubActivitySectionProps) => {
               <div className="flex-1 min-w-0">
                 <p className="text-xs leading-tight">{activity.description}</p>
                 <p className="text-[10px] text-muted-foreground mt-0.5">
-                  {format(new Date(activity.timestamp), "hh:mm a")}
+                  {format(new Date(activity.timestamp), "MMM dd, hh:mm a")}
                 </p>
               </div>
             </div>
