@@ -7,6 +7,7 @@ import { LogIn, LogOut, Clock, MapPin, Camera, Loader2, Check, X, Coffee, Play }
 import { format, differenceInMinutes } from "date-fns";
 import { ClubSession, AttendanceBlock, StaffBreak, StaffStatus } from "@/hooks/useClubSession";
 import { compressImage } from "@/lib/imageCompression";
+import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 import {
   AlertDialog,
@@ -94,13 +95,16 @@ const AttendanceModule = ({
 
   // Break handlers
   const handleStartBreak = async () => {
+    haptic('medium');
     setBreakLoading(true);
     try {
       await startBreak();
+      haptic('success');
       toast.success("Break started. Please resume duty after your break.", {
         icon: "☕",
       });
     } catch (error: any) {
+      haptic('error');
       console.error("Start break error:", error);
       toast.error(error.message || "Failed to start break");
     } finally {
@@ -109,13 +113,16 @@ const AttendanceModule = ({
   };
 
   const handleEndBreak = async () => {
+    haptic('medium');
     setBreakLoading(true);
     try {
       await endBreak();
+      haptic('success');
       toast.success("Welcome back! You're back on duty.", {
         icon: "💪",
       });
     } catch (error: any) {
+      haptic('error');
       console.error("End break error:", error);
       toast.error(error.message || "Failed to end break");
     } finally {
@@ -184,6 +191,8 @@ const AttendanceModule = ({
 
   const capturePhoto = async () => {
     if (!videoRef.current) return;
+    
+    haptic('medium');
 
     try {
       const canvas = document.createElement("canvas");
@@ -210,6 +219,7 @@ const AttendanceModule = ({
             setPhotoPreview(URL.createObjectURL(compressed));
             setFlowState('preview');
           } catch (compressError) {
+            haptic('error');
             console.error("Compression error:", compressError);
             toast.error("Failed to process photo");
             setFlowState('idle');
@@ -217,6 +227,7 @@ const AttendanceModule = ({
         }
       }, "image/jpeg", 0.95);
     } catch (error) {
+      haptic('error');
       console.error("Capture error:", error);
       toast.error("Failed to capture photo");
       setFlowState('idle');
@@ -286,14 +297,17 @@ const AttendanceModule = ({
 
   const handleConfirmCheckIn = async () => {
     if (!photoBlob || !location) return;
-
+    
+    haptic('medium');
     setFlowState('processing');
     try {
       const photoUrl = await uploadPhoto(photoBlob);
       await checkIn(photoUrl, location.lat, location.lng);
+      haptic('success');
       toast.success("Checked in successfully! 🎉");
       resetFlow();
     } catch (error: any) {
+      haptic('error');
       console.error("Check-in error:", error);
       toast.error(error.message || "Failed to check in");
       setFlowState('preview');
@@ -301,6 +315,7 @@ const AttendanceModule = ({
   };
 
   const handleConfirmPreview = () => {
+    haptic('selection');
     if (isCheckingOut) {
       if (isEarlyExit) {
         // Early exit - directly checkout with duty NOT completed
@@ -314,6 +329,7 @@ const AttendanceModule = ({
   };
 
   const handleDutyResponse = async (dutyCompleted: boolean) => {
+    haptic('medium');
     setShowDutyDialog(false);
     if (!photoBlob || !location) return;
 
@@ -322,6 +338,7 @@ const AttendanceModule = ({
       const photoUrl = await uploadPhoto(photoBlob);
       await checkOut(photoUrl, location.lat, location.lng, dutyCompleted);
       
+      haptic('success');
       if (isEarlyExit) {
         toast.success("Early checkout recorded. See you next time! 👋");
       } else if (dutyCompleted) {
@@ -331,6 +348,7 @@ const AttendanceModule = ({
       }
       resetFlow();
     } catch (error: any) {
+      haptic('error');
       console.error("Check-out error:", error);
       toast.error(error.message || "Failed to check out");
       setFlowState('preview');

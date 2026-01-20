@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Camera, Check, Loader2, RotateCcw, Image } from "lucide-react";
 import { ClubSession } from "@/hooks/useClubSession";
 import { compressImage } from "@/lib/imageCompression";
+import { haptic } from "@/lib/haptics";
 
 interface PhotoModuleProps {
   user: User;
@@ -94,6 +95,8 @@ const PhotoModule = ({ user, venueId, session, updateSessionTask }: PhotoModuleP
 
   const capturePhoto = async () => {
     if (!videoRef.current) return;
+    
+    haptic('medium');
 
     try {
       const canvas = document.createElement("canvas");
@@ -121,6 +124,7 @@ const PhotoModule = ({ user, venueId, session, updateSessionTask }: PhotoModuleP
         }
       }, "image/jpeg", 0.95);
     } catch (error) {
+      haptic('error');
       console.error("Capture error:", error);
       toast.error("Failed to capture photo");
     }
@@ -135,7 +139,8 @@ const PhotoModule = ({ user, venueId, session, updateSessionTask }: PhotoModuleP
 
   const handleUpload = async () => {
     if (!photoBlob || !session) return;
-
+    
+    haptic('medium');
     setFlowState('uploading');
     try {
       const fileName = `${venueId}/${session.session_date}-${Date.now()}.jpg`;
@@ -163,6 +168,7 @@ const PhotoModule = ({ user, venueId, session, updateSessionTask }: PhotoModuleP
       // Update session
       await updateSessionTask('photo', user.id);
       
+      haptic('success');
       toast.success("Counter photo received. Looks well maintained! 📸");
       
       // Cleanup
@@ -171,6 +177,7 @@ const PhotoModule = ({ user, venueId, session, updateSessionTask }: PhotoModuleP
       setPhotoPreview(null);
       setFlowState('idle');
     } catch (error: any) {
+      haptic('error');
       console.error("Upload error:", error);
       toast.error(error.message || "Failed to upload photo");
       setFlowState('preview');
