@@ -17,6 +17,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import CheckoutBlockedDialog from "./CheckoutBlockedDialog";
+import EarlyCheckoutDialog from "@/components/dashboard/employee/EarlyCheckoutDialog";
 import { TabId } from "./BottomNav";
 
 interface AttendanceModuleProps {
@@ -60,12 +61,15 @@ const AttendanceModule = ({
 }: AttendanceModuleProps) => {
   const [flowState, setFlowState] = useState<FlowState>('idle');
   const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [isEarlyExit, setIsEarlyExit] = useState(false);
   const [photoBlob, setPhotoBlob] = useState<Blob | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
   const [showDutyDialog, setShowDutyDialog] = useState(false);
   const [showBlockedDialog, setShowBlockedDialog] = useState(false);
+  const [showEarlyExitDialog, setShowEarlyExitDialog] = useState(false);
+  const [earlyExitLoading, setEarlyExitLoading] = useState(false);
   const [breakLoading, setBreakLoading] = useState(false);
   const [breakDuration, setBreakDuration] = useState(0);
   
@@ -264,6 +268,22 @@ const AttendanceModule = ({
     }
   };
 
+  // Early Exit flow handlers
+  const handleEarlyExitRequest = () => {
+    setShowEarlyExitDialog(true);
+  };
+
+  const handleEarlyExitConfirm = async (reason: string) => {
+    setEarlyExitLoading(true);
+    setIsEarlyExit(true);
+    setIsCheckingOut(true);
+    
+    // Start camera to capture checkout selfie
+    startCamera();
+    setShowEarlyExitDialog(false);
+    setEarlyExitLoading(false);
+  };
+
   const handleConfirmCheckIn = async () => {
     if (!photoBlob || !location) return;
 
@@ -282,7 +302,12 @@ const AttendanceModule = ({
 
   const handleConfirmPreview = () => {
     if (isCheckingOut) {
-      setShowDutyDialog(true);
+      if (isEarlyExit) {
+        // Early exit - directly checkout with duty NOT completed
+        handleDutyResponse(false);
+      } else {
+        setShowDutyDialog(true);
+      }
     } else {
       handleConfirmCheckIn();
     }
@@ -297,7 +322,9 @@ const AttendanceModule = ({
       const photoUrl = await uploadPhoto(photoBlob);
       await checkOut(photoUrl, location.lat, location.lng, dutyCompleted);
       
-      if (dutyCompleted) {
+      if (isEarlyExit) {
+        toast.success("Early checkout recorded. See you next time! 👋");
+      } else if (dutyCompleted) {
         toast.success("Checked out successfully! Great work today! 🌟");
       } else {
         toast.success("On break - see you when you return! ☕");
@@ -317,6 +344,7 @@ const AttendanceModule = ({
     setLocation(null);
     setFlowState('idle');
     setIsCheckingOut(false);
+    setIsEarlyExit(false);
     stopCamera();
   };
 
@@ -442,7 +470,16 @@ const AttendanceModule = ({
               onOpenChange={setShowBlockedDialog}
               session={session}
               onNavigateToTask={handleNavigateToTask}
+              onEarlyExit={handleEarlyExitRequest}
               blockReason={checkoutEligibility.reason}
+            />
+
+            {/* Early Checkout Confirmation Dialog */}
+            <EarlyCheckoutDialog
+              open={showEarlyExitDialog}
+              onOpenChange={setShowEarlyExitDialog}
+              onConfirm={handleEarlyExitConfirm}
+              loading={earlyExitLoading}
             />
 
             {/* Session info */}

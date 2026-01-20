@@ -8,7 +8,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Package, TrendingUp, Camera, AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Package, TrendingUp, Camera, AlertTriangle, LogOut } from "lucide-react";
 import { ClubSession } from "@/hooks/useClubSession";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +18,7 @@ interface CheckoutBlockedDialogProps {
   onOpenChange: (open: boolean) => void;
   session: ClubSession | null;
   onNavigateToTask: (task: 'stock' | 'sales' | 'photo') => void;
+  onEarlyExit?: () => void;
   blockReason?: string;
 }
 
@@ -31,6 +33,7 @@ const CheckoutBlockedDialog = ({
   onOpenChange,
   session,
   onNavigateToTask,
+  onEarlyExit,
   blockReason,
 }: CheckoutBlockedDialogProps) => {
   // Determine pending tasks
@@ -49,12 +52,19 @@ const CheckoutBlockedDialog = ({
   }
 
   const firstPendingTask = pendingTasks[0];
+  const isOnBreak = blockReason === "Resume duty before checkout";
+  const hasPendingTasks = pendingTasks.length > 0 && !isOnBreak;
 
   const handleGoToTasks = () => {
     if (firstPendingTask) {
       onNavigateToTask(firstPendingTask.id);
     }
     onOpenChange(false);
+  };
+
+  const handleEarlyExit = () => {
+    onOpenChange(false);
+    onEarlyExit?.();
   };
 
   return (
@@ -68,7 +78,7 @@ const CheckoutBlockedDialog = ({
             Checkout not allowed yet
           </AlertDialogTitle>
           <AlertDialogDescription className="text-center text-muted-foreground">
-            {blockReason === "Resume duty before checkout" ? (
+            {isOnBreak ? (
               "Please resume your duty before checking out."
             ) : (
               "Please complete the following before checkout:"
@@ -77,7 +87,7 @@ const CheckoutBlockedDialog = ({
         </AlertDialogHeader>
 
         {/* Pending tasks list */}
-        {pendingTasks.length > 0 && blockReason !== "Resume duty before checkout" && (
+        {hasPendingTasks && (
           <div className="space-y-2 my-4">
             {pendingTasks.map((task) => {
               const Icon = task.icon;
@@ -100,7 +110,8 @@ const CheckoutBlockedDialog = ({
         )}
 
         <AlertDialogFooter className="flex-col gap-2 sm:flex-col">
-          {pendingTasks.length > 0 && blockReason !== "Resume duty before checkout" && (
+          {/* Primary action - Go to Pending Tasks */}
+          {hasPendingTasks && (
             <AlertDialogAction
               onClick={handleGoToTasks}
               className="w-full h-12 rounded-xl bg-primary hover:bg-primary/90 font-semibold"
@@ -108,6 +119,20 @@ const CheckoutBlockedDialog = ({
               Go to Pending Tasks
             </AlertDialogAction>
           )}
+
+          {/* Early Exit option - always visible when tasks are pending */}
+          {hasPendingTasks && onEarlyExit && (
+            <Button
+              variant="outline"
+              onClick={handleEarlyExit}
+              className="w-full h-12 rounded-xl font-semibold border-2 border-warning/50 text-warning hover:bg-warning/10"
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              Early Exit (Morning / Relief Duty)
+            </Button>
+          )}
+
+          {/* Cancel button */}
           <AlertDialogCancel className="w-full h-12 rounded-xl font-semibold mt-0">
             Cancel
           </AlertDialogCancel>
