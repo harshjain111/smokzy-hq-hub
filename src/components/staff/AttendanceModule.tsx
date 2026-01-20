@@ -632,13 +632,13 @@ const AttendanceModule = ({
               <Camera className="w-5 h-5 mr-2" />
               Retake
             </Button>
-            <Button
-              size="lg"
+            <button
+              type="button"
               onClick={handleConfirmPreview}
               disabled={!canConfirm}
               className={cn(
-                "flex-1 h-14 text-white font-semibold text-base rounded-xl shadow-lg",
-                canConfirm ? "bg-success hover:bg-success/90" : "bg-muted opacity-50"
+                "flex-1 h-14 text-white font-semibold text-base rounded-xl shadow-lg flex items-center justify-center touch-manipulation",
+                canConfirm ? "bg-success hover:bg-success/90 active:bg-success/80" : "bg-muted opacity-50 cursor-not-allowed"
               )}
             >
               {locationLoading ? (
@@ -652,13 +652,13 @@ const AttendanceModule = ({
                   Confirm
                 </>
               )}
-            </Button>
+            </button>
           </div>
         </div>
 
-        {/* Duty completion dialog - rendered OUTSIDE the fixed preview div for proper z-index stacking */}
+        {/* Duty completion dialog - portal renders at z-[100] above all content */}
         <AlertDialog open={showDutyDialog} onOpenChange={setShowDutyDialog}>
-          <AlertDialogContent className="z-[80]">
+          <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle className="text-center text-xl">
                 Is your duty completed for today?
