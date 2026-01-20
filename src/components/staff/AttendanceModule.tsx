@@ -318,8 +318,8 @@ const AttendanceModule = ({
     haptic('selection');
     if (isCheckingOut) {
       if (isEarlyExit) {
-        // Early exit - directly checkout with duty NOT completed
-        handleDutyResponse(false);
+        // Early exit - directly checkout without asking duty question
+        handleEarlyExitCheckout();
       } else {
         setShowDutyDialog(true);
       }
@@ -328,30 +328,60 @@ const AttendanceModule = ({
     }
   };
 
-  const handleDutyResponse = async (dutyCompleted: boolean) => {
-    haptic('medium');
-    setShowDutyDialog(false);
+  const handleEarlyExitCheckout = async () => {
     if (!photoBlob || !location) return;
 
     setFlowState('processing');
     try {
       const photoUrl = await uploadPhoto(photoBlob);
-      await checkOut(photoUrl, location.lat, location.lng, dutyCompleted);
+      await checkOut(photoUrl, location.lat, location.lng, false);
       
       haptic('success');
-      if (isEarlyExit) {
-        toast.success("Early checkout recorded. See you next time! 👋");
-      } else if (dutyCompleted) {
-        toast.success("Checked out successfully! Great work today! 🌟");
-      } else {
-        toast.success("On break - see you when you return! ☕");
-      }
+      toast.success("Early checkout recorded. See you next time! 👋");
       resetFlow();
     } catch (error: any) {
       haptic('error');
-      console.error("Check-out error:", error);
+      console.error("Early exit checkout error:", error);
       toast.error(error.message || "Failed to check out");
       setFlowState('preview');
+    }
+  };
+
+  const handleDutyResponse = async (dutyCompleted: boolean) => {
+    haptic('medium');
+    setShowDutyDialog(false);
+    
+    if (dutyCompleted) {
+      // YES - Duty Complete: Proceed with checkout
+      if (!photoBlob || !location) return;
+
+      setFlowState('processing');
+      try {
+        const photoUrl = await uploadPhoto(photoBlob);
+        await checkOut(photoUrl, location.lat, location.lng, true);
+        
+        haptic('success');
+        toast.success("Checked out successfully! Great work today! 🌟");
+        resetFlow();
+      } catch (error: any) {
+        haptic('error');
+        console.error("Check-out error:", error);
+        toast.error(error.message || "Failed to check out");
+        setFlowState('preview');
+      }
+    } else {
+      // NO - I Will Return: Cancel checkout and start a break
+      resetFlow();
+      
+      try {
+        await startBreak();
+        haptic('success');
+        toast.success("Break started. Please resume duty when you return! ☕");
+      } catch (error: any) {
+        haptic('error');
+        console.error("Start break error:", error);
+        toast.error(error.message || "Failed to start break");
+      }
     }
   };
 
