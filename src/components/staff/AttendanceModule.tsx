@@ -548,7 +548,8 @@ const AttendanceModule = ({
     return (
       <>
         <div className="fixed inset-0 z-[60] bg-black flex flex-col">
-          <div className="flex-1 relative">
+          {/* Photo preview area */}
+          <div className="flex-1 relative overflow-hidden min-h-0">
             {photoPreview && (
               <img
                 src={photoPreview}
@@ -580,12 +581,13 @@ const AttendanceModule = ({
             </div>
           </div>
 
-          <div className="p-6 bg-black/80 flex items-center justify-center gap-4">
+          {/* Action buttons - fixed at bottom with safe area */}
+          <div className="shrink-0 p-4 bg-black flex items-center justify-center gap-4" style={{ paddingBottom: 'max(2rem, env(safe-area-inset-bottom))' }}>
             <Button
               variant="outline"
               size="lg"
               onClick={handleRetake}
-              className="flex-1 h-14 bg-white text-black border-white hover:bg-white/90"
+              className="flex-1 h-14 bg-white text-black border-white hover:bg-white/90 font-semibold text-base rounded-xl shadow-lg"
             >
               <Camera className="w-5 h-5 mr-2" />
               Retake
@@ -595,7 +597,7 @@ const AttendanceModule = ({
               onClick={handleConfirmPreview}
               disabled={!canConfirm}
               className={cn(
-                "flex-1 h-14 text-white",
+                "flex-1 h-14 text-white font-semibold text-base rounded-xl shadow-lg",
                 canConfirm ? "bg-success hover:bg-success/90" : "bg-muted opacity-50"
               )}
             >
