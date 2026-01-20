@@ -62,13 +62,13 @@ serve(async (req) => {
       throw deleteError;
     }
 
-    // Insert new role
+    // Insert new role - for club_management and employee, venueId is required
     const { error: roleError } = await supabaseAdmin
       .from('user_roles')
       .insert({
         user_id: userId,
         role,
-        venue_id: role === 'employee' ? venueId : null,
+        venue_id: (role === 'employee' || role === 'club_management') ? venueId : null,
       });
 
     if (roleError) {

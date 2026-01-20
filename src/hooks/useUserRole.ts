@@ -2,9 +2,12 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 
+export type AppRole = "admin" | "employee" | "club_management";
+
 export interface UserRole {
-  role: "admin" | "employee";
+  role: AppRole;
   venueId: string | null;
+  venueIds: string[]; // For club_management who can have multiple venues
 }
 
 export const useUserRole = (user: User | null) => {
@@ -21,20 +24,42 @@ export const useUserRole = (user: User | null) => {
     setLoading(true);
     
     const fetchUserRole = async () => {
+      // Fetch all roles for the user (club_management can have multiple venues)
       const { data, error } = await supabase
         .from("user_roles")
         .select("role, venue_id")
-        .eq("user_id", user.id)
-        .maybeSingle();
+        .eq("user_id", user.id);
 
       if (error) {
         console.error("Error fetching user role:", error);
         setUserRole(null);
-      } else if (data) {
-        setUserRole({
-          role: data.role as "admin" | "employee",
-          venueId: data.venue_id,
-        });
+      } else if (data && data.length > 0) {
+        // Prioritize roles: admin > club_management > employee
+        const adminRole = data.find(r => r.role === 'admin');
+        const clubMgmtRoles = data.filter(r => r.role === 'club_management');
+        const employeeRole = data.find(r => r.role === 'employee');
+
+        if (adminRole) {
+          setUserRole({
+            role: 'admin',
+            venueId: adminRole.venue_id,
+            venueIds: data.filter(r => r.venue_id).map(r => r.venue_id as string),
+          });
+        } else if (clubMgmtRoles.length > 0) {
+          setUserRole({
+            role: 'club_management',
+            venueId: clubMgmtRoles[0].venue_id,
+            venueIds: clubMgmtRoles.map(r => r.venue_id).filter(Boolean) as string[],
+          });
+        } else if (employeeRole) {
+          setUserRole({
+            role: 'employee',
+            venueId: employeeRole.venue_id,
+            venueIds: employeeRole.venue_id ? [employeeRole.venue_id] : [],
+          });
+        } else {
+          setUserRole(null);
+        }
       } else {
         setUserRole(null);
       }

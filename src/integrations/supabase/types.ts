@@ -688,10 +688,12 @@ export type Database = {
     Functions: {
       bootstrap_admin: { Args: never; Returns: boolean }
       get_user_venue: { Args: { user_id: string }; Returns: string }
+      get_user_venues: { Args: { p_user_id: string }; Returns: string[] }
       is_admin: { Args: { user_id: string }; Returns: boolean }
+      is_club_management: { Args: { p_user_id: string }; Returns: boolean }
     }
     Enums: {
-      app_role: "admin" | "employee"
+      app_role: "admin" | "employee" | "club_management"
       hookah_category: "premium" | "standard" | "budget"
       stock_category: "flavour" | "hookah_pots" | "accessories"
     }
@@ -821,7 +823,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "employee"],
+      app_role: ["admin", "employee", "club_management"],
       hookah_category: ["premium", "standard", "budget"],
       stock_category: ["flavour", "hookah_pots", "accessories"],
     },
