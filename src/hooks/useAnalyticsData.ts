@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { startOfMonth, endOfMonth, subMonths, subDays, format, isSameDay, getDay } from "date-fns";
+import { startOfMonth, endOfMonth, subMonths, subDays, format, isSameDay } from "date-fns";
+import { RealtimeChannel } from "@supabase/supabase-js";
 
 export interface SalesAnalytics {
   thisMonthTotal: number;
@@ -47,9 +48,11 @@ export const useAnalyticsData = () => {
   const [staffDiscipline, setStaffDiscipline] = useState<StaffDiscipline[]>([]);
   const [exceptions, setExceptions] = useState<ComplianceException[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const channelRef = useRef<RealtimeChannel | null>(null);
 
-  const fetchAnalytics = async () => {
-    setLoading(true);
+  const fetchAnalytics = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     try {
       const now = new Date();
       const thisMonthStart = startOfMonth(now);
@@ -289,13 +292,61 @@ export const useAnalyticsData = () => {
     } catch (error) {
       console.error("Error fetching analytics:", error);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
+      setLastUpdated(new Date());
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchAnalytics();
-  }, []);
+
+    // Set up real-time subscriptions for auto-refresh
+    const channel = supabase
+      .channel('analytics-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'sales_reports' },
+        () => {
+          console.log('Sales data changed, refreshing analytics...');
+          // Small delay to ensure DB write is complete
+          setTimeout(() => fetchAnalytics(false), 300);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'staff_attendance_blocks' },
+        () => {
+          console.log('Attendance data changed, refreshing analytics...');
+          setTimeout(() => fetchAnalytics(false), 300);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'staff_breaks' },
+        () => {
+          console.log('Break data changed, refreshing analytics...');
+          setTimeout(() => fetchAnalytics(false), 300);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'club_sessions' },
+        () => {
+          console.log('Session data changed, refreshing analytics...');
+          setTimeout(() => fetchAnalytics(false), 300);
+        }
+      )
+      .subscribe();
+
+    channelRef.current = channel;
+
+    // Cleanup subscription on unmount
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+      }
+    };
+  }, [fetchAnalytics]);
 
   return { 
     salesAnalytics, 
@@ -303,6 +354,7 @@ export const useAnalyticsData = () => {
     staffDiscipline, 
     exceptions, 
     loading,
-    refresh: fetchAnalytics 
+    lastUpdated,
+    refresh: () => fetchAnalytics(true)
   };
 };
