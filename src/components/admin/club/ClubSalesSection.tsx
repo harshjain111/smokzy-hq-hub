@@ -3,10 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { format, subDays, subWeeks } from "date-fns";
-import { TrendingUp, TrendingDown, Minus, Download, Info, ChevronDown, ChevronUp } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Download, Info, ChevronDown, ChevronUp, Image, FileX, Eye } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import { toast } from "sonner";
 import { ClubSession } from "@/pages/ClubDetail";
+import KotViewModal from "./KotViewModal";
 
 interface ClubSalesSectionProps {
   clubId: string;
@@ -21,6 +22,11 @@ interface CategorySales {
   lastWeek: number;
 }
 
+interface KotStatus {
+  photoCount: number;
+  hasDeclaration: boolean;
+}
+
 export const ClubSalesSection = ({ clubId, clubName, session }: ClubSalesSectionProps) => {
   const [todaySales, setTodaySales] = useState(0);
   const [yesterdaySales, setYesterdaySales] = useState(0);
@@ -29,6 +35,8 @@ export const ClubSalesSection = ({ clubId, clubName, session }: ClubSalesSection
   const [trendData, setTrendData] = useState<{ date: string; sales: number }[]>([]);
   const [showTrend, setShowTrend] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [kotStatus, setKotStatus] = useState<KotStatus | null>(null);
+  const [showKotModal, setShowKotModal] = useState(false);
 
   useEffect(() => {
     if (session) {
@@ -38,6 +46,27 @@ export const ClubSalesSection = ({ clubId, clubName, session }: ClubSalesSection
 
   const fetchSalesData = async () => {
     setLoading(true);
+    await Promise.all([fetchSales(), fetchKotStatus()]);
+    setLoading(false);
+  };
+
+  const fetchKotStatus = async () => {
+    if (!session?.id) return;
+    
+    const { data } = await supabase
+      .from("kot_entries")
+      .select("entry_type")
+      .eq("session_id", session.id);
+
+    if (data) {
+      setKotStatus({
+        photoCount: data.filter(e => e.entry_type === 'photo').length,
+        hasDeclaration: data.some(e => e.entry_type === 'no_kot_declared'),
+      });
+    }
+  };
+
+  const fetchSales = async () => {
     const today = new Date();
     const yesterday = subDays(today, 1);
     const lastWeekSameDay = subWeeks(today, 1);
@@ -92,8 +121,6 @@ export const ClubSalesSection = ({ clubId, clubName, session }: ClubSalesSection
       }
     } catch (error) {
       console.error("Error fetching sales:", error);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -193,6 +220,46 @@ export const ClubSalesSection = ({ clubId, clubName, session }: ClubSalesSection
         </div>
       )}
 
+      {/* KOT Status */}
+      {session && kotStatus && (
+        <div className="space-y-2">
+          <span className="text-sm font-medium">KOT Proof</span>
+          <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+            <div className="flex items-center gap-2">
+              {kotStatus.photoCount > 0 ? (
+                <>
+                  <Image className="h-4 w-4 text-success" />
+                  <span className="text-sm">
+                    Available ({kotStatus.photoCount} image{kotStatus.photoCount > 1 ? 's' : ''})
+                  </span>
+                </>
+              ) : kotStatus.hasDeclaration ? (
+                <>
+                  <FileX className="h-4 w-4 text-warning" />
+                  <span className="text-sm text-warning">Not Available (Declared)</span>
+                </>
+              ) : (
+                <>
+                  <Info className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">No KOT uploaded</span>
+                </>
+              )}
+            </div>
+            {(kotStatus.photoCount > 0 || kotStatus.hasDeclaration) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowKotModal(true)}
+                className="h-8 text-xs"
+              >
+                <Eye className="h-3.5 w-3.5 mr-1" />
+                View
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* 7-Day Trend (Collapsible) */}
       <div className="space-y-2">
         <button 
@@ -231,6 +298,16 @@ export const ClubSalesSection = ({ clubId, clubName, session }: ClubSalesSection
         <Download className="h-4 w-4 mr-2" />
         Download Sales Report
       </Button>
+
+      {/* KOT View Modal */}
+      {session && (
+        <KotViewModal
+          open={showKotModal}
+          onOpenChange={setShowKotModal}
+          sessionId={session.id}
+          sessionDate={session.session_date}
+        />
+      )}
     </div>
   );
 };
