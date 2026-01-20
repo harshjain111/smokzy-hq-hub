@@ -226,8 +226,8 @@ const BulkAddStockDialog = ({
 
         {/* Grid container */}
         <div className="flex-1 overflow-auto -mx-6 px-6">
-          {/* Grid header */}
-          <div className="grid grid-cols-[1fr_140px_120px_40px] gap-2 mb-2 sticky top-0 bg-background py-2 z-10">
+          {/* Grid header - hidden on mobile, shown on larger screens */}
+          <div className="hidden sm:grid grid-cols-[1fr_140px_120px_40px] gap-2 mb-2 sticky top-0 bg-background py-2 z-10">
             <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-1">
               Item Name <span className="text-destructive">*</span>
             </div>
@@ -240,11 +240,26 @@ const BulkAddStockDialog = ({
             <div />
           </div>
 
-          {/* Grid rows */}
-          <div className="space-y-2 pb-4">
+          {/* Grid rows - stacked on mobile, horizontal on larger screens */}
+          <div className="space-y-3 sm:space-y-2 pb-4">
             {rows.map((row, index) => (
-              <div key={row.id} className="space-y-1">
-                <div className="grid grid-cols-[1fr_140px_120px_40px] gap-2 items-center">
+              <div key={row.id} className="space-y-2 sm:space-y-1 p-3 sm:p-0 bg-muted/30 sm:bg-transparent rounded-xl sm:rounded-none">
+                {/* Mobile: Row number */}
+                <div className="flex items-center justify-between sm:hidden">
+                  <span className="text-xs font-medium text-muted-foreground">Item {index + 1}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => deleteRow(row.id)}
+                    disabled={saving || rows.length <= 1}
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+                
+                {/* Desktop grid layout */}
+                <div className="hidden sm:grid grid-cols-[1fr_140px_120px_40px] gap-2 items-center">
                   {/* Item Name */}
                   <Input
                     placeholder={`Item ${index + 1}`}
@@ -303,7 +318,7 @@ const BulkAddStockDialog = ({
                     </SelectContent>
                   </Select>
 
-                  {/* Delete button */}
+                  {/* Delete button - desktop only */}
                   <Button
                     variant="ghost"
                     size="icon"
@@ -313,6 +328,76 @@ const BulkAddStockDialog = ({
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>
+                </div>
+
+                {/* Mobile stacked layout */}
+                <div className="flex flex-col gap-2 sm:hidden">
+                  {/* Item Name */}
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Item Name</label>
+                    <Input
+                      placeholder="Enter item name"
+                      value={row.itemName}
+                      onChange={(e) => updateRow(row.id, "itemName", e.target.value)}
+                      className={cn(
+                        "h-11 text-sm rounded-xl",
+                        row.error && "border-destructive focus-visible:ring-destructive"
+                      )}
+                      disabled={saving}
+                    />
+                  </div>
+
+                  {/* Category & Unit row on mobile */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">Category</label>
+                      <Select
+                        value={row.category}
+                        onValueChange={(v) => updateRow(row.id, "category", v)}
+                        disabled={saving}
+                      >
+                        <SelectTrigger 
+                          className={cn(
+                            "h-11 text-sm rounded-xl",
+                            row.error && !row.category && "border-destructive"
+                          )}
+                        >
+                          <SelectValue placeholder="Select" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-popover z-50">
+                          {CATEGORY_OPTIONS.map(option => (
+                            <SelectItem key={option.value} value={option.value} className="text-sm">
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">Unit</label>
+                      <Select
+                        value={row.unit}
+                        onValueChange={(v) => updateRow(row.id, "unit", v)}
+                        disabled={saving}
+                      >
+                        <SelectTrigger 
+                          className={cn(
+                            "h-11 text-sm rounded-xl",
+                            row.error && !row.unit && "border-destructive"
+                          )}
+                        >
+                          <SelectValue placeholder="Select" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-popover z-50">
+                          {UNIT_OPTIONS.map(option => (
+                            <SelectItem key={option.value} value={option.value} className="text-sm">
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Row error message */}
