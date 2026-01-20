@@ -167,6 +167,10 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
         ...prev,
         [itemId]: value,
       }));
+      // Clear validation error when user enters a value
+      if (value !== '') {
+        setValidationErrors(prev => ({ ...prev, [itemId]: false }));
+      }
     }
   };
 
@@ -289,20 +293,40 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
     }
   };
 
-  const handleSubmit = async () => {
-    setSubmitting(true);
-    try {
-      const hasEmpty = stock.some(item => quantities[item.id] === '' || quantities[item.id] === undefined);
-      if (hasEmpty) {
-        toast.error("Please enter quantities for all items");
-        setSubmitting(false);
-        return;
-      }
+  // Track which items have validation errors
+  const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
 
+  const handleSubmit = async () => {
+    // Validate ALL items have explicit input (not empty string or undefined)
+    const emptyItems: Record<string, boolean> = {};
+    let hasEmpty = false;
+    
+    for (const item of stock) {
+      const qty = quantities[item.id];
+      if (qty === '' || qty === undefined) {
+        emptyItems[item.id] = true;
+        hasEmpty = true;
+      }
+    }
+    
+    if (hasEmpty) {
+      setValidationErrors(emptyItems);
+      toast.error("Please enter stock quantity for all items before submitting.");
+      return;
+    }
+    
+    // Clear validation errors
+    setValidationErrors({});
+    setSubmitting(true);
+    
+    try {
       for (const [itemId, qty] of Object.entries(quantities)) {
+        // Only parse if qty is a valid string number (already validated non-empty above)
+        const quantity = parseInt(qty);
+        
         const { error } = await supabase
           .from("stock")
-          .update({ quantity: parseInt(qty) || 0 })
+          .update({ quantity })
           .eq("id", itemId);
 
         if (error) throw error;
@@ -573,7 +597,11 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
                           initial={{ opacity: 0, x: -10 }}
                           animate={{ opacity: 1, x: 0 }}
                           transition={{ delay: itemIndex * 0.03 }}
-                          className="flex items-center justify-between py-4 px-5 bg-card rounded-2xl border border-border/50 shadow-sm"
+                          className={`flex items-center justify-between py-4 px-5 bg-card rounded-2xl border shadow-sm transition-colors ${
+                            validationErrors[item.id] 
+                              ? 'border-destructive bg-destructive/5' 
+                              : 'border-border/50'
+                          }`}
                         >
                           <div className="flex-1 min-w-0 pr-2">
                             <div className="flex items-center gap-2">
@@ -584,6 +612,9 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
                                 </span>
                               )}
                             </div>
+                            {validationErrors[item.id] && (
+                              <p className="text-xs text-destructive mt-0.5">Required</p>
+                            )}
                           </div>
                           
                           {/* Quantity input with unit */}
@@ -594,8 +625,10 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
                               pattern="[0-9]*"
                               value={quantities[item.id] ?? ''}
                               onChange={(e) => handleQuantityChange(item.id, e.target.value)}
-                              className="w-20 h-12 text-center text-lg font-semibold rounded-xl bg-muted/50 border border-border/50 focus:border-primary/50 focus:ring-primary/20"
-                              placeholder="0"
+                              className={`w-20 h-12 text-center text-lg font-semibold rounded-xl bg-muted/50 border focus:border-primary/50 focus:ring-primary/20 ${
+                                validationErrors[item.id] ? 'border-destructive' : 'border-border/50'
+                              }`}
+                              placeholder="—"
                             />
                             <span className="text-xs text-muted-foreground w-10 text-center">
                               {item.unit}
