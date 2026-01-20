@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Check, Package, Loader2, Plus, Search, ChevronDown, ChevronUp, Pencil, Trash2, MoreVertical, Grid3X3 } from "lucide-react";
 import { ClubSession } from "@/hooks/useClubSession";
 import { motion, AnimatePresence } from "framer-motion";
+import { haptic } from "@/lib/haptics";
 import {
   Dialog,
   DialogContent,
@@ -310,6 +311,7 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
     }
     
     if (hasEmpty) {
+      haptic('warning');
       setValidationErrors(emptyItems);
       toast.error("Please enter stock quantity for all items before submitting.");
       return;
@@ -317,6 +319,7 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
     
     // Clear validation errors
     setValidationErrors({});
+    haptic('medium');
     setSubmitting(true);
     
     try {
@@ -334,8 +337,10 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
 
       await updateSessionTask('stock', user.id);
       
+      haptic('success');
       toast.success("Stock locked for today. Good control! ✓");
     } catch (error: any) {
+      haptic('error');
       console.error("Stock update error:", error);
       toast.error(error.message || "Failed to update stock");
     } finally {

@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Minus, Plus, Check, TrendingUp, Loader2 } from "lucide-react";
 import { ClubSession } from "@/hooks/useClubSession";
 import { format } from "date-fns";
+import { haptic } from "@/lib/haptics";
 import KotProofSection from "./KotProofSection";
 
 interface SalesModuleProps {
@@ -81,6 +82,7 @@ const SalesModule = ({ user, venueId, session, updateSessionTask }: SalesModuleP
   }, [session, fetchSubmitterInfo]);
 
   const handleQuantityChange = (categoryId: string, delta: number) => {
+    haptic('selection');
     setQuantities(prev => {
       const current = prev[categoryId] ?? 0;
       return {
@@ -125,6 +127,7 @@ const SalesModule = ({ user, venueId, session, updateSessionTask }: SalesModuleP
     }
     
     if (hasEmpty) {
+      haptic('warning');
       setValidationErrors(errors);
       toast.error("Please enter sales for all categories. Enter 0 if no shisha was sold.");
       return;
@@ -132,6 +135,7 @@ const SalesModule = ({ user, venueId, session, updateSessionTask }: SalesModuleP
     
     // Clear validation errors
     setValidationErrors({});
+    haptic('medium');
 
     setSubmitting(true);
     try {
@@ -156,8 +160,10 @@ const SalesModule = ({ user, venueId, session, updateSessionTask }: SalesModuleP
       // Update session
       await updateSessionTask('sales', user.id);
       
+      haptic('success');
       toast.success("Sales logged. Session is on track! 📊");
     } catch (error: any) {
+      haptic('error');
       console.error("Sales submit error:", error);
       toast.error(error.message || "Failed to submit sales");
     } finally {
