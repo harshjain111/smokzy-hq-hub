@@ -195,26 +195,29 @@ export const useAnalyticsData = () => {
         }
       });
 
-      // Count attendance days and issues
-      const userDays: Record<string, Set<string>> = {};
+      // Count attendance by SESSION (not calendar days)
+      // This ensures shifts crossing midnight are counted as one session
+      const userSessions: Record<string, Set<string>> = {};
       
       attendanceBlocks?.forEach(block => {
         const userId = block.user_id;
         if (!staffMap[userId]) return;
 
-        const day = format(new Date(block.check_in_time), "yyyy-MM-dd");
-        if (!userDays[userId]) userDays[userId] = new Set();
-        userDays[userId].add(day);
+        // Track unique sessions worked (session_id is the source of truth)
+        const sessionId = block.session_id;
+        if (!userSessions[userId]) userSessions[userId] = new Set();
+        userSessions[userId].add(sessionId);
 
         // Check for late check-in (after 7 PM / 19:00)
+        // This is still time-based but acceptable for discipline tracking
         const checkInHour = new Date(block.check_in_time).getHours();
         if (checkInHour > 19) {
           staffMap[userId].lateCheckIns++;
         }
 
-        // Check for missed checkout
+        // Check for missed checkout (only for non-break blocks)
         if (!block.check_out_time && !block.is_break) {
-          // Check if it's been more than 12 hours
+          // Check if it's been more than 12 hours since check-in
           const hoursSince = (now.getTime() - new Date(block.check_in_time).getTime()) / (1000 * 60 * 60);
           if (hoursSince > 12) {
             staffMap[userId].missedCheckouts++;
@@ -222,10 +225,10 @@ export const useAnalyticsData = () => {
         }
       });
 
-      // Calculate days present
-      Object.keys(userDays).forEach(userId => {
+      // Calculate sessions present (not days - sessions can span midnight)
+      Object.keys(userSessions).forEach(userId => {
         if (staffMap[userId]) {
-          staffMap[userId].daysPresent = userDays[userId].size;
+          staffMap[userId].daysPresent = userSessions[userId].size; // "daysPresent" now means "sessionsPresent"
         }
       });
 

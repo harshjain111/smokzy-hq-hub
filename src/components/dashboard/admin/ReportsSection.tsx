@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FileSpreadsheet, Download, Calendar, Building2, Users, Package } from "lucide-react";
+import { FileSpreadsheet, Download, Building2, Users, Package } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
-import { format, subDays, startOfMonth, endOfMonth } from "date-fns";
+import { format, subDays, startOfMonth, endOfMonth, differenceInMinutes } from "date-fns";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 
@@ -34,7 +34,7 @@ const reports: ReportType[] = [
   {
     id: "attendance",
     title: "Attendance & Discipline",
-    description: "Staff attendance, breaks, and compliance metrics",
+    description: "Staff attendance grouped by session (not calendar date)",
     icon: <Users className="h-5 w-5 text-primary" />,
   },
   {
@@ -134,37 +134,95 @@ export const ReportsSection = () => {
         }
 
         case "attendance": {
-          let query = supabase
-            .from("staff_attendance_blocks")
-            .select(`*, venue:venues(name)`)
-            .gte("check_in_time", startDate)
-            .lte("check_in_time", endDate + "T23:59:59");
+          // SESSION-BASED ATTENDANCE REPORT
+          // First, fetch sessions within the date range
+          let sessionQuery = supabase
+            .from("club_sessions")
+            .select("id, venue_id, session_date, started_at, closed_at, status")
+            .gte("session_date", startDate)
+            .lte("session_date", endDate)
+            .order("session_date", { ascending: false });
 
           if (clubFilter !== "all") {
-            query = query.eq("venue_id", clubFilter);
+            sessionQuery = sessionQuery.eq("venue_id", clubFilter);
           }
 
-          const { data: attendanceData } = await query;
-          
-          // Fetch profiles separately
+          const { data: sessions } = await sessionQuery;
+
+          if (!sessions || sessions.length === 0) {
+            toast.info("No sessions found for the selected date range");
+            setGenerating(false);
+            return;
+          }
+
+          const sessionIds = sessions.map(s => s.id);
+          const venueIds = [...new Set(sessions.map(s => s.venue_id))];
+
+          // Fetch venues for names
+          const { data: venueData } = await supabase
+            .from("venues")
+            .select("id, name")
+            .in("id", venueIds);
+
+          const venueMap: Record<string, string> = {};
+          venueData?.forEach(v => { venueMap[v.id] = v.name; });
+
+          // Fetch attendance blocks by session_id
+          const { data: attendanceData } = await supabase
+            .from("staff_attendance_blocks")
+            .select("*")
+            .in("session_id", sessionIds);
+
+          // Fetch profiles
           const userIds = [...new Set(attendanceData?.map(a => a.user_id) || [])];
           const { data: profiles } = await supabase
             .from("profiles")
             .select("id, full_name")
-            .in("id", userIds);
+            .in("id", userIds.length > 0 ? userIds : ['00000000-0000-0000-0000-000000000000']);
           
           const profileMap: Record<string, string> = {};
           profiles?.forEach(p => { profileMap[p.id] = p.full_name; });
+
+          // Fetch breaks for these sessions
+          const { data: breaks } = await supabase
+            .from("staff_breaks")
+            .select("*")
+            .in("session_id", sessionIds);
+
+          // Build session map
+          const sessionMap: Record<string, { session_date: string; venue_id: string }> = {};
+          sessions.forEach(s => { 
+            sessionMap[s.id] = { session_date: s.session_date, venue_id: s.venue_id }; 
+          });
           
-          data = (attendanceData || []).map(a => ({
-            Date: format(new Date(a.check_in_time), "yyyy-MM-dd"),
-            Staff: profileMap[a.user_id] || "Unknown",
-            Club: (a.venue as { name: string })?.name || "Unknown",
-            "Check In": format(new Date(a.check_in_time), "HH:mm"),
-            "Check Out": a.check_out_time ? format(new Date(a.check_out_time), "HH:mm") : "Active",
-            "Is Break": a.is_break ? "Yes" : "No",
-          }));
-          filename = `Attendance_Report_${startDate}_to_${endDate}.xlsx`;
+          data = (attendanceData || []).map(a => {
+            const sessionInfo = sessionMap[a.session_id];
+            const blockBreaks = breaks?.filter(b => b.attendance_block_id === a.id) || [];
+            const totalBreakMinutes = blockBreaks.reduce((sum, b) => sum + (b.duration_minutes || 0), 0);
+            
+            const checkIn = new Date(a.check_in_time);
+            const checkOut = a.check_out_time ? new Date(a.check_out_time) : null;
+            const totalMinutes = checkOut ? differenceInMinutes(checkOut, checkIn) - totalBreakMinutes : 0;
+            const totalHours = Math.round((totalMinutes / 60) * 10) / 10;
+
+            return {
+              "Session Date": sessionInfo?.session_date || "Unknown",
+              "Club": venueMap[sessionInfo?.venue_id] || "Unknown",
+              "Staff": profileMap[a.user_id] || "Unknown",
+              "Check In": format(checkIn, "yyyy-MM-dd HH:mm"),
+              "Check Out": checkOut ? format(checkOut, "yyyy-MM-dd HH:mm") : "Active/Missed",
+              "Break (min)": totalBreakMinutes,
+              "Total Hours": checkOut ? totalHours : "-",
+              "Crosses Midnight": checkOut && checkIn.getDate() !== checkOut.getDate() ? "Yes" : "No",
+            };
+          });
+
+          // Sort by session date
+          data.sort((a, b) => 
+            new Date(b["Session Date"] as string).getTime() - new Date(a["Session Date"] as string).getTime()
+          );
+
+          filename = `Attendance_By_Session_${startDate}_to_${endDate}.xlsx`;
           break;
         }
 

@@ -210,7 +210,10 @@ const ClubDetail = () => {
                 <span className="text-sm font-medium">Attendance</span>
               </AccordionTrigger>
               <AccordionContent className="px-4 pb-4">
-                <ClubAttendanceSection clubId={clubId!} />
+                <ClubAttendanceSection 
+                  clubId={clubId!} 
+                  currentSession={currentSession ? { id: currentSession.id, session_date: currentSession.session_date } : null} 
+                />
               </AccordionContent>
             </AccordionItem>
 
@@ -219,7 +222,10 @@ const ClubDetail = () => {
                 <span className="text-sm font-medium">Activity Log</span>
               </AccordionTrigger>
               <AccordionContent className="px-4 pb-4">
-                <ClubActivitySection clubId={clubId!} />
+                <ClubActivitySection 
+                  clubId={clubId!} 
+                  currentSession={currentSession ? { id: currentSession.id, session_date: currentSession.session_date } : null}
+                />
               </AccordionContent>
             </AccordionItem>
           </Accordion>
