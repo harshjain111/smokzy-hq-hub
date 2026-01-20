@@ -5,13 +5,34 @@ import { StaffDisciplineSection } from "./StaffDisciplineSection";
 import { ComplianceExceptionsSection } from "./ComplianceExceptionsSection";
 import { ReportsSection } from "./ReportsSection";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { TrendingUp, Building2, Users, AlertTriangle, FileSpreadsheet } from "lucide-react";
+import { TrendingUp, Building2, Users, AlertTriangle, FileSpreadsheet, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { format } from "date-fns";
 
 export const AnalyticsDashboard = () => {
-  const { salesAnalytics, clubPerformance, staffDiscipline, exceptions, loading } = useAnalyticsData();
+  const { salesAnalytics, clubPerformance, staffDiscipline, exceptions, loading, lastUpdated, refresh } = useAnalyticsData();
 
   return (
     <div className="space-y-4">
+      {/* Real-time indicator */}
+      <div className="flex items-center justify-between px-3 py-2 bg-muted/50 rounded-lg">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
+          <span className="text-xs text-muted-foreground">
+            Live updates enabled • Last updated: {format(lastUpdated, "h:mm:ss a")}
+          </span>
+        </div>
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={refresh}
+          disabled={loading}
+          className="h-7 px-2"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+        </Button>
+      </div>
+
       <Accordion type="single" collapsible defaultValue="sales" className="space-y-2">
         {/* Sales Analytics */}
         <AccordionItem value="sales" className="border rounded-lg bg-card">
