@@ -14,10 +14,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { User as UserIcon, Calendar, LogOut, FileText } from "lucide-react";
+import { AppRole } from "@/hooks/useUserRole";
 
 interface ProfileMenuProps {
   user: User;
-  role: string;
+  role: AppRole;
 }
 
 const ProfileMenu = ({ user, role }: ProfileMenuProps) => {

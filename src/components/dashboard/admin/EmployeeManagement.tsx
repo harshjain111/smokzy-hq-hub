@@ -32,7 +32,7 @@ const EmployeeManagement = () => {
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<"admin" | "employee">("employee");
+  const [role, setRole] = useState<"admin" | "employee" | "club_management">("employee");
   const [venueId, setVenueId] = useState("");
 
   useEffect(() => {
@@ -97,8 +97,9 @@ const EmployeeManagement = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (role === "employee" && !venueId) {
-      toast.error("Please select a venue for the employee");
+    // Venue is required for employee and club_management roles
+    if ((role === "employee" || role === "club_management") && !venueId) {
+      toast.error("Please select a venue");
       return;
     }
 
@@ -112,7 +113,7 @@ const EmployeeManagement = () => {
             phone,
             password: password || undefined,
             role,
-            venueId: role === "employee" ? venueId : null,
+            venueId: (role === "employee" || role === "club_management") ? venueId : null,
           },
         });
 
@@ -128,7 +129,7 @@ const EmployeeManagement = () => {
             phone,
             password,
             role,
-            venueId: role === "employee" ? venueId : null,
+            venueId: (role === "employee" || role === "club_management") ? venueId : null,
           },
         });
 
@@ -156,7 +157,7 @@ const EmployeeManagement = () => {
     setEditingEmployee(employee);
     setFullName(employee.full_name);
     setPhone(employee.phone || "");
-    setRole(employee.role as "admin" | "employee");
+    setRole(employee.role as "admin" | "employee" | "club_management");
     
     const { data: roleData } = await supabase
       .from("user_roles")
@@ -255,24 +256,25 @@ const EmployeeManagement = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="role">Role</Label>
-                <Select value={role} onValueChange={(value: "admin" | "employee") => setRole(value)}>
+                <Select value={role} onValueChange={(value: "admin" | "employee" | "club_management") => setRole(value)}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-popover z-50">
                     <SelectItem value="admin">Admin</SelectItem>
                     <SelectItem value="employee">Employee</SelectItem>
+                    <SelectItem value="club_management">Club Management</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              {role === "employee" && (
+              {(role === "employee" || role === "club_management") && (
                 <div className="space-y-2">
                   <Label htmlFor="venue">Assign to Venue</Label>
                   <Select value={venueId} onValueChange={setVenueId}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select a venue" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-popover z-50">
                       {venues.map((venue) => (
                         <SelectItem key={venue.id} value={venue.id}>
                           {venue.name}

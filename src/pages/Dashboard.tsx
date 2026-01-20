@@ -8,6 +8,7 @@ import { LogOut } from "lucide-react";
 import { toast } from "sonner";
 import AdminDashboard from "@/components/dashboard/AdminDashboard";
 import EmployeeDashboard from "@/components/dashboard/EmployeeDashboard";
+import ClubManagementDashboard from "@/components/dashboard/ClubManagementDashboard";
 import ProfileMenu from "@/components/ProfileMenu";
 import AdminSettingsMenu from "@/components/AdminSettingsMenu";
 
@@ -109,6 +110,18 @@ const Dashboard = () => {
     return <EmployeeDashboard user={user!} venueId={userRole.venueId} />;
   }
 
+  // Role display text
+  const getRoleDisplayText = () => {
+    switch (userRole.role) {
+      case 'admin':
+        return 'Multi-Venue Management';
+      case 'club_management':
+        return 'Club Management Portal';
+      default:
+        return venueName || 'Loading...';
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card">
@@ -116,7 +129,7 @@ const Dashboard = () => {
           <div>
             <h1 className="text-2xl font-bold text-primary">Smokzy Operations</h1>
             <p className="text-sm text-muted-foreground">
-              {userRole.role === "admin" ? "Multi-Venue Management" : venueName || "Loading..."}
+              {getRoleDisplayText()}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -127,7 +140,10 @@ const Dashboard = () => {
       </header>
 
       <main className="container mx-auto px-4 py-6">
-        <AdminDashboard user={user!} />
+        {userRole.role === "admin" && <AdminDashboard user={user!} />}
+        {userRole.role === "club_management" && (
+          <ClubManagementDashboard user={user!} venueIds={userRole.venueIds} />
+        )}
       </main>
     </div>
   );
