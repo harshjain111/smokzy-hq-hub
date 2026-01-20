@@ -9,9 +9,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Info } from "lucide-react";
 
 interface EarlyCheckoutDialogProps {
   open: boolean;
@@ -26,20 +24,12 @@ const EarlyCheckoutDialog = ({
   onConfirm,
   loading = false,
 }: EarlyCheckoutDialogProps) => {
-  const [reason, setReason] = useState("");
-
   const handleConfirm = () => {
-    if (reason.trim().length < 10) {
-      return;
-    }
-    onConfirm(reason.trim());
-    setReason("");
+    // Pass "Early Exit (Declared)" as the reason for audit trail
+    onConfirm("Early Exit (Declared) - Morning/Relief Duty");
   };
 
   const handleOpenChange = (newOpen: boolean) => {
-    if (!newOpen) {
-      setReason("");
-    }
     onOpenChange(newOpen);
   };
 
@@ -47,42 +37,40 @@ const EarlyCheckoutDialog = ({
     <AlertDialog open={open} onOpenChange={handleOpenChange}>
       <AlertDialogContent className="max-w-md">
         <AlertDialogHeader>
-          <AlertDialogTitle className="flex items-center gap-2 text-amber-600 dark:text-amber-500">
+          <AlertDialogTitle className="flex items-center gap-2 text-warning">
             <AlertTriangle className="h-5 w-5" />
-            Early Checkout
+            Confirm Early Checkout
           </AlertDialogTitle>
-          <AlertDialogDescription>
-            You are checking out without completing all tasks. This will be reported to admin immediately.
+          <AlertDialogDescription className="text-base text-foreground/80">
+            You are requesting to check out without completing stock, sales, or closing duties.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        
-        <div className="space-y-3 py-2">
-          <Label htmlFor="reason" className="text-sm font-medium">
-            Reason for early checkout <span className="text-destructive">*</span>
-          </Label>
-          <Textarea
-            id="reason"
-            placeholder="Please explain why you need to leave early (minimum 10 characters)..."
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            className="min-h-[100px] resize-none"
-            disabled={loading}
-          />
-          <p className="text-xs text-muted-foreground">
-            {reason.length}/10 minimum characters
-          </p>
-        </div>
 
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
+        <AlertDialogFooter className="flex-col gap-2 sm:flex-col">
           <AlertDialogAction
             onClick={handleConfirm}
-            disabled={reason.trim().length < 10 || loading}
-            className="bg-amber-600 hover:bg-amber-700"
+            disabled={loading}
+            className="w-full bg-warning hover:bg-warning/90 text-warning-foreground"
           >
-            {loading ? "Processing..." : "Confirm Early Checkout"}
+            {loading ? "Processing..." : "Yes, Confirm Early Checkout"}
           </AlertDialogAction>
+          <AlertDialogCancel 
+            disabled={loading}
+            className="w-full mt-0"
+          >
+            No, Go Back
+          </AlertDialogCancel>
         </AlertDialogFooter>
+
+        {/* Psychological accountability disclaimer */}
+        <div className="mt-4 pt-3 border-t border-border/50">
+          <div className="flex items-start gap-2">
+            <Info className="h-3.5 w-3.5 text-muted-foreground mt-0.5 flex-shrink-0" />
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              This action is logged and reviewed by management. If found misused, it may result in attendance correction as per company policy.
+            </p>
+          </div>
+        </div>
       </AlertDialogContent>
     </AlertDialog>
   );
