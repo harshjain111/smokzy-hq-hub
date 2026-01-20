@@ -306,6 +306,57 @@ export type Database = {
           },
         ]
       }
+      kot_entries: {
+        Row: {
+          created_at: string
+          declaration_note: string | null
+          declaration_reason: string | null
+          entry_type: string
+          id: string
+          photo_url: string | null
+          session_id: string
+          user_id: string
+          venue_id: string
+        }
+        Insert: {
+          created_at?: string
+          declaration_note?: string | null
+          declaration_reason?: string | null
+          entry_type: string
+          id?: string
+          photo_url?: string | null
+          session_id: string
+          user_id: string
+          venue_id: string
+        }
+        Update: {
+          created_at?: string
+          declaration_note?: string | null
+          declaration_reason?: string | null
+          entry_type?: string
+          id?: string
+          photo_url?: string | null
+          session_id?: string
+          user_id?: string
+          venue_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kot_entries_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "club_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kot_entries_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null

@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Minus, Plus, Check, TrendingUp, Loader2 } from "lucide-react";
 import { ClubSession } from "@/hooks/useClubSession";
 import { format } from "date-fns";
+import KotProofSection from "./KotProofSection";
 
 interface SalesModuleProps {
   user: User;
@@ -236,6 +237,15 @@ const SalesModule = ({ user, venueId, session, updateSessionTask }: SalesModuleP
           <p className="text-sm text-muted-foreground">Total Hookahs</p>
           <p className="text-3xl font-bold text-foreground">{totalSales}</p>
         </div>
+
+        {/* KOT Proof Section */}
+        {session?.id && (
+          <KotProofSection
+            user={user}
+            venueId={venueId}
+            sessionId={session.id}
+          />
+        )}
       </div>
 
       {/* Submit button - fixed at bottom */}
