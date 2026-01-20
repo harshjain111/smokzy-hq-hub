@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Check, Package, Loader2, Plus, Search, ChevronDown, ChevronUp, Pencil, Trash2, MoreVertical } from "lucide-react";
+import { Check, Package, Loader2, Plus, Search, ChevronDown, ChevronUp, Pencil, Trash2, MoreVertical, Grid3X3 } from "lucide-react";
 import { ClubSession } from "@/hooks/useClubSession";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -39,6 +39,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import BulkAddStockDialog from "./BulkAddStockDialog";
 
 interface StockModuleProps {
   user: User;
@@ -87,6 +88,7 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
   
   // Add item state
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [bulkAddDialogOpen, setBulkAddDialogOpen] = useState(false);
   const [newItemName, setNewItemName] = useState("");
   const [newItemCategory, setNewItemCategory] = useState<StockCategory | "">("");
   const [addingItem, setAddingItem] = useState(false);
@@ -440,7 +442,7 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
         animate={{ opacity: 1, y: 0 }}
         className="px-5 pt-4 pb-3 space-y-4"
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
             <Input
@@ -451,11 +453,14 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
               className="pl-12 h-14 text-base rounded-2xl bg-muted/50 border-0"
             />
           </div>
+          
+          {/* Single Add Button */}
           <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
             <DialogTrigger asChild>
               <Button 
                 size="icon" 
                 className="h-14 w-14 rounded-2xl bg-gradient-to-r from-gradient-start to-gradient-end hover:opacity-90 shrink-0"
+                title="Add Item"
               >
                 <Plus className="w-6 h-6" />
               </Button>
@@ -481,7 +486,7 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
                     <SelectTrigger className="h-14 text-base rounded-xl">
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-popover z-50">
                       {Object.entries(CATEGORY_CONFIG).map(([key, config]) => (
                         <SelectItem key={key} value={key} className="h-12">
                           {config.label} ({config.unit})
@@ -500,6 +505,17 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
               </div>
             </DialogContent>
           </Dialog>
+          
+          {/* Bulk Add Button */}
+          <Button 
+            size="icon"
+            variant="outline"
+            onClick={() => setBulkAddDialogOpen(true)}
+            className="h-14 w-14 rounded-2xl border-border/50 hover:bg-muted shrink-0"
+            title="Bulk Add (Grid)"
+          >
+            <Grid3X3 className="w-5 h-5" />
+          </Button>
         </div>
         
         <p className="text-sm text-muted-foreground">
@@ -715,6 +731,15 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Bulk Add Dialog */}
+      <BulkAddStockDialog
+        open={bulkAddDialogOpen}
+        onOpenChange={setBulkAddDialogOpen}
+        venueId={venueId}
+        existingItems={stock.map(s => ({ item_name: s.item_name, category: s.category }))}
+        onItemsAdded={fetchStock}
+      />
     </div>
   );
 };
