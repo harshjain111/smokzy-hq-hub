@@ -23,11 +23,13 @@ interface Category {
 
 const SalesModule = ({ user, venueId, session, updateSessionTask }: SalesModuleProps) => {
   const [categories, setCategories] = useState<Category[]>([]);
-  const [quantities, setQuantities] = useState<Record<string, number>>({});
+  // Use null to indicate "not yet entered" vs 0 which is "explicitly entered zero"
+  const [quantities, setQuantities] = useState<Record<string, number | null>>({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitterName, setSubmitterName] = useState<string | null>(null);
   const [submittedAt, setSubmittedAt] = useState<string | null>(null);
+  const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
 
   const fetchCategories = useCallback(async () => {
     setLoading(true);
@@ -39,10 +41,10 @@ const SalesModule = ({ user, venueId, session, updateSessionTask }: SalesModuleP
 
     if (data) {
       setCategories(data);
-      // Initialize quantities with 0
-      const initialQuantities: Record<string, number> = {};
+      // Initialize quantities with null (not yet entered)
+      const initialQuantities: Record<string, number | null> = {};
       data.forEach(cat => {
-        initialQuantities[cat.id] = 0;
+        initialQuantities[cat.id] = null;
       });
       setQuantities(initialQuantities);
     }
@@ -79,46 +81,76 @@ const SalesModule = ({ user, venueId, session, updateSessionTask }: SalesModuleP
   }, [session, fetchSubmitterInfo]);
 
   const handleQuantityChange = (categoryId: string, delta: number) => {
-    setQuantities(prev => ({
-      ...prev,
-      [categoryId]: Math.max(0, (prev[categoryId] || 0) + delta),
-    }));
+    setQuantities(prev => {
+      const current = prev[categoryId] ?? 0;
+      return {
+        ...prev,
+        [categoryId]: Math.max(0, current + delta),
+      };
+    });
+    // Clear validation error when user interacts
+    setValidationErrors(prev => ({ ...prev, [categoryId]: false }));
   };
 
   const handleDirectInput = (categoryId: string, value: string) => {
-    const num = parseInt(value) || 0;
-    setQuantities(prev => ({
-      ...prev,
-      [categoryId]: Math.max(0, num),
-    }));
+    // Allow empty string during typing, but treat it as null (not entered)
+    if (value === '') {
+      setQuantities(prev => ({
+        ...prev,
+        [categoryId]: null,
+      }));
+    } else {
+      const num = parseInt(value);
+      if (!isNaN(num)) {
+        setQuantities(prev => ({
+          ...prev,
+          [categoryId]: Math.max(0, num),
+        }));
+      }
+    }
+    // Clear validation error when user interacts
+    setValidationErrors(prev => ({ ...prev, [categoryId]: false }));
   };
 
   const handleSubmit = async () => {
-    // Check if at least one category has sales
-    const hasAnySales = Object.values(quantities).some(qty => qty > 0);
+    // Validate that all categories have explicit input (not null)
+    const errors: Record<string, boolean> = {};
+    let hasEmpty = false;
     
-    if (!hasAnySales) {
-      toast.error("Please enter at least one sale");
+    for (const cat of categories) {
+      if (quantities[cat.id] === null || quantities[cat.id] === undefined) {
+        errors[cat.id] = true;
+        hasEmpty = true;
+      }
+    }
+    
+    if (hasEmpty) {
+      setValidationErrors(errors);
+      toast.error("Please enter sales for all categories. Enter 0 if no shisha was sold.");
       return;
     }
+    
+    // Clear validation errors
+    setValidationErrors({});
 
     setSubmitting(true);
     try {
       const sessionDate = session?.session_date || format(new Date(), "yyyy-MM-dd");
 
-      // Insert sales for categories with quantity > 0
+      // Insert sales for ALL categories (including 0 values)
       for (const [categoryId, qty] of Object.entries(quantities)) {
-        if (qty > 0) {
-          const { error } = await supabase.from("sales_reports").insert({
-            venue_id: venueId,
-            reported_by: user.id,
-            report_date: sessionDate,
-            category_id: categoryId,
-            quantity_sold: qty,
-          });
+        // qty is guaranteed to be a number at this point (validated above)
+        const quantity = qty as number;
+        
+        const { error } = await supabase.from("sales_reports").insert({
+          venue_id: venueId,
+          reported_by: user.id,
+          report_date: sessionDate,
+          category_id: categoryId,
+          quantity_sold: quantity,
+        });
 
-          if (error) throw error;
-        }
+        if (error) throw error;
       }
 
       // Update session
@@ -180,7 +212,7 @@ const SalesModule = ({ user, venueId, session, updateSessionTask }: SalesModuleP
     );
   }
 
-  const totalSales = Object.values(quantities).reduce((sum, qty) => sum + qty, 0);
+  const totalSales = Object.values(quantities).reduce((sum, qty) => sum + (qty ?? 0), 0);
 
   return (
     <div className="flex flex-col min-h-[calc(100vh-8rem)] pb-20">
@@ -189,6 +221,7 @@ const SalesModule = ({ user, venueId, session, updateSessionTask }: SalesModuleP
         <div className="text-center">
           <h2 className="text-lg font-semibold text-foreground">Log Today's Sales</h2>
           <p className="text-sm text-muted-foreground">Enter quantity sold per category</p>
+          <p className="text-xs text-muted-foreground mt-1">Enter 0 if no shisha was sold today</p>
         </div>
       </div>
 
@@ -197,10 +230,17 @@ const SalesModule = ({ user, venueId, session, updateSessionTask }: SalesModuleP
         {categories.map(category => (
           <div
             key={category.id}
-            className="flex items-center justify-between p-4 bg-card border border-border rounded-xl"
+            className={`flex items-center justify-between p-4 bg-card border rounded-xl transition-colors ${
+              validationErrors[category.id] 
+                ? 'border-destructive bg-destructive/5' 
+                : 'border-border'
+            }`}
           >
             <div className="flex-1 min-w-0">
               <p className="font-medium text-foreground">{category.category_name}</p>
+              {validationErrors[category.id] && (
+                <p className="text-xs text-destructive mt-0.5">Required</p>
+              )}
             </div>
             
             {/* Counter */}
@@ -216,9 +256,12 @@ const SalesModule = ({ user, venueId, session, updateSessionTask }: SalesModuleP
               <Input
                 type="number"
                 min="0"
-                value={quantities[category.id] || 0}
+                value={quantities[category.id] ?? ''}
+                placeholder="—"
                 onChange={(e) => handleDirectInput(category.id, e.target.value)}
-                className="w-16 h-12 text-center text-lg font-semibold rounded-xl [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className={`w-16 h-12 text-center text-lg font-semibold rounded-xl [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                  validationErrors[category.id] ? 'border-destructive' : ''
+                }`}
               />
               <Button
                 variant="outline"
