@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { FileSpreadsheet, Download, Building2, Users, Package } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -271,113 +270,111 @@ export const ReportsSection = () => {
   };
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium flex items-center gap-2">
-          <FileSpreadsheet className="h-4 w-4 text-primary" />
-          Reports & Exports
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {reports.map((report) => (
-          <Dialog 
-            key={report.id} 
-            onOpenChange={(open) => {
-              if (open) {
-                setSelectedReport(report.id);
-                fetchVenues();
-              }
-            }}
-          >
-            <DialogTrigger asChild>
-              <Button 
-                variant="outline" 
-                className="w-full justify-start gap-3 h-auto py-3"
-              >
+    <div className="space-y-3">
+      {reports.map((report) => (
+        <Dialog 
+          key={report.id} 
+          onOpenChange={(open) => {
+            if (open) {
+              setSelectedReport(report.id);
+              fetchVenues();
+            }
+          }}
+        >
+          <DialogTrigger asChild>
+            <Button 
+              variant="outline" 
+              className="w-full justify-start gap-3 h-auto py-4 px-4 min-h-[64px] rounded-xl border-border/60 hover:bg-muted/50 active:scale-[0.98] transition-all"
+            >
+              <div className="p-2 rounded-lg bg-primary/10 shrink-0">
                 {report.icon}
-                <div className="text-left">
-                  <div className="font-medium">{report.title}</div>
-                  <div className="text-xs text-muted-foreground">{report.description}</div>
-                </div>
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-sm">
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
+              </div>
+              <div className="text-left flex-1 min-w-0">
+                <div className="font-medium text-sm">{report.title}</div>
+                <div className="text-xs text-muted-foreground line-clamp-1">{report.description}</div>
+              </div>
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-sm mx-auto rounded-xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-3 text-base">
+                <div className="p-2 rounded-lg bg-primary/10 shrink-0">
                   {report.icon}
-                  {report.title}
-                </DialogTitle>
-              </DialogHeader>
-              
-              <div className="space-y-4 py-4">
+                </div>
+                {report.title}
+              </DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Date Range</Label>
+                <Select value={dateRange} onValueChange={handleDateRangeChange}>
+                  <SelectTrigger className="h-12">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover z-50">
+                    <SelectItem value="7days">Last 7 Days</SelectItem>
+                    <SelectItem value="30days">Last 30 Days</SelectItem>
+                    <SelectItem value="thisMonth">This Month</SelectItem>
+                    <SelectItem value="custom">Custom Range</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {dateRange === "custom" && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium">Start Date</Label>
+                    <Input 
+                      type="date" 
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="h-12"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium">End Date</Label>
+                    <Input 
+                      type="date" 
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="h-12"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {report.id !== "stock_variance" && (
                 <div className="space-y-2">
-                  <Label>Date Range</Label>
-                  <Select value={dateRange} onValueChange={handleDateRangeChange}>
-                    <SelectTrigger>
-                      <SelectValue />
+                  <Label className="text-sm font-medium">Club Filter</Label>
+                  <Select value={clubFilter} onValueChange={setClubFilter}>
+                    <SelectTrigger className="h-12">
+                      <SelectValue placeholder="All Clubs" />
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="7days">Last 7 Days</SelectItem>
-                      <SelectItem value="30days">Last 30 Days</SelectItem>
-                      <SelectItem value="thisMonth">This Month</SelectItem>
-                      <SelectItem value="custom">Custom Range</SelectItem>
+                    <SelectContent className="bg-popover z-50">
+                      <SelectItem value="all">All Clubs</SelectItem>
+                      {venues.map((venue) => (
+                        <SelectItem key={venue.id} value={venue.id}>
+                          {venue.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
+              )}
 
-                {dateRange === "custom" && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1">
-                      <Label className="text-xs">Start Date</Label>
-                      <Input 
-                        type="date" 
-                        value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">End Date</Label>
-                      <Input 
-                        type="date" 
-                        value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {report.id !== "stock_variance" && (
-                  <div className="space-y-2">
-                    <Label>Club Filter</Label>
-                    <Select value={clubFilter} onValueChange={setClubFilter}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="All Clubs" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Clubs</SelectItem>
-                        {venues.map((venue) => (
-                          <SelectItem key={venue.id} value={venue.id}>
-                            {venue.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                <Button 
-                  onClick={generateReport} 
-                  disabled={generating}
-                  className="w-full"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  {generating ? "Generating..." : "Download Excel"}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-        ))}
-      </CardContent>
-    </Card>
+              <Button 
+                onClick={generateReport} 
+                disabled={generating}
+                className="w-full h-12 text-base font-medium mt-2"
+              >
+                <Download className="h-5 w-5 mr-2" />
+                {generating ? "Generating..." : "Download Excel"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      ))}
+    </div>
   );
 };

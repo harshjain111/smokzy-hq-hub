@@ -33,13 +33,13 @@ export const AnalyticsDashboard = () => {
         </Button>
       </div>
 
-      <Accordion type="single" collapsible defaultValue="sales" className="space-y-2">
+      <Accordion type="single" collapsible defaultValue="sales" className="space-y-3">
         {/* Sales Analytics */}
-        <AccordionItem value="sales" className="border rounded-lg bg-card">
-          <AccordionTrigger className="px-4 py-3 hover:no-underline">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-primary" />
-              <span className="font-medium">Sales Analytics</span>
+        <AccordionItem value="sales" className="border rounded-xl bg-card shadow-sm">
+          <AccordionTrigger className="px-4 py-4 hover:no-underline min-h-[56px]">
+            <div className="flex items-center gap-3">
+              <TrendingUp className="h-5 w-5 text-primary shrink-0" />
+              <span className="font-medium text-base">Sales Analytics</span>
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-4 pb-4">
@@ -48,11 +48,11 @@ export const AnalyticsDashboard = () => {
         </AccordionItem>
 
         {/* Club Performance */}
-        <AccordionItem value="performance" className="border rounded-lg bg-card">
-          <AccordionTrigger className="px-4 py-3 hover:no-underline">
-            <div className="flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-primary" />
-              <span className="font-medium">Club Performance</span>
+        <AccordionItem value="performance" className="border rounded-xl bg-card shadow-sm">
+          <AccordionTrigger className="px-4 py-4 hover:no-underline min-h-[56px]">
+            <div className="flex items-center gap-3">
+              <Building2 className="h-5 w-5 text-primary shrink-0" />
+              <span className="font-medium text-base">Club Performance</span>
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-4 pb-4">
@@ -61,11 +61,11 @@ export const AnalyticsDashboard = () => {
         </AccordionItem>
 
         {/* Attendance & Discipline */}
-        <AccordionItem value="discipline" className="border rounded-lg bg-card">
-          <AccordionTrigger className="px-4 py-3 hover:no-underline">
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-primary" />
-              <span className="font-medium">Attendance & Discipline</span>
+        <AccordionItem value="discipline" className="border rounded-xl bg-card shadow-sm">
+          <AccordionTrigger className="px-4 py-4 hover:no-underline min-h-[56px]">
+            <div className="flex items-center gap-3">
+              <Users className="h-5 w-5 text-primary shrink-0" />
+              <span className="font-medium text-base">Attendance & Discipline</span>
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-4 pb-4">
@@ -74,13 +74,13 @@ export const AnalyticsDashboard = () => {
         </AccordionItem>
 
         {/* Compliance & Exceptions */}
-        <AccordionItem value="exceptions" className="border rounded-lg bg-card">
-          <AccordionTrigger className="px-4 py-3 hover:no-underline">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-destructive" />
-              <span className="font-medium">Compliance & Exceptions</span>
+        <AccordionItem value="exceptions" className="border rounded-xl bg-card shadow-sm">
+          <AccordionTrigger className="px-4 py-4 hover:no-underline min-h-[56px]">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="h-5 w-5 text-destructive shrink-0" />
+              <span className="font-medium text-base">Compliance & Exceptions</span>
               {exceptions.length > 0 && (
-                <span className="ml-2 text-xs bg-destructive/20 text-destructive px-1.5 py-0.5 rounded-full">
+                <span className="ml-auto text-xs bg-destructive/20 text-destructive px-2 py-1 rounded-full font-medium">
                   {exceptions.length}
                 </span>
               )}
@@ -92,11 +92,11 @@ export const AnalyticsDashboard = () => {
         </AccordionItem>
 
         {/* Reports & Exports */}
-        <AccordionItem value="reports" className="border rounded-lg bg-card">
-          <AccordionTrigger className="px-4 py-3 hover:no-underline">
-            <div className="flex items-center gap-2">
-              <FileSpreadsheet className="h-4 w-4 text-primary" />
-              <span className="font-medium">Reports & Exports</span>
+        <AccordionItem value="reports" className="border rounded-xl bg-card shadow-sm">
+          <AccordionTrigger className="px-4 py-4 hover:no-underline min-h-[56px]">
+            <div className="flex items-center gap-3">
+              <FileSpreadsheet className="h-5 w-5 text-primary shrink-0" />
+              <span className="font-medium text-base">Reports & Exports</span>
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-4 pb-4">
