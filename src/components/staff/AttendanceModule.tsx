@@ -619,7 +619,10 @@ const AttendanceModule = ({
           </div>
 
           {/* Action buttons - fixed at bottom with safe area */}
-          <div className="shrink-0 p-4 bg-black flex items-center justify-center gap-4" style={{ paddingBottom: 'max(2rem, env(safe-area-inset-bottom))' }}>
+          <div 
+            className="shrink-0 p-4 bg-black flex items-center justify-center gap-4"
+            style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}
+          >
             <Button
               variant="outline"
               size="lg"
@@ -653,16 +656,9 @@ const AttendanceModule = ({
           </div>
         </div>
 
-        {/* Duty completion dialog - must be rendered here for checkout flow */}
-        <AlertDialog open={showDutyDialog} onOpenChange={(open) => {
-          // Only allow closing via our handlers, not via backdrop click or escape
-          if (!open && flowState === 'preview') {
-            // User tried to close without selecting - keep it open
-            return;
-          }
-          setShowDutyDialog(open);
-        }}>
-          <AlertDialogContent className="z-[70]">
+        {/* Duty completion dialog - rendered OUTSIDE the fixed preview div for proper z-index stacking */}
+        <AlertDialog open={showDutyDialog} onOpenChange={setShowDutyDialog}>
+          <AlertDialogContent className="z-[80]">
             <AlertDialogHeader>
               <AlertDialogTitle className="text-center text-xl">
                 Is your duty completed for today?
