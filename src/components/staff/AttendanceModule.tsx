@@ -16,6 +16,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import CheckoutBlockedDialog from "./CheckoutBlockedDialog";
+import { TabId } from "./BottomNav";
 
 interface AttendanceModuleProps {
   user: User;
@@ -33,6 +35,8 @@ interface AttendanceModuleProps {
   startBreak: () => Promise<void>;
   endBreak: () => Promise<void>;
   isLongBreak: () => boolean;
+  // Navigation for blocked checkout
+  onNavigateToTab?: (tab: TabId) => void;
 }
 
 type FlowState = 'idle' | 'capturing' | 'preview' | 'processing';
@@ -52,6 +56,7 @@ const AttendanceModule = ({
   startBreak,
   endBreak,
   isLongBreak,
+  onNavigateToTab,
 }: AttendanceModuleProps) => {
   const [flowState, setFlowState] = useState<FlowState>('idle');
   const [isCheckingOut, setIsCheckingOut] = useState(false);
@@ -60,6 +65,7 @@ const AttendanceModule = ({
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
   const [showDutyDialog, setShowDutyDialog] = useState(false);
+  const [showBlockedDialog, setShowBlockedDialog] = useState(false);
   const [breakLoading, setBreakLoading] = useState(false);
   const [breakDuration, setBreakDuration] = useState(0);
   
@@ -244,11 +250,18 @@ const AttendanceModule = ({
 
   const handleCheckOutStart = () => {
     if (!checkoutEligibility.canCheckout) {
-      toast.error(checkoutEligibility.reason);
+      // Show the blocked dialog instead of just a toast
+      setShowBlockedDialog(true);
       return;
     }
     setIsCheckingOut(true);
     startCamera();
+  };
+
+  const handleNavigateToTask = (task: 'stock' | 'sales' | 'photo') => {
+    if (onNavigateToTab) {
+      onNavigateToTab(task);
+    }
   };
 
   const handleConfirmCheckIn = async () => {
@@ -400,17 +413,16 @@ const AttendanceModule = ({
                 Start Break
               </Button>
 
-              {/* Checkout button */}
+              {/* Checkout button - ALWAYS enabled and clickable */}
               <Button
                 size="lg"
                 variant={checkoutEligibility.canCheckout ? "default" : "outline"}
                 onClick={handleCheckOutStart}
-                disabled={!checkoutEligibility.canCheckout}
                 className={cn(
                   "w-full h-14 text-base font-semibold rounded-2xl shadow-lg",
                   checkoutEligibility.canCheckout 
                     ? "bg-primary hover:bg-primary/90" 
-                    : "opacity-60"
+                    : "border-2 border-primary/30 text-primary hover:bg-primary/5"
                 )}
               >
                 <LogOut className="w-5 h-5 mr-2" />
@@ -419,10 +431,19 @@ const AttendanceModule = ({
             </div>
 
             {!checkoutEligibility.canCheckout && (
-              <p className="text-sm text-muted-foreground text-center max-w-xs">
-                {checkoutEligibility.reason}
+              <p className="text-sm text-warning text-center max-w-xs font-medium">
+                ⚠️ Tap Check Out to see pending tasks
               </p>
             )}
+
+            {/* Checkout Blocked Dialog */}
+            <CheckoutBlockedDialog
+              open={showBlockedDialog}
+              onOpenChange={setShowBlockedDialog}
+              session={session}
+              onNavigateToTask={handleNavigateToTask}
+              blockReason={checkoutEligibility.reason}
+            />
 
             {/* Session info */}
             {session && (

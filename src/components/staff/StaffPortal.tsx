@@ -86,6 +86,7 @@ const StaffPortal = ({ user, venueId }: StaffPortalProps) => {
             startBreak={startBreak}
             endBreak={endBreak}
             isLongBreak={isLongBreak}
+            onNavigateToTab={setActiveTab}
           />
         );
       case 'stock':
