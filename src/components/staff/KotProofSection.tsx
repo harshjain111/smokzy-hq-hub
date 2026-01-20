@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -75,11 +75,11 @@ const KotProofSection = ({ user, venueId, sessionId }: KotProofSectionProps) => 
   };
 
   // Fetch on mount
-  useState(() => {
+  useEffect(() => {
     if (sessionId) {
       fetchKotEntries();
     }
-  });
+  }, [sessionId]);
 
   const handleFileUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;

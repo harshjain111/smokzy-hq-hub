@@ -346,10 +346,10 @@ const ClubManagementDashboard = ({ user, venueIds }: ClubManagementDashboardProp
   return (
     <div className="space-y-6">
       {/* Venue Selector & Refresh */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
         {venues.length > 1 && (
           <Select value={selectedVenueId} onValueChange={setSelectedVenueId}>
-            <SelectTrigger className="w-[250px]">
+            <SelectTrigger className="w-full sm:w-[250px] h-12 sm:h-10">
               <SelectValue placeholder="Select venue" />
             </SelectTrigger>
             <SelectContent className="bg-popover z-50">
@@ -362,7 +362,7 @@ const ClubManagementDashboard = ({ user, venueIds }: ClubManagementDashboardProp
           </Select>
         )}
         
-        <div className="flex items-center gap-2 ml-auto">
+        <div className="flex items-center justify-between sm:justify-end gap-2 sm:ml-auto">
           <span className="text-xs text-muted-foreground">
             Updated: {format(lastUpdated, 'HH:mm:ss')}
           </span>
@@ -371,6 +371,7 @@ const ClubManagementDashboard = ({ user, venueIds }: ClubManagementDashboardProp
             size="sm"
             onClick={handleRefresh}
             disabled={refreshing}
+            className="h-10 sm:h-9"
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
             Refresh
@@ -485,14 +486,14 @@ const ClubManagementDashboard = ({ user, venueIds }: ClubManagementDashboardProp
 
       {/* Tabs for Attendance & Sales */}
       <Tabs defaultValue="attendance" className="w-full">
-        <TabsList className="w-full md:w-auto">
-          <TabsTrigger value="attendance" className="flex-1 md:flex-none">
+        <TabsList className="w-full md:w-auto h-12 p-1">
+          <TabsTrigger value="attendance" className="flex-1 md:flex-none h-10 text-sm">
             <Users className="w-4 h-4 mr-2" />
-            Live Attendance
+            <span className="hidden sm:inline">Live </span>Attendance
           </TabsTrigger>
-          <TabsTrigger value="sales" className="flex-1 md:flex-none">
+          <TabsTrigger value="sales" className="flex-1 md:flex-none h-10 text-sm">
             <BarChart3 className="w-4 h-4 mr-2" />
-            Sales Reports
+            <span className="hidden sm:inline">Sales </span>Reports
           </TabsTrigger>
         </TabsList>
 
@@ -535,10 +536,10 @@ const ClubManagementDashboard = ({ user, venueIds }: ClubManagementDashboardProp
         {/* Sales Reports Tab */}
         <TabsContent value="sales" className="mt-4 space-y-4">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+            <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:space-y-0 pb-4">
               <CardTitle className="text-lg">Sales Report</CardTitle>
               <Select value={dateRange} onValueChange={(v) => setDateRange(v as DateRange)}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-full sm:w-[180px] h-11 sm:h-10">
                   <Calendar className="w-4 h-4 mr-2" />
                   <SelectValue />
                 </SelectTrigger>
