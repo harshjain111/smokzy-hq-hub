@@ -34,7 +34,7 @@ const EarlyCheckoutDialog = ({
 
   return (
     <AlertDialog open={open} onOpenChange={handleOpenChange}>
-      <AlertDialogContent className="max-w-sm mx-4 rounded-2xl">
+      <AlertDialogContent>
         <AlertDialogHeader className="text-center">
           <div className="mx-auto w-16 h-16 rounded-full bg-warning/15 flex items-center justify-center mb-4 border-4 border-warning/30">
             <AlertTriangle className="w-8 h-8 text-warning" />

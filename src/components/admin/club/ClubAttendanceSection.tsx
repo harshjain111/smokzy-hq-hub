@@ -224,7 +224,7 @@ export const ClubAttendanceSection = ({ clubId, currentSession }: ClubAttendance
             <ChevronRight className="h-4 w-4 ml-2" />
           </Button>
         </DialogTrigger>
-        <DialogContent className="max-w-[95vw] max-h-[85vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-2xl">
           <DialogHeader className="pb-2">
             <DialogTitle className="text-base">Attendance by Session (Last 7 Sessions)</DialogTitle>
           </DialogHeader>
