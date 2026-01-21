@@ -131,6 +131,33 @@ const AttendanceModule = ({
   };
 
   // Fetch location in parallel when starting camera
+  // Request location permission proactively
+  const requestLocationPermission = useCallback(async (): Promise<boolean> => {
+    // Check if Permissions API is supported
+    if ('permissions' in navigator) {
+      try {
+        const permission = await navigator.permissions.query({ name: 'geolocation' });
+        
+        if (permission.state === 'denied') {
+          toast.error("Location access is blocked. Please enable it in your browser settings and refresh.");
+          return false;
+        }
+        
+        if (permission.state === 'prompt') {
+          // Permission will be requested when we call getCurrentPosition
+          toast.info("Please allow location access when prompted.");
+        }
+        
+        return true;
+      } catch (error) {
+        // Permissions API not fully supported, continue anyway
+        console.log("Permissions API query failed, continuing with geolocation request");
+        return true;
+      }
+    }
+    return true;
+  }, []);
+
   const fetchLocation = useCallback(async (retryCount = 0) => {
     setLocationLoading(true);
     
@@ -141,10 +168,19 @@ const AttendanceModule = ({
       return;
     }
     
+    // Check/request permission first
+    if (retryCount === 0) {
+      const hasPermission = await requestLocationPermission();
+      if (!hasPermission) {
+        setLocationLoading(false);
+        return;
+      }
+    }
+    
     try {
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
+          enableHighAccuracy: retryCount < 1, // Use high accuracy first, then fall back
           timeout: 20000,
           maximumAge: 0, // Don't use cached position
         });
@@ -153,6 +189,7 @@ const AttendanceModule = ({
         lat: position.coords.latitude,
         lng: position.coords.longitude,
       });
+      haptic('success');
     } catch (error) {
       const geoError = error as GeolocationPositionError;
       console.error("Location error:", geoError.code, geoError.message);
@@ -160,15 +197,16 @@ const AttendanceModule = ({
       // Handle specific error codes
       switch (geoError.code) {
         case 1: // PERMISSION_DENIED
+          haptic('error');
           toast.error("Location permission denied. Please enable location in your browser settings and refresh the page.");
           break;
         case 2: // POSITION_UNAVAILABLE
           if (retryCount < 2) {
-            // Retry with lower accuracy
             console.log("Retrying location fetch with lower accuracy...");
             setTimeout(() => fetchLocation(retryCount + 1), 1000);
             return;
           }
+          haptic('warning');
           toast.error("Location unavailable. Please ensure GPS is enabled and try again.");
           break;
         case 3: // TIMEOUT
@@ -177,6 +215,7 @@ const AttendanceModule = ({
             setTimeout(() => fetchLocation(retryCount + 1), 500);
             return;
           }
+          haptic('warning');
           toast.error("Location request timed out. Please check your GPS signal and try again.");
           break;
         default:
@@ -185,7 +224,7 @@ const AttendanceModule = ({
     } finally {
       setLocationLoading(false);
     }
-  }, []);
+  }, [requestLocationPermission]);
 
   const startCamera = async () => {
     try {
