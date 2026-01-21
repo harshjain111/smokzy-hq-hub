@@ -131,13 +131,22 @@ const AttendanceModule = ({
   };
 
   // Fetch location in parallel when starting camera
-  const fetchLocation = useCallback(async () => {
+  const fetchLocation = useCallback(async (retryCount = 0) => {
     setLocationLoading(true);
+    
+    // Check if geolocation is supported
+    if (!navigator.geolocation) {
+      toast.error("Geolocation is not supported by this browser.");
+      setLocationLoading(false);
+      return;
+    }
+    
     try {
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
           enableHighAccuracy: true,
-          timeout: 15000,
+          timeout: 20000,
+          maximumAge: 0, // Don't use cached position
         });
       });
       setLocation({
@@ -145,8 +154,34 @@ const AttendanceModule = ({
         lng: position.coords.longitude,
       });
     } catch (error) {
-      console.error("Location error:", error);
-      toast.error("Failed to get location. Please enable location access.");
+      const geoError = error as GeolocationPositionError;
+      console.error("Location error:", geoError.code, geoError.message);
+      
+      // Handle specific error codes
+      switch (geoError.code) {
+        case 1: // PERMISSION_DENIED
+          toast.error("Location permission denied. Please enable location in your browser settings and refresh the page.");
+          break;
+        case 2: // POSITION_UNAVAILABLE
+          if (retryCount < 2) {
+            // Retry with lower accuracy
+            console.log("Retrying location fetch with lower accuracy...");
+            setTimeout(() => fetchLocation(retryCount + 1), 1000);
+            return;
+          }
+          toast.error("Location unavailable. Please ensure GPS is enabled and try again.");
+          break;
+        case 3: // TIMEOUT
+          if (retryCount < 2) {
+            console.log("Location timeout, retrying...");
+            setTimeout(() => fetchLocation(retryCount + 1), 500);
+            return;
+          }
+          toast.error("Location request timed out. Please check your GPS signal and try again.");
+          break;
+        default:
+          toast.error("Failed to get location. Please try again.");
+      }
     } finally {
       setLocationLoading(false);
     }
