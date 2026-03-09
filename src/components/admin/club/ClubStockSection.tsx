@@ -2,8 +2,11 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { format } from "date-fns";
-import { Download, AlertTriangle, Package, Info, ChevronRight } from "lucide-react";
+import { format, subDays } from "date-fns";
+import { 
+  Download, AlertTriangle, Package, Info, ChevronRight, TrendingDown, 
+  TrendingUp, BarChart3, AlertCircle, CheckCircle2, RefreshCw
+} from "lucide-react";
 import { toast } from "sonner";
 import { ClubSession } from "@/pages/ClubDetail";
 import {
@@ -13,13 +16,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface ClubStockSectionProps {
@@ -38,15 +34,30 @@ interface StockItem {
   updated_at: string;
 }
 
+interface StockInsight {
+  type: 'critical' | 'warning' | 'info' | 'positive';
+  message: string;
+  action?: string;
+}
+
+interface CategorySummary {
+  name: string;
+  totalItems: number;
+  lowStockItems: number;
+  healthScore: number;
+}
+
 export const ClubStockSection = ({ clubId, clubName, session }: ClubStockSectionProps) => {
   const [stockData, setStockData] = useState<StockItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
-  const [dateRange, setDateRange] = useState<"7" | "30">("7");
+  const [insights, setInsights] = useState<StockInsight[]>([]);
+  const [categorySummary, setCategorySummary] = useState<CategorySummary[]>([]);
+  const [lastStockUpdate, setLastStockUpdate] = useState<string | null>(null);
 
   useEffect(() => {
     fetchStock();
-  }, [clubId]);
+  }, [clubId, session]);
 
   const fetchStock = async () => {
     setLoading(true);
@@ -57,22 +68,114 @@ export const ClubStockSection = ({ clubId, clubName, session }: ClubStockSection
       .order("category")
       .order("quantity", { ascending: true });
 
-    setStockData(data || []);
+    if (data) {
+      setStockData(data);
+      analyzeStock(data);
+      
+      // Get latest update time
+      const latestUpdate = data.reduce((latest, item) => {
+        return new Date(item.updated_at) > new Date(latest) ? item.updated_at : latest;
+      }, data[0]?.updated_at || '');
+      setLastStockUpdate(latestUpdate);
+    }
     setLoading(false);
   };
 
+  const analyzeStock = (items: StockItem[]) => {
+    const newInsights: StockInsight[] = [];
+    
+    // Critical stock (at or below threshold)
+    const criticalItems = items.filter(item => item.quantity <= item.low_stock_threshold);
+    const outOfStock = items.filter(item => item.quantity === 0);
+    
+    // Category analysis
+    const categoryMap = new Map<string, { total: number; low: number }>();
+    items.forEach(item => {
+      const cat = categoryMap.get(item.category) || { total: 0, low: 0 };
+      cat.total++;
+      if (item.quantity <= item.low_stock_threshold) cat.low++;
+      categoryMap.set(item.category, cat);
+    });
+
+    // Generate insights
+    if (outOfStock.length > 0) {
+      newInsights.push({
+        type: 'critical',
+        message: `${outOfStock.length} item${outOfStock.length > 1 ? 's' : ''} OUT OF STOCK`,
+        action: 'Immediate reorder required'
+      });
+    }
+
+    if (criticalItems.length > outOfStock.length) {
+      const lowOnly = criticalItems.length - outOfStock.length;
+      newInsights.push({
+        type: 'warning',
+        message: `${lowOnly} item${lowOnly > 1 ? 's' : ''} running low`,
+        action: 'Plan reorder soon'
+      });
+    }
+
+    // Category health
+    const categorySum: CategorySummary[] = [];
+    categoryMap.forEach((stats, name) => {
+      const healthScore = stats.total > 0 
+        ? Math.round(((stats.total - stats.low) / stats.total) * 100)
+        : 100;
+      categorySum.push({
+        name: name.replace('_', ' '),
+        totalItems: stats.total,
+        lowStockItems: stats.low,
+        healthScore
+      });
+
+      if (healthScore < 50) {
+        newInsights.push({
+          type: 'warning',
+          message: `${name.replace('_', ' ')} category needs attention (${healthScore}% healthy)`
+        });
+      }
+    });
+
+    // Sort by health score (worst first)
+    categorySum.sort((a, b) => a.healthScore - b.healthScore);
+    setCategorySummary(categorySum);
+
+    // Positive insights
+    if (criticalItems.length === 0) {
+      newInsights.push({
+        type: 'positive',
+        message: 'All items well stocked!'
+      });
+    }
+
+    // Stock freshness
+    if (session?.stock_submitted && session.stock_submitted_at) {
+      newInsights.push({
+        type: 'info',
+        message: `Last updated ${format(new Date(session.stock_submitted_at), "hh:mm a")}`
+      });
+    }
+
+    setInsights(newInsights);
+  };
+
   const lowStockItems = stockData.filter(item => item.quantity <= item.low_stock_threshold);
+  const outOfStockItems = stockData.filter(item => item.quantity === 0);
   const totalItems = stockData.length;
+  const stockHealthScore = totalItems > 0 
+    ? Math.round(((totalItems - lowStockItems.length) / totalItems) * 100)
+    : 100;
 
   const exportStock = () => {
-    const headers = ["Item Name", "Category", "Unit", "Current Quantity", "Threshold", "Status"];
+    const headers = ["Item Name", "Category", "Unit", "Current Qty", "Threshold", "Status", "Last Updated"];
     const rows = stockData.map(item => [
       item.item_name,
-      item.category,
+      item.category.replace('_', ' '),
       item.unit,
       item.quantity,
       item.low_stock_threshold,
-      item.quantity <= item.low_stock_threshold ? "Low" : "OK"
+      item.quantity === 0 ? "OUT OF STOCK" : item.quantity <= item.low_stock_threshold ? "LOW" : "OK",
+      format(new Date(item.updated_at), "yyyy-MM-dd HH:mm")
     ]);
 
     const csv = [headers, ...rows].map(row => row.join(",")).join("\n");
@@ -83,6 +186,30 @@ export const ClubStockSection = ({ clubId, clubName, session }: ClubStockSection
     a.download = `${clubName}-stock-${format(new Date(), "yyyy-MM-dd")}.csv`;
     a.click();
     toast.success("Stock report exported");
+  };
+
+  const getHealthColor = (score: number) => {
+    if (score >= 80) return 'text-success bg-success/10 border-success/20';
+    if (score >= 50) return 'text-warning bg-warning/10 border-warning/20';
+    return 'text-destructive bg-destructive/10 border-destructive/20';
+  };
+
+  const getInsightStyle = (type: StockInsight['type']) => {
+    switch (type) {
+      case 'critical': return 'bg-destructive/10 text-destructive border-destructive/20';
+      case 'warning': return 'bg-warning/10 text-warning border-warning/20';
+      case 'positive': return 'bg-success/10 text-success border-success/20';
+      default: return 'bg-muted/50 text-muted-foreground';
+    }
+  };
+
+  const getInsightIcon = (type: StockInsight['type']) => {
+    switch (type) {
+      case 'critical': return <AlertCircle className="h-3.5 w-3.5" />;
+      case 'warning': return <AlertTriangle className="h-3.5 w-3.5" />;
+      case 'positive': return <CheckCircle2 className="h-3.5 w-3.5" />;
+      default: return <Info className="h-3.5 w-3.5" />;
+    }
   };
 
   // No session state
@@ -112,30 +239,123 @@ export const ClubStockSection = ({ clubId, clubName, session }: ClubStockSection
 
   return (
     <div className="space-y-4">
-      {/* Summary Stats */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="p-3 rounded-lg bg-muted/30 text-center">
-          <div className="flex items-center justify-center gap-2">
-            <Package className="h-4 w-4 text-muted-foreground" />
-            <span className="text-lg font-semibold">{totalItems}</span>
+      {/* Stock Health Score */}
+      <div className={`p-4 rounded-lg border ${getHealthColor(stockHealthScore)}`}>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <Package className="h-5 w-5" />
+            <span className="font-semibold">Stock Health</span>
           </div>
-          <p className="text-[10px] text-muted-foreground mt-0.5">Total Items</p>
+          <div className="text-2xl font-bold">{stockHealthScore}%</div>
         </div>
-        <div className={`p-3 rounded-lg text-center ${lowStockItems.length > 0 ? 'bg-warning/10' : 'bg-success/10'}`}>
-          <div className="flex items-center justify-center gap-2">
-            <AlertTriangle className={`h-4 w-4 ${lowStockItems.length > 0 ? 'text-warning' : 'text-success'}`} />
-            <span className="text-lg font-semibold">{lowStockItems.length}</span>
-          </div>
-          <p className="text-[10px] text-muted-foreground mt-0.5">Low Stock Alerts</p>
+        <div className="h-2 bg-current/20 rounded-full overflow-hidden">
+          <div 
+            className="h-full bg-current rounded-full transition-all"
+            style={{ width: `${stockHealthScore}%` }}
+          />
+        </div>
+        <div className="flex items-center justify-between mt-2 text-xs">
+          <span>{totalItems} total items</span>
+          <span>{totalItems - lowStockItems.length} well stocked</span>
         </div>
       </div>
 
-      {/* Low Stock Alerts - Exceptions Only */}
-      {lowStockItems.length > 0 && (
+      {/* Quick Stats */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="p-2.5 rounded-lg bg-muted/30 text-center">
+          <div className="text-lg font-bold">{totalItems}</div>
+          <p className="text-[9px] text-muted-foreground">Total Items</p>
+        </div>
+        <div className={`p-2.5 rounded-lg text-center ${outOfStockItems.length > 0 ? 'bg-destructive/10' : 'bg-muted/30'}`}>
+          <div className={`text-lg font-bold ${outOfStockItems.length > 0 ? 'text-destructive' : ''}`}>
+            {outOfStockItems.length}
+          </div>
+          <p className="text-[9px] text-muted-foreground">Out of Stock</p>
+        </div>
+        <div className={`p-2.5 rounded-lg text-center ${lowStockItems.length > outOfStockItems.length ? 'bg-warning/10' : 'bg-muted/30'}`}>
+          <div className={`text-lg font-bold ${lowStockItems.length > outOfStockItems.length ? 'text-warning' : ''}`}>
+            {lowStockItems.length - outOfStockItems.length}
+          </div>
+          <p className="text-[9px] text-muted-foreground">Running Low</p>
+        </div>
+      </div>
+
+      {/* Smart Insights */}
+      {insights.length > 0 && (
+        <div className="space-y-1.5">
+          {insights.slice(0, 4).map((insight, i) => (
+            <div 
+              key={i} 
+              className={`flex items-start gap-2 p-2.5 rounded-lg border text-xs ${getInsightStyle(insight.type)}`}
+            >
+              {getInsightIcon(insight.type)}
+              <div className="flex-1">
+                <span className="font-medium">{insight.message}</span>
+                {insight.action && (
+                  <p className="text-[10px] mt-0.5 opacity-80">{insight.action}</p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Category Health Summary */}
+      {categorySummary.length > 0 && (
         <div className="space-y-2">
-          <span className="text-sm font-medium text-warning">Low Stock Items</span>
+          <span className="text-sm font-medium">Category Health</span>
           <div className="space-y-1.5">
-            {lowStockItems.slice(0, 5).map(item => (
+            {categorySummary.map(cat => (
+              <div key={cat.name} className="flex items-center justify-between p-2 bg-muted/30 rounded">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium capitalize">{cat.name}</span>
+                  <span className="text-[10px] text-muted-foreground">({cat.totalItems} items)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {cat.lowStockItems > 0 && (
+                    <Badge variant="outline" className="text-[9px] text-warning border-warning/30">
+                      {cat.lowStockItems} low
+                    </Badge>
+                  )}
+                  <span className={`text-xs font-bold ${
+                    cat.healthScore >= 80 ? 'text-success' :
+                    cat.healthScore >= 50 ? 'text-warning' : 'text-destructive'
+                  }`}>
+                    {cat.healthScore}%
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Critical Items Alert */}
+      {outOfStockItems.length > 0 && (
+        <div className="space-y-2">
+          <span className="text-sm font-medium text-destructive">⚠️ Out of Stock - Immediate Action</span>
+          <div className="space-y-1.5">
+            {outOfStockItems.map(item => (
+              <div key={item.id} className="flex items-center justify-between p-2.5 bg-destructive/5 border border-destructive/20 rounded">
+                <div>
+                  <span className="text-xs font-medium">{item.item_name}</span>
+                  <p className="text-[10px] text-muted-foreground capitalize">{item.category.replace('_', ' ')}</p>
+                </div>
+                <Badge variant="destructive" className="text-[10px]">
+                  OUT
+                </Badge>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Low Stock Items */}
+      {lowStockItems.length > outOfStockItems.length && (
+        <div className="space-y-2">
+          <span className="text-sm font-medium text-warning">Running Low - Plan Reorder</span>
+          <div className="space-y-1.5">
+            {lowStockItems.filter(i => i.quantity > 0).slice(0, 5).map(item => (
               <div key={item.id} className="flex items-center justify-between p-2 bg-warning/5 border border-warning/20 rounded">
                 <div className="flex items-center gap-2">
                   <AlertTriangle className="h-3 w-3 text-warning shrink-0" />
@@ -149,38 +369,32 @@ export const ClubStockSection = ({ clubId, clubName, session }: ClubStockSection
                 </Badge>
               </div>
             ))}
-            {lowStockItems.length > 5 && (
+            {lowStockItems.filter(i => i.quantity > 0).length > 5 && (
               <p className="text-[10px] text-muted-foreground text-center">
-                +{lowStockItems.length - 5} more items
+                +{lowStockItems.filter(i => i.quantity > 0).length - 5} more items
               </p>
             )}
           </div>
         </div>
       )}
 
-      {/* View Detailed Table Button */}
+      {/* View Full Inventory Button */}
       <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
         <DialogTrigger asChild>
           <Button variant="outline" size="sm" className="w-full">
-            View Detailed Stock Table
+            View Full Inventory
             <ChevronRight className="h-4 w-4 ml-2" />
           </Button>
         </DialogTrigger>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[80vh]">
           <DialogHeader className="pb-2">
-            <DialogTitle className="text-base">Stock Details - {clubName}</DialogTitle>
+            <DialogTitle className="text-base">Full Inventory - {clubName}</DialogTitle>
           </DialogHeader>
           
-          <div className="flex items-center justify-between gap-2 pb-3 border-b">
-            <Select value={dateRange} onValueChange={(v: any) => setDateRange(v)}>
-              <SelectTrigger className="w-[130px] h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="7">Last 7 Days</SelectItem>
-                <SelectItem value="30">Last 30 Days</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="flex items-center justify-between pb-3 border-b">
+            <div className="text-xs text-muted-foreground">
+              {lastStockUpdate && `Last updated: ${format(new Date(lastStockUpdate), "MMM dd, hh:mm a")}`}
+            </div>
             <Button variant="outline" size="sm" onClick={exportStock} className="h-8 text-xs">
               <Download className="h-3.5 w-3.5 mr-1.5" />
               Export
@@ -193,23 +407,26 @@ export const ClubStockSection = ({ clubId, clubName, session }: ClubStockSection
                 <TableRow>
                   <TableHead className="text-xs sticky left-0 bg-background">Item</TableHead>
                   <TableHead className="text-xs">Category</TableHead>
-                  <TableHead className="text-xs text-center">Qty</TableHead>
+                  <TableHead className="text-xs text-center">Quantity</TableHead>
                   <TableHead className="text-xs text-center">Threshold</TableHead>
                   <TableHead className="text-xs text-center">Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {stockData.map(item => {
-                  const isLow = item.quantity <= item.low_stock_threshold;
+                  const isOut = item.quantity === 0;
+                  const isLow = item.quantity <= item.low_stock_threshold && item.quantity > 0;
                   return (
-                    <TableRow key={item.id}>
+                    <TableRow key={item.id} className={isOut ? 'bg-destructive/5' : isLow ? 'bg-warning/5' : ''}>
                       <TableCell className="text-xs font-medium sticky left-0 bg-background">
                         {item.item_name}
                       </TableCell>
                       <TableCell className="text-xs capitalize text-muted-foreground">
                         {item.category.replace('_', ' ')}
                       </TableCell>
-                      <TableCell className="text-xs text-center">
+                      <TableCell className={`text-xs text-center font-medium ${
+                        isOut ? 'text-destructive' : isLow ? 'text-warning' : ''
+                      }`}>
                         {item.quantity} {item.unit}
                       </TableCell>
                       <TableCell className="text-xs text-center text-muted-foreground">
@@ -217,10 +434,10 @@ export const ClubStockSection = ({ clubId, clubName, session }: ClubStockSection
                       </TableCell>
                       <TableCell className="text-center">
                         <Badge 
-                          variant={isLow ? "destructive" : "secondary"} 
-                          className="text-[9px]"
+                          variant={isOut ? "destructive" : isLow ? "outline" : "secondary"} 
+                          className={`text-[9px] ${isLow && !isOut ? 'text-warning border-warning' : ''}`}
                         >
-                          {isLow ? "Low" : "OK"}
+                          {isOut ? "OUT" : isLow ? "LOW" : "OK"}
                         </Badge>
                       </TableCell>
                     </TableRow>
@@ -235,7 +452,7 @@ export const ClubStockSection = ({ clubId, clubName, session }: ClubStockSection
       {/* Download Button */}
       <Button variant="ghost" size="sm" onClick={exportStock} className="w-full text-muted-foreground">
         <Download className="h-4 w-4 mr-2" />
-        Download Stock Report
+        Export Stock Report
       </Button>
     </div>
   );
