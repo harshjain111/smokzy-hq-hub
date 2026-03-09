@@ -116,7 +116,9 @@ export const useAdminStats = () => {
       setClubs(clubData);
 
       // Calculate KPIs
-      const activeClubs = clubData.filter(c => c.sessionStatus === 'active').length;
+      // Active clubs = clubs with at least one staff currently on duty
+      const venuesWithStaff = new Set(activeBlocks?.map(b => b.venue_id) || []);
+      const activeClubs = venuesWithStaff.size;
       const staffOnDutyNow = activeBlocks?.length || 0;
       const openSessions = sessions?.filter(s => s.status === 'open').length || 0;
       const stockPendingClubs = clubData.filter(c => c.sessionStatus === 'active' && !sessions?.find(s => s.venue_id === c.id)?.stock_submitted).length;
