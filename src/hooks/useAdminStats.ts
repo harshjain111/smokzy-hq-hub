@@ -59,11 +59,17 @@ export const useAdminStats = () => {
         .select("*")
         .eq("session_date", today);
 
-      // Fetch active attendance blocks (staff on duty)
-      const { data: activeBlocks } = await supabase
-        .from("staff_attendance_blocks")
-        .select("*")
-        .is("check_out_time", null);
+      // Get today's session IDs
+      const todaySessionIds = sessions?.map(s => s.id) || [];
+
+      // Fetch active attendance blocks (staff on duty) - only for today's sessions
+      const { data: activeBlocks } = todaySessionIds.length > 0
+        ? await supabase
+            .from("staff_attendance_blocks")
+            .select("*")
+            .in("session_id", todaySessionIds)
+            .is("check_out_time", null)
+        : { data: [] };
 
       // Build club tile data
       const clubData: ClubTileData[] = venues.map(venue => {
