@@ -31,10 +31,16 @@ export const ClubOverviewTab = ({ clubId, session, loading }: ClubOverviewTabPro
   }, [clubId, session]);
 
   const fetchStaffOnDuty = async () => {
+    // Only fetch staff if there's a current session - filter by session_id
+    if (!session?.id) {
+      setStaffOnDuty([]);
+      return;
+    }
+
     const { data } = await supabase
       .from("staff_attendance_blocks")
       .select("id, user_id, check_in_time, profiles:user_id(full_name)")
-      .eq("venue_id", clubId)
+      .eq("session_id", session.id)
       .is("check_out_time", null);
 
     if (data) {

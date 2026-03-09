@@ -75,10 +75,10 @@ const ClubDetail = () => {
     try {
       const today = format(new Date(), "yyyy-MM-dd");
 
-      const [venueRes, sessionRes, staffRes] = await Promise.all([
+      // Fetch venue and today's session first
+      const [venueRes, sessionRes] = await Promise.all([
         supabase.from("venues").select("name").eq("id", clubId).single(),
         supabase.from("club_sessions").select("*").eq("venue_id", clubId).eq("session_date", today).maybeSingle(),
-        supabase.from("staff_attendance_blocks").select("id").eq("venue_id", clubId).is("check_out_time", null),
       ]);
 
       if (venueRes.data) {
@@ -86,7 +86,18 @@ const ClubDetail = () => {
       }
 
       setCurrentSession(sessionRes.data);
-      setStaffOnDuty(staffRes.data?.length || 0);
+
+      // Only count staff on duty if there's a session today - filter by session_id
+      if (sessionRes.data?.id) {
+        const { data: staffRes } = await supabase
+          .from("staff_attendance_blocks")
+          .select("id")
+          .eq("session_id", sessionRes.data.id)
+          .is("check_out_time", null);
+        setStaffOnDuty(staffRes?.length || 0);
+      } else {
+        setStaffOnDuty(0);
+      }
     } catch (error) {
       console.error("Error fetching club details:", error);
     } finally {
