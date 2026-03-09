@@ -182,8 +182,16 @@ export const SessionHistoryList = ({ clubId, clubName, onSelectSession }: Sessio
         </div>
       )}
 
+      {/* Period Summary */}
+      <PeriodSummaryPanel
+        sessions={sessions}
+        clubId={clubId}
+        clubName={clubName}
+        dateRange={getDateRange()}
+      />
+
       {/* Session List */}
-      <ScrollArea className="h-[calc(100vh-280px)]">
+      <ScrollArea className="h-[calc(100vh-520px)]">
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
