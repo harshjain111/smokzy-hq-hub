@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { CalendarIcon, Download, CheckCircle2, XCircle, AlertTriangle, ChevronRight, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import * as XLSX from "xlsx";
+import { PeriodSummaryPanel } from "./PeriodSummaryPanel";
 
 interface HistoricalSession {
   id: string;
