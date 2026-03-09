@@ -59,11 +59,17 @@ export const useAdminStats = () => {
         .select("*")
         .eq("session_date", today);
 
-      // Fetch active attendance blocks (staff on duty)
-      const { data: activeBlocks } = await supabase
-        .from("staff_attendance_blocks")
-        .select("*")
-        .is("check_out_time", null);
+      // Get today's session IDs
+      const todaySessionIds = sessions?.map(s => s.id) || [];
+
+      // Fetch active attendance blocks (staff on duty) - only for today's sessions
+      const { data: activeBlocks } = todaySessionIds.length > 0
+        ? await supabase
+            .from("staff_attendance_blocks")
+            .select("*")
+            .in("session_id", todaySessionIds)
+            .is("check_out_time", null)
+        : { data: [] };
 
       // Build club tile data
       const clubData: ClubTileData[] = venues.map(venue => {
@@ -110,7 +116,9 @@ export const useAdminStats = () => {
       setClubs(clubData);
 
       // Calculate KPIs
-      const activeClubs = clubData.filter(c => c.sessionStatus === 'active').length;
+      // Active clubs = clubs with at least one staff currently on duty
+      const venuesWithStaff = new Set(activeBlocks?.map(b => b.venue_id) || []);
+      const activeClubs = venuesWithStaff.size;
       const staffOnDutyNow = activeBlocks?.length || 0;
       const openSessions = sessions?.filter(s => s.status === 'open').length || 0;
       const stockPendingClubs = clubData.filter(c => c.sessionStatus === 'active' && !sessions?.find(s => s.venue_id === c.id)?.stock_submitted).length;
