@@ -95,6 +95,15 @@ const ProfileMenu = ({ user, role }: ProfileMenuProps) => {
             </DropdownMenuItem>
           </>
         )}
+        {isInstallable && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="cursor-pointer text-primary font-medium" onClick={install}>
+              <Download className="mr-2 h-4 w-4" />
+              <span>Install Club App</span>
+            </DropdownMenuItem>
+          </>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive">
           <LogOut className="mr-2 h-4 w-4" />
