@@ -25,6 +25,7 @@ interface ProfileMenuProps {
 const ProfileMenu = ({ user, role }: ProfileMenuProps) => {
   const navigate = useNavigate();
   const [profileName, setProfileName] = useState<string>("");
+  const { isInstallable, install } = usePWAInstall();
 
   useEffect(() => {
     fetchProfile();
