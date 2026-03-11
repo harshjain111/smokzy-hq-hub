@@ -19,7 +19,7 @@ export default defineConfig(({ mode }) => ({
       workbox: {
         navigateFallbackDenylist: [/^\/~oauth/],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
-        runtimeCaching: [
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
           {
             urlPattern: /^https:\/\/fqtfmhlevdhaitkyoyzr\.supabase\.co\/.*/i,
             handler: "NetworkFirst",
