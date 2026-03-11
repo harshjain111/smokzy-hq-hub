@@ -20,6 +20,7 @@ export default defineConfig(({ mode }) => ({
         navigateFallbackDenylist: [/^\/~oauth/],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        runtimeCaching: [
           {
             urlPattern: /^https:\/\/fqtfmhlevdhaitkyoyzr\.supabase\.co\/.*/i,
             handler: "NetworkFirst",
