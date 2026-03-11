@@ -13,8 +13,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { User as UserIcon, Calendar, LogOut, FileText } from "lucide-react";
+import { User as UserIcon, Calendar, LogOut, FileText, Download } from "lucide-react";
 import { AppRole } from "@/hooks/useUserRole";
+import { usePWAInstall } from "@/hooks/usePWAInstall";
 
 interface ProfileMenuProps {
   user: User;
@@ -24,6 +25,7 @@ interface ProfileMenuProps {
 const ProfileMenu = ({ user, role }: ProfileMenuProps) => {
   const navigate = useNavigate();
   const [profileName, setProfileName] = useState<string>("");
+  const { isInstallable, install } = usePWAInstall();
 
   useEffect(() => {
     fetchProfile();
@@ -90,6 +92,15 @@ const ProfileMenu = ({ user, role }: ProfileMenuProps) => {
             <DropdownMenuItem className="cursor-pointer">
               <FileText className="mr-2 h-4 w-4" />
               <span>My Reports</span>
+            </DropdownMenuItem>
+          </>
+        )}
+        {isInstallable && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="cursor-pointer text-primary font-medium" onClick={install}>
+              <Download className="mr-2 h-4 w-4" />
+              <span>Install Club App</span>
             </DropdownMenuItem>
           </>
         )}
