@@ -13,8 +13,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { User as UserIcon, Calendar, LogOut, FileText } from "lucide-react";
+import { User as UserIcon, Calendar, LogOut, FileText, Download } from "lucide-react";
 import { AppRole } from "@/hooks/useUserRole";
+import { usePWAInstall } from "@/hooks/usePWAInstall";
 
 interface ProfileMenuProps {
   user: User;
