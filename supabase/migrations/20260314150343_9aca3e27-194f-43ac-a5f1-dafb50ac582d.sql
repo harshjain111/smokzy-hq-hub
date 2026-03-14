@@ -1,0 +1,1 @@
+ALTER TABLE public.club_sessions DROP CONSTRAINT IF EXISTS club_sessions_venue_id_session_date_key;
