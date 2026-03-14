@@ -15,28 +15,13 @@ import { ClubSalesSection } from "@/components/admin/club/ClubSalesSection";
 import { ClubStockSection } from "@/components/admin/club/ClubStockSection";
 import { ClubAttendanceSection } from "@/components/admin/club/ClubAttendanceSection";
 import { ClubActivitySection } from "@/components/admin/club/ClubActivitySection";
-import { SessionHistoryList } from "@/components/admin/club/SessionHistoryList";
-import { HistoricalSessionDetail } from "@/components/admin/club/HistoricalSessionDetail";
-import { format } from "date-fns";
+import { DateNavigationStrip } from "@/components/admin/club/DateNavigationStrip";
+import { HistoricalDayView } from "@/components/admin/club/HistoricalDayView";
+import { format, subDays } from "date-fns";
 
 export interface ClubSession {
   id: string;
   venue_id: string;
-  session_date: string;
-  started_at: string;
-  closed_at: string | null;
-  status: string;
-  stock_submitted: boolean;
-  stock_submitted_at: string | null;
-  sales_submitted: boolean;
-  sales_submitted_at: string | null;
-  photo_uploaded: boolean;
-  photo_uploaded_at: string | null;
-  force_close_reason: string | null;
-}
-
-interface HistoricalSession {
-  id: string;
   session_date: string;
   started_at: string;
   closed_at: string | null;
@@ -62,7 +47,7 @@ const ClubDetail = () => {
   const [refreshKey, setRefreshKey] = useState(0);
   const [expandedSection, setExpandedSection] = useState<string>("overview");
   const [viewMode, setViewMode] = useState<ViewMode>("live");
-  const [selectedHistoricalSession, setSelectedHistoricalSession] = useState<HistoricalSession | null>(null);
+  const [selectedHistoryDate, setSelectedHistoryDate] = useState<Date>(subDays(new Date(), 1));
 
   useEffect(() => {
     if (clubId) {
@@ -75,7 +60,6 @@ const ClubDetail = () => {
     try {
       const today = format(new Date(), "yyyy-MM-dd");
 
-      // Fetch venue and today's session first
       const [venueRes, sessionRes] = await Promise.all([
         supabase.from("venues").select("name").eq("id", clubId).single(),
         supabase.from("club_sessions").select("*").eq("venue_id", clubId).eq("session_date", today).maybeSingle(),
@@ -87,7 +71,6 @@ const ClubDetail = () => {
 
       setCurrentSession(sessionRes.data);
 
-      // Only count staff on duty if there's a session today - filter by session_id
       if (sessionRes.data?.id) {
         const { data: staffRes } = await supabase
           .from("staff_attendance_blocks")
@@ -120,14 +103,6 @@ const ClubDetail = () => {
     return <Badge className="bg-success/20 text-success border-success/30 text-[10px] font-medium">Active</Badge>;
   };
 
-  const handleSelectHistoricalSession = (session: HistoricalSession) => {
-    setSelectedHistoricalSession(session);
-  };
-
-  const handleBackFromHistoricalDetail = () => {
-    setSelectedHistoricalSession(null);
-  };
-
   return (
     <div className="min-h-screen bg-background">
       {/* Fixed Compact Header */}
@@ -156,7 +131,7 @@ const ClubDetail = () => {
         {/* Live/History Toggle */}
         <div className="flex border-t border-border">
           <button
-            onClick={() => { setViewMode("live"); setSelectedHistoricalSession(null); }}
+            onClick={() => setViewMode("live")}
             className={`flex-1 py-2.5 text-xs font-medium transition-colors ${
               viewMode === "live" 
                 ? "bg-primary text-primary-foreground" 
@@ -181,7 +156,6 @@ const ClubDetail = () => {
       {/* Content */}
       <div className="p-3 pb-8">
         {viewMode === "live" ? (
-          /* Live Session View */
           <Accordion
             type="single"
             collapsible
@@ -241,21 +215,17 @@ const ClubDetail = () => {
             </AccordionItem>
           </Accordion>
         ) : (
-          /* History View */
-          selectedHistoricalSession ? (
-            <HistoricalSessionDetail
-              session={selectedHistoricalSession}
+          <div className="space-y-3">
+            <DateNavigationStrip
+              selectedDate={selectedHistoryDate}
+              onDateChange={setSelectedHistoryDate}
+            />
+            <HistoricalDayView
               clubId={clubId!}
               clubName={clubName}
-              onBack={handleBackFromHistoricalDetail}
+              selectedDate={selectedHistoryDate}
             />
-          ) : (
-            <SessionHistoryList
-              clubId={clubId!}
-              clubName={clubName}
-              onSelectSession={handleSelectHistoricalSession}
-            />
-          )
+          </div>
         )}
       </div>
     </div>
