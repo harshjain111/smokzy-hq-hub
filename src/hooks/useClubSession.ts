@@ -116,6 +116,50 @@ export const useClubSession = (userId: string, venueId: string) => {
     }
   }, [venueId]);
 
+  // Force-close any stale open sessions from previous business dates
+  const forceCloseStaleSessionsClient = useCallback(async () => {
+    if (!venueId) return;
+
+    const now = new Date();
+    const hour = now.getHours();
+    // Calculate today's business date
+    const businessDate = hour < settings.force_close_hour
+      ? format(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1), "yyyy-MM-dd")
+      : format(now, "yyyy-MM-dd");
+
+    // Find all open sessions for this venue that are older than the current business date
+    const { data: staleSessions } = await supabase
+      .from("club_sessions")
+      .select("id, session_date")
+      .eq("venue_id", venueId)
+      .eq("status", "open")
+      .lt("session_date", businessDate);
+
+    if (staleSessions && staleSessions.length > 0) {
+      for (const stale of staleSessions) {
+        console.log(`Force-closing stale session ${stale.id} from ${stale.session_date}`);
+        await supabase
+          .from("club_sessions")
+          .update({
+            status: "force_closed",
+            closed_at: new Date().toISOString(),
+            force_close_reason: "Auto-closed: session exceeded daily boundary (client)",
+          })
+          .eq("id", stale.id);
+
+        // Auto-checkout any staff still checked in on this session
+        await supabase
+          .from("staff_attendance_blocks")
+          .update({
+            check_out_time: new Date().toISOString(),
+            duty_completed: false,
+          })
+          .eq("session_id", stale.id)
+          .is("check_out_time", null);
+      }
+    }
+  }, [venueId, settings.force_close_hour]);
+
   const fetchSession = useCallback(async () => {
     if (!venueId) {
       setLoading(false);
@@ -123,53 +167,52 @@ export const useClubSession = (userId: string, venueId: string) => {
     }
 
     try {
-      // Try today's date first, then yesterday if early morning
-      const today = format(new Date(), "yyyy-MM-dd");
+      // First, clean up any stale sessions from previous business dates
+      await forceCloseStaleSessionsClient();
+
       const now = new Date();
       const hour = now.getHours();
 
-      let sessionDate = today;
-      
-      // Check for open session from yesterday (night shift crossing midnight)
-      if (hour < settings.force_close_hour) {
-        const yesterday = new Date(now);
-        yesterday.setDate(yesterday.getDate() - 1);
-        const yesterdayStr = format(yesterday, "yyyy-MM-dd");
-        
-        const { data: yesterdaySession } = await supabase
-          .from("club_sessions")
-          .select("*")
-          .eq("venue_id", venueId)
-          .eq("session_date", yesterdayStr)
-          .eq("status", "open")
-          .single();
+      // Calculate business date: before force_close_hour → yesterday, otherwise today
+      const businessDate = hour < settings.force_close_hour
+        ? format(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1), "yyyy-MM-dd")
+        : format(now, "yyyy-MM-dd");
 
-        if (yesterdaySession) {
-          setSession(yesterdaySession as ClubSession);
-          setLoading(false);
-          return;
-        }
-      }
-
-      // Look for today's session
-      const { data: todaySession } = await supabase
+      // Look for an OPEN session for the current business date
+      const { data: openSession } = await supabase
         .from("club_sessions")
         .select("*")
         .eq("venue_id", venueId)
-        .eq("session_date", sessionDate)
+        .eq("session_date", businessDate)
+        .eq("status", "open")
         .single();
 
-      if (todaySession) {
-        setSession(todaySession as ClubSession);
+      if (openSession) {
+        setSession(openSession as ClubSession);
       } else {
-        setSession(null);
+        // Also check for a closed/force_closed session for today's business date (read-only view)
+        const { data: closedSession } = await supabase
+          .from("club_sessions")
+          .select("*")
+          .eq("venue_id", venueId)
+          .eq("session_date", businessDate)
+          .in("status", ["closed", "force_closed"])
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single();
+
+        if (closedSession) {
+          setSession(closedSession as ClubSession);
+        } else {
+          setSession(null);
+        }
       }
     } catch (error) {
       console.error("Error fetching session:", error);
     } finally {
       setLoading(false);
     }
-  }, [venueId, settings.force_close_hour]);
+  }, [venueId, settings.force_close_hour, forceCloseStaleSessionsClient]);
 
   const fetchMyAttendance = useCallback(async () => {
     if (!userId || !session) return;
