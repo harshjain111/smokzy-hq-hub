@@ -335,14 +335,24 @@ export const useClubSession = (userId: string, venueId: string) => {
 
   // Create or join a session when staff checks in
   const getOrCreateSession = useCallback(async (): Promise<ClubSession> => {
-    const sessionDate = format(new Date(), "yyyy-MM-dd");
+    const now = new Date();
+    const hour = now.getHours();
 
-    // Check for existing open session
+    // Use business-date logic: before force_close_hour → yesterday's date
+    const sessionDate = hour < settings.force_close_hour
+      ? format(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1), "yyyy-MM-dd")
+      : format(now, "yyyy-MM-dd");
+
+    // First, force-close any stale open sessions from previous business dates
+    await forceCloseStaleSessionsClient();
+
+    // Check for existing OPEN session for this business date
     const { data: existing } = await supabase
       .from("club_sessions")
       .select("*")
       .eq("venue_id", venueId)
       .eq("session_date", sessionDate)
+      .eq("status", "open")
       .single();
 
     if (existing) {
@@ -362,7 +372,7 @@ export const useClubSession = (userId: string, venueId: string) => {
 
     if (error) throw error;
     return newSession as ClubSession;
-  }, [venueId]);
+  }, [venueId, settings.force_close_hour, forceCloseStaleSessionsClient]);
 
   // Check in to the current session
   const checkIn = useCallback(async (
