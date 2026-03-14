@@ -120,7 +120,7 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
       setStock(data);
       const initialQuantities: Record<string, string> = {};
       data.forEach(item => {
-        initialQuantities[item.id] = item.quantity.toString();
+        initialQuantities[item.id] = '';
       });
       setQuantities(initialQuantities);
     }
