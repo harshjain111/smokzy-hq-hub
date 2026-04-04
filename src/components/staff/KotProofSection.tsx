@@ -92,9 +92,9 @@ const KotProofSection = ({ user, venueId, sessionId }: KotProofSectionProps) => 
         // Compress image
         const compressedBlob = await compressImage(file);
         
-        // Generate unique filename
+        // Generate unique filename — first folder must be user.id to match storage policy
         const timestamp = Date.now();
-        const filename = `${venueId}/${sessionId}/${user.id}_${timestamp}_${i}.jpg`;
+        const filename = `${user.id}/${venueId}_${sessionId}_${timestamp}_${i}.jpg`;
         
         // Upload to storage
         const { error: uploadError } = await supabase.storage
@@ -106,10 +106,12 @@ const KotProofSection = ({ user, venueId, sessionId }: KotProofSectionProps) => 
 
         if (uploadError) throw uploadError;
 
-        // Get public URL
-        const { data: urlData } = supabase.storage
+        // Get signed URL (bucket is private)
+        const { data: urlData, error: urlError } = await supabase.storage
           .from("kot-photos")
-          .getPublicUrl(filename);
+          .createSignedUrl(filename, 60 * 60 * 24 * 365); // 1 year
+
+        if (urlError || !urlData?.signedUrl) throw urlError || new Error("Failed to get signed URL");
 
         // Create KOT entry
         const { error: entryError } = await supabase
@@ -119,7 +121,7 @@ const KotProofSection = ({ user, venueId, sessionId }: KotProofSectionProps) => 
             session_id: sessionId,
             user_id: user.id,
             entry_type: 'photo',
-            photo_url: urlData.publicUrl,
+            photo_url: urlData.signedUrl,
           });
 
         if (entryError) throw entryError;
