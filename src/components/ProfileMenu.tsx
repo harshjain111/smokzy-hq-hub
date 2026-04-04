@@ -44,7 +44,11 @@ const ProfileMenu = ({ user, role }: ProfileMenuProps) => {
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut({ scope: 'local' });
+    } catch (e) {
+      console.warn("Sign out error (ignored):", e);
+    }
     toast.success("Logged out successfully");
     navigate("/auth");
   };
