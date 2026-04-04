@@ -89,8 +89,13 @@ const KotProofSection = ({ user, venueId, sessionId }: KotProofSectionProps) => 
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         
-        // Compress image
-        const compressedBlob = await compressImage(file);
+        // Compress with aggressive settings to avoid memory issues on mobile
+        const compressedBlob = await compressImage(file, {
+          maxWidth: 1280,
+          maxHeight: 1280,
+          quality: 0.6,
+          maxSizeMB: 0.5,
+        });
         
         // Generate unique filename — first folder must be user.id to match storage policy
         const timestamp = Date.now();
