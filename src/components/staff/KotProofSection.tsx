@@ -23,6 +23,13 @@ import { toast } from "sonner";
 import { Camera, ImagePlus, FileX, Check, Loader2, X, Info } from "lucide-react";
 import { compressImage } from "@/lib/imageCompression";
 
+const getUploadExtension = (file: File) => {
+  if (file.type === "image/png") return "png";
+  if (file.type === "image/webp") return "webp";
+  if (file.type === "image/heic" || file.type === "image/heif") return "heic";
+  return "jpg";
+};
+
 interface KotProofSectionProps {
   user: User;
   venueId: string;
@@ -90,7 +97,7 @@ const KotProofSection = ({ user, venueId, sessionId }: KotProofSectionProps) => 
         const file = files[i];
         
         // Compress with aggressive settings to avoid memory issues on mobile
-        const compressedBlob = await compressImage(file, {
+        const uploadFile = await compressImage(file, {
           maxWidth: 1280,
           maxHeight: 1280,
           quality: 0.6,
@@ -99,13 +106,14 @@ const KotProofSection = ({ user, venueId, sessionId }: KotProofSectionProps) => 
         
         // Generate unique filename — first folder must be user.id to match storage policy
         const timestamp = Date.now();
-        const filename = `${user.id}/${venueId}_${sessionId}_${timestamp}_${i}.jpg`;
+        const extension = getUploadExtension(uploadFile);
+        const filename = `${user.id}/${venueId}_${sessionId}_${timestamp}_${i}.${extension}`;
         
         // Upload to storage
         const { error: uploadError } = await supabase.storage
           .from("kot-photos")
-          .upload(filename, compressedBlob, {
-            contentType: "image/jpeg",
+          .upload(filename, uploadFile, {
+            contentType: uploadFile.type || "image/jpeg",
             upsert: false,
           });
 
@@ -215,6 +223,7 @@ const KotProofSection = ({ user, venueId, sessionId }: KotProofSectionProps) => 
           multiple
         />
         <Button
+          type="button"
           variant="outline"
           size="sm"
           onClick={() => cameraInputRef.current?.click()}
@@ -239,6 +248,7 @@ const KotProofSection = ({ user, venueId, sessionId }: KotProofSectionProps) => 
           multiple
         />
         <Button
+          type="button"
           variant="outline"
           size="sm"
           onClick={() => fileInputRef.current?.click()}
@@ -255,6 +265,7 @@ const KotProofSection = ({ user, venueId, sessionId }: KotProofSectionProps) => 
 
         {/* No KOT button */}
         <Button
+          type="button"
           variant="outline"
           size="sm"
           onClick={() => setShowNoKotDialog(true)}
@@ -342,6 +353,7 @@ const KotProofSection = ({ user, venueId, sessionId }: KotProofSectionProps) => 
 
           <DialogFooter className="gap-2 sm:gap-2">
             <Button
+              type="button"
               variant="outline"
               onClick={() => setShowNoKotDialog(false)}
               disabled={declaring}
@@ -350,6 +362,7 @@ const KotProofSection = ({ user, venueId, sessionId }: KotProofSectionProps) => 
               Cancel
             </Button>
             <Button
+              type="button"
               onClick={handleNoKotDeclaration}
               disabled={declaring || !declarationReason}
               className="flex-1 h-11 rounded-xl bg-warning hover:bg-warning/90 text-warning-foreground"

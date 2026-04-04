@@ -9,6 +9,72 @@ interface CompressionOptions {
   maxSizeMB?: number;
 }
 
+const MEGABYTE = 1024 * 1024;
+
+function getFileExtension(file: File) {
+  const match = file.name.match(/\.([^.]+)$/);
+  return match?.[1]?.toLowerCase() || "jpg";
+}
+
+function loadImageElement(file: File): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(image);
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Failed to decode image"));
+    };
+
+    image.src = objectUrl;
+  });
+}
+
+async function drawCompressedBlob(
+  source: CanvasImageSource,
+  width: number,
+  height: number,
+  quality: number
+): Promise<Blob> {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+
+  const ctx = canvas.getContext('2d', { alpha: false });
+  if (!ctx) throw new Error('Failed to get canvas context');
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'medium';
+  ctx.drawImage(source, 0, 0, width, height);
+
+  const blob = await new Promise<Blob>((res, rej) => {
+    canvas.toBlob(
+      (b) => (b ? res(b) : rej(new Error('Failed to compress image'))),
+      'image/jpeg',
+      quality
+    );
+  });
+
+  canvas.width = 0;
+  canvas.height = 0;
+
+  return blob;
+}
+
+async function createResizedBitmap(file: File, width: number, height: number) {
+  return createImageBitmap(file, {
+    resizeWidth: width,
+    resizeHeight: height,
+    resizeQuality: 'high',
+    imageOrientation: 'from-image',
+  });
+}
+
 const DEFAULT_OPTIONS: Required<CompressionOptions> = {
   maxWidth: 1920,
   maxHeight: 1920,
@@ -28,72 +94,64 @@ export async function compressImage(
 ): Promise<File> {
   const opts = { ...DEFAULT_OPTIONS, ...options };
 
-  // Use createImageBitmap + canvas for memory-efficient processing
-  // Avoids FileReader.readAsDataURL which doubles memory for large files
-  const bitmap = await createImageBitmap(file);
+  if (file.size <= opts.maxSizeMB * MEGABYTE) {
+    return file;
+  }
+
+  let targetWidth = opts.maxWidth;
+  let targetHeight = opts.maxHeight;
+  let source: CanvasImageSource | null = null;
+  let bitmap: ImageBitmap | null = null;
 
   try {
-    let { width, height } = bitmap;
+    try {
+      bitmap = await createResizedBitmap(file, opts.maxWidth, opts.maxHeight);
+      targetWidth = bitmap.width;
+      targetHeight = bitmap.height;
+      source = bitmap;
+    } catch {
+      const image = await loadImageElement(file);
+      const aspectRatio = image.naturalWidth / image.naturalHeight;
 
-    if (width > opts.maxWidth || height > opts.maxHeight) {
-      const aspectRatio = width / height;
-      if (width > height) {
-        width = opts.maxWidth;
-        height = Math.round(width / aspectRatio);
-      } else {
-        height = opts.maxHeight;
-        width = Math.round(height * aspectRatio);
+      targetWidth = image.naturalWidth;
+      targetHeight = image.naturalHeight;
+
+      if (targetWidth > opts.maxWidth || targetHeight > opts.maxHeight) {
+        if (targetWidth > targetHeight) {
+          targetWidth = opts.maxWidth;
+          targetHeight = Math.round(targetWidth / aspectRatio);
+        } else {
+          targetHeight = opts.maxHeight;
+          targetWidth = Math.round(targetHeight * aspectRatio);
+        }
       }
+
+      source = image;
     }
 
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
+    let finalBlob = await drawCompressedBlob(source, targetWidth, targetHeight, opts.quality);
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('Failed to get canvas context');
-
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(bitmap, 0, 0, width, height);
-
-    // Release bitmap memory immediately
-    bitmap.close();
-
-    const blob = await new Promise<Blob>((res, rej) => {
-      canvas.toBlob(
-        (b) => (b ? res(b) : rej(new Error('Failed to compress image'))),
-        'image/jpeg',
-        opts.quality
+    if (finalBlob.size > opts.maxSizeMB * MEGABYTE) {
+      finalBlob = await drawCompressedBlob(
+        source,
+        Math.max(960, Math.round(targetWidth * 0.75)),
+        Math.max(960, Math.round(targetHeight * 0.75)),
+        Math.max(0.35, opts.quality - 0.25)
       );
-    });
-
-    // If still too large, retry with lower quality
-    let finalBlob = blob;
-    if (blob.size / (1024 * 1024) > opts.maxSizeMB && opts.quality > 0.4) {
-      finalBlob = await new Promise<Blob>((res, rej) => {
-        canvas.toBlob(
-          (b) => (b ? res(b) : rej(new Error('Re-compress failed'))),
-          'image/jpeg',
-          Math.max(0.3, opts.quality - 0.2)
-        );
-      });
     }
-
-    // Release canvas memory
-    canvas.width = 0;
-    canvas.height = 0;
 
     const compressedFile = new File(
       [finalBlob],
       file.name.replace(/\.[^/.]+$/, '.jpg'),
-      { type: 'image/jpeg' }
+      { type: 'image/jpeg', lastModified: Date.now() }
     );
 
     console.log(`Image compressed: ${(file.size / 1024).toFixed(0)}KB → ${(compressedFile.size / 1024).toFixed(0)}KB`);
     return compressedFile;
   } catch (error) {
-    bitmap.close();
-    throw error;
+    console.warn(`Image compression skipped for ${file.name}.${getFileExtension(file)}:`, error);
+    return file;
+  } finally {
+    bitmap?.close();
   }
 }
