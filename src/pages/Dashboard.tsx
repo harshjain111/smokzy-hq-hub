@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import AdminDashboard from "@/components/dashboard/AdminDashboard";
 import EmployeeDashboard from "@/components/dashboard/EmployeeDashboard";
 import ClubManagementDashboard from "@/components/dashboard/ClubManagementDashboard";
+import DailySummary from "@/pages/DailySummary";
 import ProfileMenu from "@/components/ProfileMenu";
 import AdminSettingsMenu from "@/components/AdminSettingsMenu";
 
@@ -112,6 +113,11 @@ const Dashboard = () => {
   // For employees, render StaffPortal directly (it has its own full layout)
   if (userRole.role === "employee" && userRole.venueId) {
     return <EmployeeDashboard user={user!} venueId={userRole.venueId} />;
+  }
+
+  // Club Incharge gets their own command center
+  if (userRole.role === "club_incharge") {
+    return <DailySummary user={user!} />;
   }
 
   // Role display text
