@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { Settings, Building2, Users, Tag, CalendarClock, Camera, Leaf } from "lucide-react";
+import { Settings, Building2, Users, Tag, CalendarClock, Camera, Leaf, CalendarDays, CalendarCheck, Package, History } from "lucide-react";
 
 const AdminSettingsMenu = () => {
   const navigate = useNavigate();
@@ -49,6 +49,22 @@ const AdminSettingsMenu = () => {
         <DropdownMenuItem onClick={() => navigate("/manage-flavours")}>
           <Leaf className="mr-2 h-4 w-4" />
           Manage Flavours
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate("/roster/weekly")}>
+          <CalendarDays className="mr-2 h-4 w-4" />
+          Weekly Roster
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate("/roster/daily")}>
+          <CalendarCheck className="mr-2 h-4 w-4" />
+          Daily Roster
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate("/packet-dispatch")}>
+          <Package className="mr-2 h-4 w-4" />
+          Packet Dispatch
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate("/packet-dispatch/history")}>
+          <History className="mr-2 h-4 w-4" />
+          Dispatch History
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
