@@ -25,6 +25,8 @@ import DailyClubReport from "./pages/DailyClubReport";
 import InspectionForm from "./pages/InspectionForm";
 import InspectionHistory from "./pages/InspectionHistory";
 import StaffPerformance from "./pages/StaffPerformance";
+import WeeklySummary from "./pages/WeeklySummary";
+import AccessoryTracker from "./pages/AccessoryTracker";
 
 const queryClient = new QueryClient();
 
@@ -55,6 +57,8 @@ const App = () => (
           <Route path="/inspections" element={<ProtectedRoute><InspectionHistory /></ProtectedRoute>} />
           <Route path="/inspections/new" element={<ProtectedRoute><InspectionForm /></ProtectedRoute>} />
           <Route path="/staff-performance" element={<ProtectedRoute><StaffPerformance /></ProtectedRoute>} />
+          <Route path="/weekly-summary" element={<ProtectedRoute><WeeklySummary /></ProtectedRoute>} />
+          <Route path="/accessories" element={<ProtectedRoute><AccessoryTracker /></ProtectedRoute>} />
           <Route path="/my-profile" element={<ProtectedRoute><MyProfile /></ProtectedRoute>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
