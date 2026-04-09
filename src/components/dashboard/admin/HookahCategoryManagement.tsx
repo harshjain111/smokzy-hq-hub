@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Plus, Trash2, Package } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 
 interface Venue {
   id: string;
@@ -18,6 +19,7 @@ interface HookahCategory {
   id: string;
   venue_id: string;
   category_name: string;
+  is_packet_trackable: boolean;
   venue_name?: string;
 }
 
@@ -184,13 +186,22 @@ const HookahCategoryManagement = () => {
                         className="flex items-center justify-between p-3 bg-muted rounded-lg"
                       >
                         <span className="font-medium">{category.category_name}</span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteCategory(category.id)}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              checked={category.is_packet_trackable}
+                              onCheckedChange={() => handleToggleTrackable(category)}
+                            />
+                            <span className="text-xs text-muted-foreground">Packet</span>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteCategory(category.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>
