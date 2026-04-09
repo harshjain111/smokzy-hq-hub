@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import AdminDashboard from "@/components/dashboard/AdminDashboard";
 import EmployeeDashboard from "@/components/dashboard/EmployeeDashboard";
 import ClubManagementDashboard from "@/components/dashboard/ClubManagementDashboard";
+import DailySummary from "@/pages/DailySummary";
 import ProfileMenu from "@/components/ProfileMenu";
 import AdminSettingsMenu from "@/components/AdminSettingsMenu";
 
@@ -114,6 +115,11 @@ const Dashboard = () => {
     return <EmployeeDashboard user={user!} venueId={userRole.venueId} />;
   }
 
+  // Club Incharge gets their own command center
+  if (userRole.role === "club_incharge") {
+    return <DailySummary user={user!} />;
+  }
+
   // Role display text
   const getRoleDisplayText = () => {
     switch (userRole.role) {
@@ -139,14 +145,14 @@ const Dashboard = () => {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            {(userRole.role === "admin" || userRole.role === "club_incharge") && <AdminSettingsMenu />}
+            {userRole.role === "admin" && <AdminSettingsMenu />}
             <ProfileMenu user={user!} role={userRole.role} />
           </div>
         </div>
       </header>
 
       <main className="container mx-auto px-4 py-6">
-        {(userRole.role === "admin" || userRole.role === "club_incharge") && <AdminDashboard user={user!} />}
+        {userRole.role === "admin" && <AdminDashboard user={user!} />}
         {userRole.role === "club_management" && (
           <ClubManagementDashboard user={user!} venueIds={userRole.venueIds} />
         )}
