@@ -105,6 +105,24 @@ const HookahCategoryManagement = () => {
     }
   };
 
+  const handleToggleTrackable = async (category: HookahCategory) => {
+    const { error } = await supabase
+      .from("venue_hookah_categories")
+      .update({ is_packet_trackable: !category.is_packet_trackable })
+      .eq("id", category.id);
+
+    if (error) {
+      toast.error("Failed to update trackable status");
+    } else {
+      toast.success(
+        !category.is_packet_trackable
+          ? "Category now counts as packet usage"
+          : "Category no longer counts as packet usage"
+      );
+      fetchCategories();
+    }
+  };
+
   // Group categories by venue
   const groupedCategories = categories.reduce((acc, cat) => {
     if (!acc[cat.venue_id]) {
