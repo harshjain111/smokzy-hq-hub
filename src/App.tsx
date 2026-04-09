@@ -21,6 +21,7 @@ import WeeklyRoster from "./pages/WeeklyRoster";
 import DailyRoster from "./pages/DailyRoster";
 import PacketDispatch from "./pages/PacketDispatch";
 import DispatchHistory from "./pages/DispatchHistory";
+import DailyClubReport from "./pages/DailyClubReport";
 
 const queryClient = new QueryClient();
 
@@ -47,6 +48,7 @@ const App = () => (
           <Route path="/roster/daily" element={<ProtectedRoute><DailyRoster /></ProtectedRoute>} />
           <Route path="/packet-dispatch" element={<ProtectedRoute><PacketDispatch /></ProtectedRoute>} />
           <Route path="/packet-dispatch/history" element={<ProtectedRoute><DispatchHistory /></ProtectedRoute>} />
+          <Route path="/daily-report" element={<ProtectedRoute><DailyClubReport /></ProtectedRoute>} />
           <Route path="/my-profile" element={<ProtectedRoute><MyProfile /></ProtectedRoute>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
