@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 
-export type AppRole = "admin" | "employee" | "club_management";
+export type AppRole = "admin" | "employee" | "club_management" | "club_incharge";
 
 export interface UserRole {
   role: AppRole;
@@ -34,8 +34,9 @@ export const useUserRole = (user: User | null) => {
         console.error("Error fetching user role:", error);
         setUserRole(null);
       } else if (data && data.length > 0) {
-        // Prioritize roles: admin > club_management > employee
+        // Prioritize roles: admin > club_incharge > club_management > employee
         const adminRole = data.find(r => r.role === 'admin');
+        const clubInchargeRole = data.find(r => r.role === 'club_incharge');
         const clubMgmtRoles = data.filter(r => r.role === 'club_management');
         const employeeRole = data.find(r => r.role === 'employee');
 
@@ -44,6 +45,12 @@ export const useUserRole = (user: User | null) => {
             role: 'admin',
             venueId: adminRole.venue_id,
             venueIds: data.filter(r => r.venue_id).map(r => r.venue_id as string),
+          });
+        } else if (clubInchargeRole) {
+          setUserRole({
+            role: 'club_incharge',
+            venueId: null,
+            venueIds: [], // club_incharge has global access, no venue scoping
           });
         } else if (clubMgmtRoles.length > 0) {
           setUserRole({
