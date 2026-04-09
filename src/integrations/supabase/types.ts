@@ -271,6 +271,57 @@ export type Database = {
           },
         ]
       }
+      flavours: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          packet_weight_grams: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          packet_weight_grams?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          packet_weight_grams?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      global_settings: {
+        Row: {
+          created_at: string
+          id: string
+          key: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          key: string
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          key?: string
+          updated_at?: string
+          value?: string
+        }
+        Relationships: []
+      }
       hookah_pots: {
         Row: {
           created_at: string
@@ -299,6 +350,125 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "hookah_pots_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inspection_stock_checks: {
+        Row: {
+          created_at: string
+          flavour_id: string
+          id: string
+          inspection_id: string
+          match: boolean | null
+          measured_stock: number
+          reported_stock: number
+        }
+        Insert: {
+          created_at?: string
+          flavour_id: string
+          id?: string
+          inspection_id: string
+          match?: boolean | null
+          measured_stock?: number
+          reported_stock?: number
+        }
+        Update: {
+          created_at?: string
+          flavour_id?: string
+          id?: string
+          inspection_id?: string
+          match?: boolean | null
+          measured_stock?: number
+          reported_stock?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inspection_stock_checks_flavour_id_fkey"
+            columns: ["flavour_id"]
+            isOneToOne: false
+            referencedRelation: "flavours"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inspection_stock_checks_inspection_id_fkey"
+            columns: ["inspection_id"]
+            isOneToOne: false
+            referencedRelation: "inspections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inspections: {
+        Row: {
+          billing_accuracy: boolean
+          closing_procedure: boolean
+          created_at: string
+          customer_feedback: boolean
+          date: string
+          equipment_condition: boolean
+          hookah_quality: boolean
+          id: string
+          inspector_id: string
+          inventory_check: boolean
+          music_ambience: boolean
+          opening_procedure: boolean
+          remarks: string | null
+          safety_compliance: boolean
+          staff_behavior: boolean
+          staff_grooming: boolean
+          time: string
+          venue_cleanliness: boolean
+          venue_id: string
+        }
+        Insert: {
+          billing_accuracy?: boolean
+          closing_procedure?: boolean
+          created_at?: string
+          customer_feedback?: boolean
+          date: string
+          equipment_condition?: boolean
+          hookah_quality?: boolean
+          id?: string
+          inspector_id: string
+          inventory_check?: boolean
+          music_ambience?: boolean
+          opening_procedure?: boolean
+          remarks?: string | null
+          safety_compliance?: boolean
+          staff_behavior?: boolean
+          staff_grooming?: boolean
+          time: string
+          venue_cleanliness?: boolean
+          venue_id: string
+        }
+        Update: {
+          billing_accuracy?: boolean
+          closing_procedure?: boolean
+          created_at?: string
+          customer_feedback?: boolean
+          date?: string
+          equipment_condition?: boolean
+          hookah_quality?: boolean
+          id?: string
+          inspector_id?: string
+          inventory_check?: boolean
+          music_ambience?: boolean
+          opening_procedure?: boolean
+          remarks?: string | null
+          safety_compliance?: boolean
+          staff_behavior?: boolean
+          staff_grooming?: boolean
+          time?: string
+          venue_cleanliness?: boolean
+          venue_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inspections_venue_id_fkey"
             columns: ["venue_id"]
             isOneToOne: false
             referencedRelation: "venues"
@@ -357,6 +527,54 @@ export type Database = {
           },
         ]
       }
+      packet_dispatches: {
+        Row: {
+          created_at: string
+          date: string
+          dispatched_by: string
+          flavour_id: string
+          id: string
+          quantity_sent: number
+          received_by_staff_id: string | null
+          venue_id: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          dispatched_by: string
+          flavour_id: string
+          id?: string
+          quantity_sent?: number
+          received_by_staff_id?: string | null
+          venue_id: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          dispatched_by?: string
+          flavour_id?: string
+          id?: string
+          quantity_sent?: number
+          received_by_staff_id?: string | null
+          venue_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "packet_dispatches_flavour_id_fkey"
+            columns: ["flavour_id"]
+            isOneToOne: false
+            referencedRelation: "flavours"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "packet_dispatches_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -383,6 +601,59 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      roster_assignments: {
+        Row: {
+          assigned_by: string
+          created_at: string
+          date: string
+          id: string
+          remarks: string | null
+          shift_end: string | null
+          shift_start: string | null
+          staff_id: string
+          status: string
+          updated_at: string
+          venue_id: string
+          week_start_date: string | null
+        }
+        Insert: {
+          assigned_by: string
+          created_at?: string
+          date: string
+          id?: string
+          remarks?: string | null
+          shift_end?: string | null
+          shift_start?: string | null
+          staff_id: string
+          status?: string
+          updated_at?: string
+          venue_id: string
+          week_start_date?: string | null
+        }
+        Update: {
+          assigned_by?: string
+          created_at?: string
+          date?: string
+          id?: string
+          remarks?: string | null
+          shift_end?: string | null
+          shift_start?: string | null
+          staff_id?: string
+          status?: string
+          updated_at?: string
+          venue_id?: string
+          week_start_date?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roster_assignments_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sales_reports: {
         Row: {
@@ -559,6 +830,95 @@ export type Database = {
           },
         ]
       }
+      staff_training: {
+        Row: {
+          certified_by: string | null
+          completed: boolean
+          completed_date: string | null
+          created_at: string
+          id: string
+          score: number | null
+          staff_id: string
+          training_type: string
+          updated_at: string
+        }
+        Insert: {
+          certified_by?: string | null
+          completed?: boolean
+          completed_date?: string | null
+          created_at?: string
+          id?: string
+          score?: number | null
+          staff_id: string
+          training_type: string
+          updated_at?: string
+        }
+        Update: {
+          certified_by?: string | null
+          completed?: boolean
+          completed_date?: string | null
+          created_at?: string
+          id?: string
+          score?: number | null
+          staff_id?: string
+          training_type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      staff_violations: {
+        Row: {
+          action_taken: string | null
+          created_at: string
+          date: string
+          description: string | null
+          id: string
+          reported_by: string
+          resolved: boolean
+          severity: string
+          staff_id: string
+          type: string
+          updated_at: string
+          venue_id: string
+        }
+        Insert: {
+          action_taken?: string | null
+          created_at?: string
+          date: string
+          description?: string | null
+          id?: string
+          reported_by: string
+          resolved?: boolean
+          severity?: string
+          staff_id: string
+          type: string
+          updated_at?: string
+          venue_id: string
+        }
+        Update: {
+          action_taken?: string | null
+          created_at?: string
+          date?: string
+          description?: string | null
+          id?: string
+          reported_by?: string
+          resolved?: boolean
+          severity?: string
+          staff_id?: string
+          type?: string
+          updated_at?: string
+          venue_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_violations_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stock: {
         Row: {
           category: Database["public"]["Enums"]["stock_category"]
@@ -635,11 +995,62 @@ export type Database = {
           },
         ]
       }
+      venue_accessories: {
+        Row: {
+          checked_by: string | null
+          condition: string
+          created_at: string
+          id: string
+          item_type: string
+          last_checked_date: string | null
+          quantity: number
+          remarks: string | null
+          replacement_needed: boolean
+          updated_at: string
+          venue_id: string
+        }
+        Insert: {
+          checked_by?: string | null
+          condition?: string
+          created_at?: string
+          id?: string
+          item_type: string
+          last_checked_date?: string | null
+          quantity?: number
+          remarks?: string | null
+          replacement_needed?: boolean
+          updated_at?: string
+          venue_id: string
+        }
+        Update: {
+          checked_by?: string | null
+          condition?: string
+          created_at?: string
+          id?: string
+          item_type?: string
+          last_checked_date?: string | null
+          quantity?: number
+          remarks?: string | null
+          replacement_needed?: boolean
+          updated_at?: string
+          venue_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venue_accessories_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       venue_hookah_categories: {
         Row: {
           category_name: string
           created_at: string
           id: string
+          is_packet_trackable: boolean
           updated_at: string
           venue_id: string
         }
@@ -647,6 +1058,7 @@ export type Database = {
           category_name: string
           created_at?: string
           id?: string
+          is_packet_trackable?: boolean
           updated_at?: string
           venue_id: string
         }
@@ -654,6 +1066,7 @@ export type Database = {
           category_name?: string
           created_at?: string
           id?: string
+          is_packet_trackable?: boolean
           updated_at?: string
           venue_id?: string
         }
@@ -708,6 +1121,59 @@ export type Database = {
           },
         ]
       }
+      venue_stock_daily: {
+        Row: {
+          closing_stock: number | null
+          created_at: string
+          date: string
+          id: string
+          min_stock_threshold: number
+          opening_stock: number | null
+          opening_stock_source: string
+          packets_received: number
+          packets_used: number
+          updated_at: string
+          updated_by: string | null
+          venue_id: string
+        }
+        Insert: {
+          closing_stock?: number | null
+          created_at?: string
+          date: string
+          id?: string
+          min_stock_threshold?: number
+          opening_stock?: number | null
+          opening_stock_source?: string
+          packets_received?: number
+          packets_used?: number
+          updated_at?: string
+          updated_by?: string | null
+          venue_id: string
+        }
+        Update: {
+          closing_stock?: number | null
+          created_at?: string
+          date?: string
+          id?: string
+          min_stock_threshold?: number
+          opening_stock?: number | null
+          opening_stock_source?: string
+          packets_received?: number
+          packets_used?: number
+          updated_at?: string
+          updated_by?: string | null
+          venue_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venue_stock_daily_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       venues: {
         Row: {
           created_at: string
@@ -741,6 +1207,7 @@ export type Database = {
       get_user_venue: { Args: { user_id: string }; Returns: string }
       get_user_venues: { Args: { p_user_id: string }; Returns: string[] }
       is_admin: { Args: { user_id: string }; Returns: boolean }
+      is_club_incharge: { Args: { p_user_id: string }; Returns: boolean }
       is_club_management: { Args: { p_user_id: string }; Returns: boolean }
     }
     Enums: {
