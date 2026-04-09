@@ -119,6 +119,8 @@ const Dashboard = () => {
     switch (userRole.role) {
       case 'admin':
         return 'Multi-Venue Management';
+      case 'club_incharge':
+        return 'Club Incharge Portal';
       case 'club_management':
         return 'Club Management Portal';
       default:
@@ -137,14 +139,14 @@ const Dashboard = () => {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            {userRole.role === "admin" && <AdminSettingsMenu />}
+            {(userRole.role === "admin" || userRole.role === "club_incharge") && <AdminSettingsMenu />}
             <ProfileMenu user={user!} role={userRole.role} />
           </div>
         </div>
       </header>
 
       <main className="container mx-auto px-4 py-6">
-        {userRole.role === "admin" && <AdminDashboard user={user!} />}
+        {(userRole.role === "admin" || userRole.role === "club_incharge") && <AdminDashboard user={user!} />}
         {userRole.role === "club_management" && (
           <ClubManagementDashboard user={user!} venueIds={userRole.venueIds} />
         )}

@@ -13,6 +13,7 @@ import VenueReports from "./pages/VenueReports";
 import ManageVenues from "./pages/ManageVenues";
 import ManageEmployees from "./pages/ManageEmployees";
 import ManageCategories from "./pages/ManageCategories";
+import ManageFlavours from "./pages/ManageFlavours";
 import AttendanceReport from "./pages/AttendanceReport";
 import CounterPictures from "./pages/CounterPictures";
 import ClubDetail from "./pages/ClubDetail";
