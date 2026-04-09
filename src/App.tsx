@@ -22,6 +22,9 @@ import DailyRoster from "./pages/DailyRoster";
 import PacketDispatch from "./pages/PacketDispatch";
 import DispatchHistory from "./pages/DispatchHistory";
 import DailyClubReport from "./pages/DailyClubReport";
+import InspectionForm from "./pages/InspectionForm";
+import InspectionHistory from "./pages/InspectionHistory";
+import StaffPerformance from "./pages/StaffPerformance";
 
 const queryClient = new QueryClient();
 
@@ -49,6 +52,9 @@ const App = () => (
           <Route path="/packet-dispatch" element={<ProtectedRoute><PacketDispatch /></ProtectedRoute>} />
           <Route path="/packet-dispatch/history" element={<ProtectedRoute><DispatchHistory /></ProtectedRoute>} />
           <Route path="/daily-report" element={<ProtectedRoute><DailyClubReport /></ProtectedRoute>} />
+          <Route path="/inspections" element={<ProtectedRoute><InspectionHistory /></ProtectedRoute>} />
+          <Route path="/inspections/new" element={<ProtectedRoute><InspectionForm /></ProtectedRoute>} />
+          <Route path="/staff-performance" element={<ProtectedRoute><StaffPerformance /></ProtectedRoute>} />
           <Route path="/my-profile" element={<ProtectedRoute><MyProfile /></ProtectedRoute>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
