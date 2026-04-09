@@ -145,14 +145,14 @@ const Dashboard = () => {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            {(userRole.role === "admin" || userRole.role === "club_incharge") && <AdminSettingsMenu />}
+            {userRole.role === "admin" && <AdminSettingsMenu />}
             <ProfileMenu user={user!} role={userRole.role} />
           </div>
         </div>
       </header>
 
       <main className="container mx-auto px-4 py-6">
-        {(userRole.role === "admin" || userRole.role === "club_incharge") && <AdminDashboard user={user!} />}
+        {userRole.role === "admin" && <AdminDashboard user={user!} />}
         {userRole.role === "club_management" && (
           <ClubManagementDashboard user={user!} venueIds={userRole.venueIds} />
         )}
