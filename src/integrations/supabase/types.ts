@@ -744,7 +744,7 @@ export type Database = {
       is_club_management: { Args: { p_user_id: string }; Returns: boolean }
     }
     Enums: {
-      app_role: "admin" | "employee" | "club_management"
+      app_role: "admin" | "employee" | "club_management" | "club_incharge"
       hookah_category: "premium" | "standard" | "budget"
       stock_category: "flavour" | "hookah_pots" | "accessories"
     }
@@ -874,7 +874,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "employee", "club_management"],
+      app_role: ["admin", "employee", "club_management", "club_incharge"],
       hookah_category: ["premium", "standard", "budget"],
       stock_category: ["flavour", "hookah_pots", "accessories"],
     },
