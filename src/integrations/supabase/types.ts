@@ -416,13 +416,16 @@ export type Database = {
           inventory_check: boolean
           music_ambience: boolean
           opening_procedure: boolean
+          photo_url: string | null
           remarks: string | null
           safety_compliance: boolean
+          score: number | null
           staff_behavior: boolean
           staff_grooming: boolean
           time: string
           venue_cleanliness: boolean
           venue_id: string
+          violation_noted: boolean
         }
         Insert: {
           billing_accuracy?: boolean
@@ -437,13 +440,16 @@ export type Database = {
           inventory_check?: boolean
           music_ambience?: boolean
           opening_procedure?: boolean
+          photo_url?: string | null
           remarks?: string | null
           safety_compliance?: boolean
+          score?: number | null
           staff_behavior?: boolean
           staff_grooming?: boolean
           time: string
           venue_cleanliness?: boolean
           venue_id: string
+          violation_noted?: boolean
         }
         Update: {
           billing_accuracy?: boolean
@@ -458,13 +464,16 @@ export type Database = {
           inventory_check?: boolean
           music_ambience?: boolean
           opening_procedure?: boolean
+          photo_url?: string | null
           remarks?: string | null
           safety_compliance?: boolean
+          score?: number | null
           staff_behavior?: boolean
           staff_grooming?: boolean
           time?: string
           venue_cleanliness?: boolean
           venue_id?: string
+          violation_noted?: boolean
         }
         Relationships: [
           {
