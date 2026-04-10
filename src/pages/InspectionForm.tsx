@@ -74,6 +74,17 @@ const InspectionForm = () => {
 
   useEffect(() => {
     supabase.from("venues").select("id, name").order("name").then(({ data }) => setVenues(data || []));
+    // Load custom checklist from global_settings
+    supabase.from("global_settings").select("value").eq("key", "inspection_checklist").single().then(({ data }) => {
+      let checkItems = DEFAULT_CHECKS;
+      if (data?.value) {
+        try { checkItems = JSON.parse(data.value); } catch {}
+      }
+      setCHECKS(checkItems);
+      const init: Record<string, boolean> = {};
+      checkItems.forEach(c => (init[c.key] = false));
+      setChecks(init);
+    });
   }, []);
 
   // When venue changes, pick random spot-check flavours + fetch staff
