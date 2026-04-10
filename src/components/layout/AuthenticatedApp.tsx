@@ -37,6 +37,7 @@ const MyProfile = lazy(() => import("@/pages/MyProfile"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
 const INCHARGE_ROLES = ["admin", "club_incharge"] as const;
+const INCHARGE_PLUS_MGMT = ["admin", "club_incharge", "club_management"] as const;
 const ADMIN_ONLY = ["admin"] as const;
 
 const AuthenticatedApp = () => {
@@ -118,8 +119,8 @@ const AuthenticatedApp = () => {
           <Route path="/manage-venues" element={guard([...INCHARGE_ROLES], <ManageVenues />)} />
           <Route path="/manage-categories" element={guard([...INCHARGE_ROLES], <ManageCategories />)} />
           <Route path="/manage-flavours" element={guard([...INCHARGE_ROLES], <ManageFlavours />)} />
-          <Route path="/attendance-report" element={guard([...INCHARGE_ROLES], <AttendanceReport />)} />
-          <Route path="/counter-pictures" element={guard([...INCHARGE_ROLES], <CounterPictures />)} />
+          <Route path="/attendance-report" element={guard([...INCHARGE_PLUS_MGMT], <AttendanceReport />)} />
+          <Route path="/counter-pictures" element={guard([...INCHARGE_PLUS_MGMT], <CounterPictures />)} />
           <Route path="/roster/weekly" element={guard([...INCHARGE_ROLES], <WeeklyRoster />)} />
           <Route path="/roster/daily" element={guard([...INCHARGE_ROLES], <DailyRoster />)} />
           <Route path="/packet-dispatch" element={guard([...INCHARGE_ROLES], <PacketDispatch />)} />
