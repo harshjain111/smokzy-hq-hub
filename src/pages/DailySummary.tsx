@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import {
   Package,
   ShoppingCart,
@@ -17,6 +16,8 @@ import {
 } from "lucide-react";
 import ProfileMenu from "@/components/ProfileMenu";
 import AdminSettingsMenu from "@/components/AdminSettingsMenu";
+import NotificationBell from "@/components/NotificationBell";
+import RecentActivityFeed from "@/components/dashboard/RecentActivityFeed";
 import { User } from "@supabase/supabase-js";
 
 interface DailySummaryProps {
@@ -25,9 +26,17 @@ interface DailySummaryProps {
 
 const formatDate = (d: Date) => d.toISOString().split("T")[0];
 
+const getGreeting = () => {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
+};
+
 const DailySummary = ({ user }: DailySummaryProps) => {
   const navigate = useNavigate();
   const today = formatDate(new Date());
+  const [userName, setUserName] = useState("");
 
   const [kpis, setKpis] = useState({
     dispatched: 0,
@@ -42,7 +51,13 @@ const DailySummary = ({ user }: DailySummaryProps) => {
 
   useEffect(() => {
     fetchDailyData();
+    fetchUserName();
   }, []);
+
+  const fetchUserName = async () => {
+    const { data } = await supabase.from("profiles").select("full_name").eq("id", user.id).single();
+    if (data?.full_name) setUserName(data.full_name.split(" ")[0]);
+  };
 
   const fetchDailyData = async () => {
     setLoading(true);
@@ -71,35 +86,17 @@ const DailySummary = ({ user }: DailySummaryProps) => {
     const trackableIds = new Set((trackableCats || []).map((c) => c.id));
     const totalSold = (salesData || []).filter((s) => trackableIds.has(s.category_id)).reduce((s, d) => s + d.quantity_sold, 0);
     const totalUsed = (stockDaily || []).reduce((s, d) => s + d.packets_used, 0);
-    const mismatchCount = (stockDaily || []).filter((s) => s.packets_used !== 0).length > 0
-      ? (stockDaily || []).filter((s) => {
-          const venueSold = (salesData || []).filter((sale) => trackableIds.has(sale.category_id)).reduce((sum, sale) => sum + sale.quantity_sold, 0);
-          return s.packets_used - venueSold !== 0;
-        }).length
-      : 0;
 
     const uniqueStaff = new Set((activeBlocks || []).map((b) => b.user_id));
 
-    // Alerts
     const newAlerts: { type: string; message: string; venueId?: string }[] = [];
-
-    // Low stock alerts
     (lowStockVenues || []).forEach((v) => {
       if (v.closing_stock !== null && v.closing_stock <= v.min_stock_threshold) {
-        newAlerts.push({
-          type: "low_stock",
-          message: `Low stock: ${v.closing_stock} packets remaining`,
-          venueId: v.venue_id,
-        });
+        newAlerts.push({ type: "low_stock", message: `Low stock: ${v.closing_stock} packets remaining`, venueId: v.venue_id });
       }
     });
-
-    // Mismatch alert
     if (totalUsed - totalSold > 0) {
-      newAlerts.push({
-        type: "mismatch",
-        message: `Net mismatch today: ${totalUsed - totalSold} packets unaccounted`,
-      });
+      newAlerts.push({ type: "mismatch", message: `Net mismatch today: ${totalUsed - totalSold} packets unaccounted` });
     }
 
     setKpis({
@@ -136,12 +133,15 @@ const DailySummary = ({ user }: DailySummaryProps) => {
       <header className="border-b bg-card">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-primary">Smokzy HQ</h1>
-            <p className="text-sm text-muted-foreground">
+            <h1 className="text-xl md:text-2xl font-bold text-primary">
+              {getGreeting()}, {userName || "Boss"} 👋
+            </h1>
+            <p className="text-xs md:text-sm text-muted-foreground">
               {new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" })}
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 md:gap-3">
+            <NotificationBell />
             <AdminSettingsMenu />
             <ProfileMenu user={user} role="club_incharge" />
           </div>
@@ -176,10 +176,7 @@ const DailySummary = ({ user }: DailySummaryProps) => {
             </CardHeader>
             <CardContent className="space-y-2">
               {alerts.slice(0, 5).map((alert, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-2 text-sm p-2 rounded-lg bg-background/50"
-                >
+                <div key={i} className="flex items-center gap-2 text-sm p-2 rounded-lg bg-background/50">
                   <AlertTriangle className="h-3.5 w-3.5 text-destructive shrink-0" />
                   <span className="flex-1">{alert.message}</span>
                 </div>
@@ -191,7 +188,7 @@ const DailySummary = ({ user }: DailySummaryProps) => {
         {/* Quick Actions */}
         <div>
           <h2 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">Quick Actions</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
             {quickActions.map((action) => (
               <button
                 key={action.route}
@@ -204,11 +201,14 @@ const DailySummary = ({ user }: DailySummaryProps) => {
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-sm">{action.label}</div>
                 </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                <ChevronRight className="h-4 w-4 text-muted-foreground opacity-50 group-hover:opacity-100 transition-opacity" />
               </button>
             ))}
           </div>
         </div>
+
+        {/* Recent Activity */}
+        <RecentActivityFeed />
       </main>
     </div>
   );
