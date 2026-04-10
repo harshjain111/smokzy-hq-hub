@@ -87,7 +87,9 @@ const AppShell = ({ children, user, role, pageTitle }: AppShellProps) => {
             </Button>
           )}
         </div>
-        <AppSidebar collapsed={sidebarCollapsed || isTablet} role={role} />
+        <div className="flex-1 overflow-y-auto">
+          <AppSidebar collapsed={sidebarCollapsed || isTablet} role={role} />
+        </div>
       </aside>
 
       {/* Mobile "More" drawer */}
