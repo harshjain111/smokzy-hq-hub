@@ -4,8 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Package, ShoppingCart, AlertTriangle, ClipboardCheck, ChevronRight,
-  CalendarDays, BarChart3, Users, Bell,
+  CalendarDays, BarChart3, Users, Bell, ListChecks, Clock,
 } from "lucide-react";
+import { useNavigate as useNav } from "react-router-dom";
+import { Badge } from "@/components/ui/badge";
 import RecentActivityFeed from "@/components/dashboard/RecentActivityFeed";
 import { Skeleton } from "@/components/ui/skeleton";
 
