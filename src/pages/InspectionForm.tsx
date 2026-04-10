@@ -62,13 +62,31 @@ const InspectionForm = () => {
   const [loadingSpotChecks, setLoadingSpotChecks] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Violation fields
+  // Violation fields — support multiple
+  interface ViolationEntry {
+    staffId: string;
+    type: string;
+    severity: string;
+    description: string;
+  }
   const [violationNoted, setViolationNoted] = useState(false);
-  const [violationType, setViolationType] = useState("");
-  const [violationDesc, setViolationDesc] = useState("");
-  const [violationSeverity, setViolationSeverity] = useState("low");
-  const [violationStaffId, setViolationStaffId] = useState("");
+  const [violations, setViolations] = useState<ViolationEntry[]>([
+    { staffId: "", type: "", severity: "low", description: "" },
+  ]);
   const [venueStaff, setVenueStaff] = useState<{ id: string; name: string }[]>([]);
+
+  const addViolation = () => {
+    setViolations((prev) => [...prev, { staffId: "", type: "", severity: "low", description: "" }]);
+  };
+
+  const updateViolation = (index: number, field: keyof ViolationEntry, value: string) => {
+    setViolations((prev) => prev.map((v, i) => (i === index ? { ...v, [field]: value } : v)));
+  };
+
+  const removeViolation = (index: number) => {
+    setViolations((prev) => prev.filter((_, i) => i !== index));
+    if (violations.length <= 1) setViolationNoted(false);
+  };
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -242,20 +260,25 @@ const InspectionForm = () => {
         if (scError) throw scError;
       }
 
-      // Auto-create violation if noted
-      if (violationNoted && violationType && violationStaffId) {
-        const { error: vioError } = await supabase
-          .from("staff_violations")
-          .insert({
-            staff_id: violationStaffId,
-            venue_id: selectedVenue,
-            type: violationType,
-            description: violationDesc || null,
-            severity: violationSeverity,
-            date: now.toISOString().split("T")[0],
-            reported_by: user.id,
-          });
-        if (vioError) console.error("Violation insert error:", vioError);
+      // Auto-create violations if noted
+      if (violationNoted && violations.length > 0) {
+        const validViolations = violations.filter((v) => v.type && v.staffId);
+        if (validViolations.length > 0) {
+          const { error: vioError } = await supabase
+            .from("staff_violations")
+            .insert(
+              validViolations.map((v) => ({
+                staff_id: v.staffId,
+                venue_id: selectedVenue,
+                type: v.type,
+                description: v.description || null,
+                severity: v.severity,
+                date: now.toISOString().split("T")[0],
+                reported_by: user.id,
+              }))
+            );
+          if (vioError) console.error("Violation insert error:", vioError);
+        }
       }
 
       toast.success(`Inspection submitted — Score: ${scorePercent}%`);
@@ -456,50 +479,73 @@ const InspectionForm = () => {
             </button>
 
             {violationNoted && (
-              <div className="space-y-3 pt-2 border-t">
-                <Select value={violationStaffId} onValueChange={setViolationStaffId}>
-                  <SelectTrigger className="h-12">
-                    <SelectValue placeholder="Staff involved..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {venueStaff.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={violationType} onValueChange={setViolationType}>
-                  <SelectTrigger className="h-12">
-                    <SelectValue placeholder="Violation type..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="grooming">Grooming</SelectItem>
-                    <SelectItem value="behavior">Behavior</SelectItem>
-                    <SelectItem value="attendance">Attendance</SelectItem>
-                    <SelectItem value="safety">Safety</SelectItem>
-                    <SelectItem value="stock_misuse">Stock Misuse</SelectItem>
-                    <SelectItem value="procedure_violation">Procedure Violation</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={violationSeverity} onValueChange={setViolationSeverity}>
-                  <SelectTrigger className="h-12">
-                    <SelectValue placeholder="Severity..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="critical">Critical</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Textarea
-                  placeholder="Describe the violation..."
-                  value={violationDesc}
-                  onChange={(e) => setViolationDesc(e.target.value)}
-                  className="min-h-[80px]"
-                />
+              <div className="space-y-4 pt-2 border-t">
+                {violations.map((v, idx) => (
+                  <div key={idx} className="space-y-3 p-3 rounded-lg bg-muted/30 relative">
+                    {violations.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeViolation(idx)}
+                        className="absolute top-2 right-2 text-muted-foreground hover:text-destructive"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                    <div className="text-xs font-semibold text-muted-foreground">Violation #{idx + 1}</div>
+                    <Select value={v.staffId} onValueChange={(val) => updateViolation(idx, "staffId", val)}>
+                      <SelectTrigger className="h-12">
+                        <SelectValue placeholder="Staff involved..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {venueStaff.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={v.type} onValueChange={(val) => updateViolation(idx, "type", val)}>
+                      <SelectTrigger className="h-12">
+                        <SelectValue placeholder="Violation type..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="grooming">Grooming</SelectItem>
+                        <SelectItem value="behavior">Behavior</SelectItem>
+                        <SelectItem value="attendance">Attendance</SelectItem>
+                        <SelectItem value="safety">Safety</SelectItem>
+                        <SelectItem value="stock_misuse">Stock Misuse</SelectItem>
+                        <SelectItem value="procedure_violation">Procedure Violation</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select value={v.severity} onValueChange={(val) => updateViolation(idx, "severity", val)}>
+                      <SelectTrigger className="h-12">
+                        <SelectValue placeholder="Severity..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="low">Low</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="high">High</SelectItem>
+                        <SelectItem value="critical">Critical</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Textarea
+                      placeholder="Describe the violation..."
+                      value={v.description}
+                      onChange={(e) => updateViolation(idx, "description", e.target.value)}
+                      className="min-h-[80px]"
+                    />
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addViolation}
+                  className="w-full border-dashed"
+                >
+                  + Add Another Violation
+                </Button>
               </div>
             )}
           </CardContent>
