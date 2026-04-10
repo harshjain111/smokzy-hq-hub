@@ -12,6 +12,7 @@ import ClubManagementDashboard from "@/components/dashboard/ClubManagementDashbo
 import DailySummary from "@/pages/DailySummary";
 import ProfileMenu from "@/components/ProfileMenu";
 import AdminSettingsMenu from "@/components/AdminSettingsMenu";
+import NotificationBell from "@/components/NotificationBell";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -145,6 +146,7 @@ const Dashboard = () => {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            {(userRole.role === "admin") && <NotificationBell />}
             {userRole.role === "admin" && <AdminSettingsMenu />}
             <ProfileMenu user={user!} role={userRole.role} />
           </div>
