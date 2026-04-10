@@ -20,7 +20,9 @@ export type Database = {
           created_at: string
           id: string
           is_read: boolean | null
+          link: string | null
           message: string
+          priority: string
           title: string
           type: string
           user_id: string
@@ -31,7 +33,9 @@ export type Database = {
           created_at?: string
           id?: string
           is_read?: boolean | null
+          link?: string | null
           message: string
+          priority?: string
           title: string
           type: string
           user_id: string
@@ -42,7 +46,9 @@ export type Database = {
           created_at?: string
           id?: string
           is_read?: boolean | null
+          link?: string | null
           message?: string
+          priority?: string
           title?: string
           type?: string
           user_id?: string
