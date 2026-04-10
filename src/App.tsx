@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import Auth from "./pages/Auth";
 import ProtectedRoute from "./components/ProtectedRoute";
+import RoleGuard from "./components/RoleGuard";
 import NotFound from "./pages/NotFound";
 import MyProfile from "./pages/MyProfile";
 import VenueDetail from "./pages/VenueDetail";
@@ -30,6 +31,9 @@ import AccessoryTracker from "./pages/AccessoryTracker";
 
 const queryClient = new QueryClient();
 
+const INCHARGE_ROLES = ["admin", "club_incharge"] as const;
+const ADMIN_ONLY = ["admin"] as const;
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -43,22 +47,27 @@ const App = () => (
           <Route path="/club/:clubId" element={<ProtectedRoute><ClubDetail /></ProtectedRoute>} />
           <Route path="/venue/:venueId" element={<ProtectedRoute><VenueDetail /></ProtectedRoute>} />
           <Route path="/venue/:venueId/reports" element={<ProtectedRoute><VenueReports /></ProtectedRoute>} />
-          <Route path="/manage-venues" element={<ProtectedRoute><ManageVenues /></ProtectedRoute>} />
-          <Route path="/manage-employees" element={<ProtectedRoute><ManageEmployees /></ProtectedRoute>} />
-          <Route path="/manage-categories" element={<ProtectedRoute><ManageCategories /></ProtectedRoute>} />
-          <Route path="/manage-flavours" element={<ProtectedRoute><ManageFlavours /></ProtectedRoute>} />
-          <Route path="/attendance-report" element={<ProtectedRoute><AttendanceReport /></ProtectedRoute>} />
-          <Route path="/counter-pictures" element={<ProtectedRoute><CounterPictures /></ProtectedRoute>} />
-          <Route path="/roster/weekly" element={<ProtectedRoute><WeeklyRoster /></ProtectedRoute>} />
-          <Route path="/roster/daily" element={<ProtectedRoute><DailyRoster /></ProtectedRoute>} />
-          <Route path="/packet-dispatch" element={<ProtectedRoute><PacketDispatch /></ProtectedRoute>} />
-          <Route path="/packet-dispatch/history" element={<ProtectedRoute><DispatchHistory /></ProtectedRoute>} />
-          <Route path="/daily-report" element={<ProtectedRoute><DailyClubReport /></ProtectedRoute>} />
-          <Route path="/inspections" element={<ProtectedRoute><InspectionHistory /></ProtectedRoute>} />
-          <Route path="/inspections/new" element={<ProtectedRoute><InspectionForm /></ProtectedRoute>} />
-          <Route path="/staff-performance" element={<ProtectedRoute><StaffPerformance /></ProtectedRoute>} />
-          <Route path="/weekly-summary" element={<ProtectedRoute><WeeklySummary /></ProtectedRoute>} />
-          <Route path="/accessories" element={<ProtectedRoute><AccessoryTracker /></ProtectedRoute>} />
+
+          {/* Admin-only routes */}
+          <Route path="/manage-employees" element={<RoleGuard allowedRoles={[...ADMIN_ONLY]}><ManageEmployees /></RoleGuard>} />
+
+          {/* Admin + Club Incharge routes */}
+          <Route path="/manage-venues" element={<RoleGuard allowedRoles={[...INCHARGE_ROLES]}><ManageVenues /></RoleGuard>} />
+          <Route path="/manage-categories" element={<RoleGuard allowedRoles={[...INCHARGE_ROLES]}><ManageCategories /></RoleGuard>} />
+          <Route path="/manage-flavours" element={<RoleGuard allowedRoles={[...INCHARGE_ROLES]}><ManageFlavours /></RoleGuard>} />
+          <Route path="/attendance-report" element={<RoleGuard allowedRoles={[...INCHARGE_ROLES]}><AttendanceReport /></RoleGuard>} />
+          <Route path="/counter-pictures" element={<RoleGuard allowedRoles={[...INCHARGE_ROLES]}><CounterPictures /></RoleGuard>} />
+          <Route path="/roster/weekly" element={<RoleGuard allowedRoles={[...INCHARGE_ROLES]}><WeeklyRoster /></RoleGuard>} />
+          <Route path="/roster/daily" element={<RoleGuard allowedRoles={[...INCHARGE_ROLES]}><DailyRoster /></RoleGuard>} />
+          <Route path="/packet-dispatch" element={<RoleGuard allowedRoles={[...INCHARGE_ROLES]}><PacketDispatch /></RoleGuard>} />
+          <Route path="/packet-dispatch/history" element={<RoleGuard allowedRoles={[...INCHARGE_ROLES]}><DispatchHistory /></RoleGuard>} />
+          <Route path="/daily-report" element={<RoleGuard allowedRoles={[...INCHARGE_ROLES]}><DailyClubReport /></RoleGuard>} />
+          <Route path="/inspections" element={<RoleGuard allowedRoles={[...INCHARGE_ROLES]}><InspectionHistory /></RoleGuard>} />
+          <Route path="/inspections/new" element={<RoleGuard allowedRoles={[...INCHARGE_ROLES]}><InspectionForm /></RoleGuard>} />
+          <Route path="/staff-performance" element={<RoleGuard allowedRoles={[...INCHARGE_ROLES]}><StaffPerformance /></RoleGuard>} />
+          <Route path="/weekly-summary" element={<RoleGuard allowedRoles={[...INCHARGE_ROLES]}><WeeklySummary /></RoleGuard>} />
+          <Route path="/accessories" element={<RoleGuard allowedRoles={[...INCHARGE_ROLES]}><AccessoryTracker /></RoleGuard>} />
+
           <Route path="/my-profile" element={<ProtectedRoute><MyProfile /></ProtectedRoute>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
