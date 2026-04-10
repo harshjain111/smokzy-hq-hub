@@ -66,7 +66,7 @@ serve(async (req) => {
       .insert({
         user_id: authData.user.id,
         role,
-        venue_id: (role === 'employee' || role === 'club_management') ? venueId : null,
+        venue_id: role === 'employee' ? venueId : null,
       });
 
     if (roleError) {

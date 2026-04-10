@@ -97,8 +97,8 @@ const EmployeeManagement = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Venue is required for employee and club_management roles
-    if ((role === "employee" || role === "club_management") && !venueId) {
+    // Venue is required for employee role only
+    if (role === "employee" && !venueId) {
       toast.error("Please select a venue");
       return;
     }
@@ -113,7 +113,7 @@ const EmployeeManagement = () => {
             phone,
             password: password || undefined,
             role,
-            venueId: (role === "employee" || role === "club_management") ? venueId : null,
+            venueId: role === "employee" ? venueId : null,
           },
         });
 
@@ -129,7 +129,7 @@ const EmployeeManagement = () => {
             phone,
             password,
             role,
-            venueId: (role === "employee" || role === "club_management") ? venueId : null,
+            venueId: role === "employee" ? venueId : null,
           },
         });
 
@@ -267,7 +267,7 @@ const EmployeeManagement = () => {
                   </SelectContent>
                 </Select>
               </div>
-              {(role === "employee" || role === "club_management") && (
+              {role === "employee" && (
                 <div className="space-y-2">
                   <Label htmlFor="venue">Assign to Venue</Label>
                   <Select value={venueId} onValueChange={setVenueId}>
