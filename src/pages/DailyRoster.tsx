@@ -276,7 +276,7 @@ const DailyRoster = () => {
         .eq("date", dateStr);
 
       // Delete existing rows for this venue+date then re-insert
-      await supabase.from("daily_roster").delete().eq("venue_id", venueId).eq("date", dateStr);
+      await supabase.from("daily_roster" as any).delete().eq("venue_id", venueId).eq("date", dateStr);
 
       const rowsToInsert = vr.rows.map(r => ({
         venue_id: venueId,
@@ -296,11 +296,11 @@ const DailyRoster = () => {
         is_removed: r.is_removed,
       }));
 
-      const { error } = await supabase.from("daily_roster").insert(rowsToInsert);
+      const { error } = await supabase.from("daily_roster" as any).insert(rowsToInsert);
       if (error) throw error;
 
       // Audit log
-      await supabase.from("roster_audit_log").insert({
+      await supabase.from("roster_audit_log" as any).insert({
         venue_id: venueId,
         roster_date: dateStr,
         action: isFirstSave ? "confirmed" : "edited",
@@ -310,7 +310,7 @@ const DailyRoster = () => {
       });
 
       // Mark task as completed
-      await supabase.from("incharge_daily_tasks")
+      await supabase.from("incharge_daily_tasks" as any)
         .update({ status: "completed", completed_at: now })
         .eq("venue_id", venueId)
         .eq("task_date", dateStr)
@@ -347,7 +347,7 @@ const DailyRoster = () => {
     // Audit log
     const { data: { session } } = await supabase.auth.getSession();
     const beforeData = venueRosters.get(venueId)?.rows || [];
-    await supabase.from("roster_audit_log").insert({
+    await supabase.from("roster_audit_log" as any).insert({
       venue_id: venueId,
       roster_date: dateStr,
       action: "reset",
@@ -363,7 +363,7 @@ const DailyRoster = () => {
     });
 
     // Also delete from DB
-    await supabase.from("daily_roster").delete().eq("venue_id", venueId).eq("date", dateStr);
+    await supabase.from("daily_roster" as any).delete().eq("venue_id", venueId).eq("date", dateStr);
 
     toast.success("Reset to weekly roster");
   };
