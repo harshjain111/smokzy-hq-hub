@@ -23,6 +23,35 @@ interface Venue {
   name: string;
 }
 
+const getFunctionErrorMessage = async (error: unknown, fallbackMessage: string) => {
+  if (error && typeof error === "object") {
+    const maybeMessage = "message" in error && typeof error.message === "string" ? error.message : null;
+    const maybeContext = "context" in error ? error.context : null;
+
+    if (maybeContext instanceof Response) {
+      try {
+        const payload = await maybeContext.clone().json();
+        if (payload?.error && typeof payload.error === "string") {
+          return payload.error;
+        }
+      } catch {
+        try {
+          const text = await maybeContext.clone().text();
+          if (text) return text;
+        } catch {
+          // ignore parse failures and fall back below
+        }
+      }
+    }
+
+    if (maybeMessage) {
+      return maybeMessage;
+    }
+  }
+
+  return fallbackMessage;
+};
+
 const EmployeeManagement = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [venues, setVenues] = useState<Venue[]>([]);
@@ -97,7 +126,6 @@ const EmployeeManagement = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Venue is required for employee role only
     if (role === "employee" && !venueId) {
       toast.error("Please select a venue");
       return;
@@ -105,8 +133,7 @@ const EmployeeManagement = () => {
 
     try {
       if (editingEmployee) {
-        // Update existing employee via edge function
-        const { data, error } = await supabase.functions.invoke('update-user', {
+        const { data, error } = await supabase.functions.invoke("update-user", {
           body: {
             userId: editingEmployee.id,
             fullName,
@@ -117,13 +144,14 @@ const EmployeeManagement = () => {
           },
         });
 
-        if (error) throw error;
-        if (data.error) throw new Error(data.error);
+        if (error) {
+          throw new Error(await getFunctionErrorMessage(error, "Failed to update employee"));
+        }
+        if (data?.error) throw new Error(data.error);
 
         toast.success("Employee updated successfully");
       } else {
-        // Create new employee via edge function
-        const { data, error } = await supabase.functions.invoke('create-user', {
+        const { data, error } = await supabase.functions.invoke("create-user", {
           body: {
             fullName,
             phone,
@@ -133,8 +161,10 @@ const EmployeeManagement = () => {
           },
         });
 
-        if (error) throw error;
-        if (data.error) throw new Error(data.error);
+        if (error) {
+          throw new Error(await getFunctionErrorMessage(error, "Failed to create employee"));
+        }
+        if (data?.error) throw new Error(data.error);
 
         toast.success("Employee created successfully");
       }
@@ -148,8 +178,8 @@ const EmployeeManagement = () => {
       setOpen(false);
       fetchData();
     } catch (error: any) {
-      console.error('Submit error:', error);
-      toast.error(error.message || `Failed to ${editingEmployee ? 'update' : 'create'} employee`);
+      console.error("Submit error:", error);
+      toast.error(error.message || `Failed to ${editingEmployee ? "update" : "create"} employee`);
     }
   };
 
