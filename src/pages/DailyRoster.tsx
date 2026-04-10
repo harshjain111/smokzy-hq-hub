@@ -490,6 +490,11 @@ const DailyRoster = () => {
               {venues.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
             </SelectContent>
           </Select>
+
+          <Button variant="outline" size="sm" className="h-10" onClick={handleExportDailyPDF}>
+            <FileDown className="h-4 w-4 mr-2" />
+            Export PDF
+          </Button>
         </div>
 
         {/* Venue Cards */}
