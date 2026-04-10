@@ -5,7 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, Copy, Save, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Copy, Save, Loader2, FileDown } from "lucide-react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 interface Venue {
   id: string;
@@ -281,6 +283,12 @@ const WeeklyRoster = () => {
               <Copy className="mr-2 h-4 w-4" />
               Copy Previous Week
             </Button>
+            {!dirty && sortedEmployees.length > 0 && (
+              <Button variant="outline" onClick={handleExportWeeklyPDF}>
+                <FileDown className="mr-2 h-4 w-4" />
+                Export PDF
+              </Button>
+            )}
             <Button onClick={handleSave} disabled={!dirty || saving}>
               {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               Save Roster
