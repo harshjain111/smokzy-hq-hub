@@ -122,7 +122,7 @@ const ClubManagementDashboard = ({ user, venueIds }: ClubManagementDashboardProp
     const [
       sessionRes, rosterRes, stockRes, dispatchRes,
       todaySalesRes, yesterdaySalesRes, weekSalesRes, monthSalesRes,
-      staffBlocksRes, notifRes,
+      notifRes,
     ] = await Promise.all([
       supabase.from("club_sessions").select("id, started_at, status, photo_uploaded, stock_submitted, sales_submitted, closed_at")
         .eq("venue_id", selectedVenueId).eq("session_date", today).order("created_at", { ascending: false }).limit(1).maybeSingle(),
@@ -140,10 +140,6 @@ const ClubManagementDashboard = ({ user, venueIds }: ClubManagementDashboardProp
         .eq("venue_id", selectedVenueId).gte("created_at", weekStart).lte("created_at", todayEnd),
       supabase.from("sales_reports").select("quantity_sold")
         .eq("venue_id", selectedVenueId).gte("created_at", monthStart).lte("created_at", todayEnd),
-      // Get today's attendance blocks
-      sessionRes?.data?.id ? Promise.resolve({ data: null }) :
-        supabase.from("staff_attendance_blocks").select("id, user_id, check_in_time, check_out_time, session_id")
-          .eq("venue_id", selectedVenueId).gte("check_in_time", todayStart).eq("is_break", false),
       supabase.from("admin_notifications").select("id, title, message, priority, type, created_at")
         .eq("venue_id", selectedVenueId).gte("created_at", startOfDay(subDays(now, 3)).toISOString())
         .eq("is_read", false).order("created_at", { ascending: false }).limit(20),
