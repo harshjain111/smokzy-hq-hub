@@ -53,10 +53,14 @@ export const useUserRole = (user: User | null) => {
             venueIds: [], // club_incharge has global access, no venue scoping
           });
         } else if (clubMgmtRoles.length > 0) {
+          const scopedVenueIds = clubMgmtRoles
+            .map((r) => r.venue_id)
+            .filter((venueId): venueId is string => Boolean(venueId));
+
           setUserRole({
             role: 'club_management',
-            venueId: clubMgmtRoles[0].venue_id,
-            venueIds: clubMgmtRoles.map(r => r.venue_id).filter(Boolean) as string[],
+            venueId: scopedVenueIds[0] ?? null,
+            venueIds: scopedVenueIds,
           });
         } else if (employeeRole) {
           setUserRole({
