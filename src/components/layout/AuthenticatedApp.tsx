@@ -1,41 +1,40 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { useUserRole } from "@/hooks/useUserRole";
 import AppShell from "./AppShell";
 import LoadingSpinner from "@/components/LoadingSpinner";
-import EmployeeDashboard from "@/components/dashboard/EmployeeDashboard";
-
-// Page imports
-import DashboardHome from "@/pages/DashboardHome";
-import DailySummary from "@/pages/DailySummary";
-import WeeklySummary from "@/pages/WeeklySummary";
-import ClubDetail from "@/pages/ClubDetail";
-import VenueDetail from "@/pages/VenueDetail";
-import VenueReports from "@/pages/VenueReports";
-import ManageVenues from "@/pages/ManageVenues";
-import ManageEmployees from "@/pages/ManageEmployees";
-import ManageCategories from "@/pages/ManageCategories";
-import ManageFlavours from "@/pages/ManageFlavours";
-import AttendanceReport from "@/pages/AttendanceReport";
-import CounterPictures from "@/pages/CounterPictures";
-import WeeklyRoster from "@/pages/WeeklyRoster";
-import DailyRoster from "@/pages/DailyRoster";
-import PacketDispatch from "@/pages/PacketDispatch";
-import DispatchHistory from "@/pages/DispatchHistory";
-import DailyClubReport from "@/pages/DailyClubReport";
-import InspectionForm from "@/pages/InspectionForm";
-import InspectionHistory from "@/pages/InspectionHistory";
-import StaffPerformance from "@/pages/StaffPerformance";
-import AccessoryTracker from "@/pages/AccessoryTracker";
-import InspectionSettings from "@/pages/InspectionSettings";
-import MyProfile from "@/pages/MyProfile";
-import NotFound from "@/pages/NotFound";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+
+const EmployeeDashboard = lazy(() => import("@/components/dashboard/EmployeeDashboard"));
+const DashboardHome = lazy(() => import("@/pages/DashboardHome"));
+const DailySummary = lazy(() => import("@/pages/DailySummary"));
+const WeeklySummary = lazy(() => import("@/pages/WeeklySummary"));
+const ClubDetail = lazy(() => import("@/pages/ClubDetail"));
+const VenueDetail = lazy(() => import("@/pages/VenueDetail"));
+const VenueReports = lazy(() => import("@/pages/VenueReports"));
+const ManageVenues = lazy(() => import("@/pages/ManageVenues"));
+const ManageEmployees = lazy(() => import("@/pages/ManageEmployees"));
+const ManageCategories = lazy(() => import("@/pages/ManageCategories"));
+const ManageFlavours = lazy(() => import("@/pages/ManageFlavours"));
+const AttendanceReport = lazy(() => import("@/pages/AttendanceReport"));
+const CounterPictures = lazy(() => import("@/pages/CounterPictures"));
+const WeeklyRoster = lazy(() => import("@/pages/WeeklyRoster"));
+const DailyRoster = lazy(() => import("@/pages/DailyRoster"));
+const PacketDispatch = lazy(() => import("@/pages/PacketDispatch"));
+const DispatchHistory = lazy(() => import("@/pages/DispatchHistory"));
+const DailyClubReport = lazy(() => import("@/pages/DailyClubReport"));
+const InspectionForm = lazy(() => import("@/pages/InspectionForm"));
+const InspectionHistory = lazy(() => import("@/pages/InspectionHistory"));
+const StaffPerformance = lazy(() => import("@/pages/StaffPerformance"));
+const AccessoryTracker = lazy(() => import("@/pages/AccessoryTracker"));
+const InspectionSettings = lazy(() => import("@/pages/InspectionSettings"));
+const MyProfile = lazy(() => import("@/pages/MyProfile"));
+const NotFound = lazy(() => import("@/pages/NotFound"));
 
 const INCHARGE_ROLES = ["admin", "club_incharge"] as const;
 const ADMIN_ONLY = ["admin"] as const;
@@ -102,40 +101,40 @@ const AuthenticatedApp = () => {
 
   return (
     <AppShell user={user} role={userRole.role}>
-      <Routes>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/dashboard" element={
-          userRole.role === "club_incharge" ? <DailySummary /> : <DashboardHome user={user} role={userRole} />
-        } />
-        <Route path="/daily-summary" element={guard([...INCHARGE_ROLES], <DailySummary />)} />
-        <Route path="/weekly-summary" element={guard([...INCHARGE_ROLES], <WeeklySummary />)} />
-        <Route path="/club/:clubId" element={<ClubDetail />} />
-        <Route path="/venue/:venueId" element={<VenueDetail />} />
-        <Route path="/venue/:venueId/reports" element={<VenueReports />} />
+      <Suspense fallback={<LoadingSpinner />}>
+        <Routes>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={
+            userRole.role === "club_incharge" ? <DailySummary /> : <DashboardHome user={user} role={userRole} />
+          } />
+          <Route path="/daily-summary" element={guard([...INCHARGE_ROLES], <DailySummary />)} />
+          <Route path="/weekly-summary" element={guard([...INCHARGE_ROLES], <WeeklySummary />)} />
+          <Route path="/club/:clubId" element={<ClubDetail />} />
+          <Route path="/venue/:venueId" element={<VenueDetail />} />
+          <Route path="/venue/:venueId/reports" element={<VenueReports />} />
 
-        {/* Admin-only */}
-        <Route path="/manage-employees" element={guard([...ADMIN_ONLY], <ManageEmployees />)} />
+          <Route path="/manage-employees" element={guard([...ADMIN_ONLY], <ManageEmployees />)} />
 
-        {/* Admin + Club Incharge */}
-        <Route path="/manage-venues" element={guard([...INCHARGE_ROLES], <ManageVenues />)} />
-        <Route path="/manage-categories" element={guard([...INCHARGE_ROLES], <ManageCategories />)} />
-        <Route path="/manage-flavours" element={guard([...INCHARGE_ROLES], <ManageFlavours />)} />
-        <Route path="/attendance-report" element={guard([...INCHARGE_ROLES], <AttendanceReport />)} />
-        <Route path="/counter-pictures" element={guard([...INCHARGE_ROLES], <CounterPictures />)} />
-        <Route path="/roster/weekly" element={guard([...INCHARGE_ROLES], <WeeklyRoster />)} />
-        <Route path="/roster/daily" element={guard([...INCHARGE_ROLES], <DailyRoster />)} />
-        <Route path="/packet-dispatch" element={guard([...INCHARGE_ROLES], <PacketDispatch />)} />
-        <Route path="/packet-dispatch/history" element={guard([...INCHARGE_ROLES], <DispatchHistory />)} />
-        <Route path="/daily-report" element={guard([...INCHARGE_ROLES], <DailyClubReport />)} />
-        <Route path="/inspections" element={guard([...INCHARGE_ROLES], <InspectionHistory />)} />
-        <Route path="/inspections/new" element={guard([...INCHARGE_ROLES], <InspectionForm />)} />
-        <Route path="/inspections/settings" element={guard([...INCHARGE_ROLES], <InspectionSettings />)} />
-        <Route path="/staff-performance" element={guard([...INCHARGE_ROLES], <StaffPerformance />)} />
-        <Route path="/accessories" element={guard([...INCHARGE_ROLES], <AccessoryTracker />)} />
+          <Route path="/manage-venues" element={guard([...INCHARGE_ROLES], <ManageVenues />)} />
+          <Route path="/manage-categories" element={guard([...INCHARGE_ROLES], <ManageCategories />)} />
+          <Route path="/manage-flavours" element={guard([...INCHARGE_ROLES], <ManageFlavours />)} />
+          <Route path="/attendance-report" element={guard([...INCHARGE_ROLES], <AttendanceReport />)} />
+          <Route path="/counter-pictures" element={guard([...INCHARGE_ROLES], <CounterPictures />)} />
+          <Route path="/roster/weekly" element={guard([...INCHARGE_ROLES], <WeeklyRoster />)} />
+          <Route path="/roster/daily" element={guard([...INCHARGE_ROLES], <DailyRoster />)} />
+          <Route path="/packet-dispatch" element={guard([...INCHARGE_ROLES], <PacketDispatch />)} />
+          <Route path="/packet-dispatch/history" element={guard([...INCHARGE_ROLES], <DispatchHistory />)} />
+          <Route path="/daily-report" element={guard([...INCHARGE_ROLES], <DailyClubReport />)} />
+          <Route path="/inspections" element={guard([...INCHARGE_ROLES], <InspectionHistory />)} />
+          <Route path="/inspections/new" element={guard([...INCHARGE_ROLES], <InspectionForm />)} />
+          <Route path="/inspections/settings" element={guard([...INCHARGE_ROLES], <InspectionSettings />)} />
+          <Route path="/staff-performance" element={guard([...INCHARGE_ROLES], <StaffPerformance />)} />
+          <Route path="/accessories" element={guard([...INCHARGE_ROLES], <AccessoryTracker />)} />
 
-        <Route path="/my-profile" element={<MyProfile />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+          <Route path="/my-profile" element={<MyProfile />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Suspense>
     </AppShell>
   );
 };
