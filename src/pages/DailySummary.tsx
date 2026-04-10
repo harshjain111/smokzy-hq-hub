@@ -59,7 +59,7 @@ const DailySummary = () => {
       })));
     }
   };
-  }, []);
+
 
   const fetchUserName = async () => {
     const { data: { session } } = await supabase.auth.getSession();
