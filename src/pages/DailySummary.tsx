@@ -31,10 +31,34 @@ const DailySummary = () => {
   });
   const [alerts, setAlerts] = useState<{ type: string; message: string; venueId?: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pendingTasks, setPendingTasks] = useState<{ id: string; venue_name: string; status: string; deadline: string }[]>([]);
 
   useEffect(() => {
     fetchDailyData();
     fetchUserName();
+    fetchPendingTasks();
+  }, []);
+
+  const fetchPendingTasks = async () => {
+    const { data: tasks } = await supabase
+      .from("incharge_daily_tasks" as any)
+      .select("id, venue_id, status, deadline")
+      .eq("task_date", today)
+      .eq("task_type", "confirm_daily_roster")
+      .in("status", ["pending", "overdue"]);
+
+    if (tasks && tasks.length > 0) {
+      const venueIds = [...new Set((tasks as any[]).map((t: any) => t.venue_id))];
+      const { data: venues } = await supabase.from("venues").select("id, name").in("id", venueIds);
+      const vMap = new Map((venues || []).map(v => [v.id, v.name]));
+      setPendingTasks((tasks as any[]).map((t: any) => ({
+        id: t.id,
+        venue_name: vMap.get(t.venue_id) || "Unknown",
+        status: t.status,
+        deadline: t.deadline,
+      })));
+    }
+  };
   }, []);
 
   const fetchUserName = async () => {
