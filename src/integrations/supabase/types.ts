@@ -277,6 +277,77 @@ export type Database = {
           },
         ]
       }
+      daily_roster: {
+        Row: {
+          confirmed_at: string | null
+          confirmed_by: string | null
+          created_at: string
+          date: string
+          edit_count: number
+          id: string
+          is_removed: boolean
+          last_edited_at: string | null
+          last_edited_by: string | null
+          note: string | null
+          original_staff_id: string | null
+          role: string
+          shift_end: string | null
+          shift_start: string | null
+          source: string
+          staff_id: string
+          status: string
+          venue_id: string
+        }
+        Insert: {
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          date: string
+          edit_count?: number
+          id?: string
+          is_removed?: boolean
+          last_edited_at?: string | null
+          last_edited_by?: string | null
+          note?: string | null
+          original_staff_id?: string | null
+          role?: string
+          shift_end?: string | null
+          shift_start?: string | null
+          source?: string
+          staff_id: string
+          status?: string
+          venue_id: string
+        }
+        Update: {
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          date?: string
+          edit_count?: number
+          id?: string
+          is_removed?: boolean
+          last_edited_at?: string | null
+          last_edited_by?: string | null
+          note?: string | null
+          original_staff_id?: string | null
+          role?: string
+          shift_end?: string | null
+          shift_start?: string | null
+          source?: string
+          staff_id?: string
+          status?: string
+          venue_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_roster_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       flavours: {
         Row: {
           created_at: string
@@ -356,6 +427,50 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "hookah_pots_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      incharge_daily_tasks: {
+        Row: {
+          assigned_to: string | null
+          completed_at: string | null
+          created_at: string
+          deadline: string
+          id: string
+          status: string
+          task_date: string
+          task_type: string
+          venue_id: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string
+          deadline: string
+          id?: string
+          status?: string
+          task_date: string
+          task_type: string
+          venue_id: string
+        }
+        Update: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string
+          deadline?: string
+          id?: string
+          status?: string
+          task_date?: string
+          task_type?: string
+          venue_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "incharge_daily_tasks_venue_id_fkey"
             columns: ["venue_id"]
             isOneToOne: false
             referencedRelation: "venues"
@@ -663,6 +778,47 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "roster_assignments_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      roster_audit_log: {
+        Row: {
+          action: string
+          after_data: Json | null
+          before_data: Json | null
+          created_at: string
+          id: string
+          roster_date: string
+          user_id: string | null
+          venue_id: string
+        }
+        Insert: {
+          action: string
+          after_data?: Json | null
+          before_data?: Json | null
+          created_at?: string
+          id?: string
+          roster_date: string
+          user_id?: string | null
+          venue_id: string
+        }
+        Update: {
+          action?: string
+          after_data?: Json | null
+          before_data?: Json | null
+          created_at?: string
+          id?: string
+          roster_date?: string
+          user_id?: string | null
+          venue_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roster_audit_log_venue_id_fkey"
             columns: ["venue_id"]
             isOneToOne: false
             referencedRelation: "venues"

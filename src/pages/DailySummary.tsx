@@ -4,8 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Package, ShoppingCart, AlertTriangle, ClipboardCheck, ChevronRight,
-  CalendarDays, BarChart3, Users, Bell,
+  CalendarDays, BarChart3, Users, Bell, ListChecks, Clock,
 } from "lucide-react";
+import { useNavigate as useNav } from "react-router-dom";
+import { Badge } from "@/components/ui/badge";
 import RecentActivityFeed from "@/components/dashboard/RecentActivityFeed";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -29,11 +31,35 @@ const DailySummary = () => {
   });
   const [alerts, setAlerts] = useState<{ type: string; message: string; venueId?: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pendingTasks, setPendingTasks] = useState<{ id: string; venue_name: string; status: string; deadline: string }[]>([]);
 
   useEffect(() => {
     fetchDailyData();
     fetchUserName();
+    fetchPendingTasks();
   }, []);
+
+  const fetchPendingTasks = async () => {
+    const { data: tasks } = await supabase
+      .from("incharge_daily_tasks" as any)
+      .select("id, venue_id, status, deadline")
+      .eq("task_date", today)
+      .eq("task_type", "confirm_daily_roster")
+      .in("status", ["pending", "overdue"]);
+
+    if (tasks && tasks.length > 0) {
+      const venueIds = [...new Set((tasks as any[]).map((t: any) => t.venue_id))];
+      const { data: venues } = await supabase.from("venues").select("id, name").in("id", venueIds);
+      const vMap = new Map((venues || []).map(v => [v.id, v.name]));
+      setPendingTasks((tasks as any[]).map((t: any) => ({
+        id: t.id,
+        venue_name: vMap.get(t.venue_id) || "Unknown",
+        status: t.status,
+        deadline: t.deadline,
+      })));
+    }
+  };
+
 
   const fetchUserName = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -138,6 +164,36 @@ const DailySummary = () => {
                 <span className="flex-1">{alert.message}</span>
               </div>
             ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Today's Tasks */}
+      {pendingTasks.length > 0 && (
+        <Card className="border-warning/30 bg-warning/5">
+          <CardHeader className="pb-2 pt-3 px-4">
+            <CardTitle className="text-sm flex items-center gap-2 text-warning">
+              <ListChecks className="h-4 w-4" /> Today's Tasks ({pendingTasks.length} pending)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 px-4 pb-3">
+            {pendingTasks.map(task => {
+              const isOverdue = task.status === "overdue";
+              const deadlineTime = new Date(task.deadline).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+              return (
+                <button
+                  key={task.id}
+                  onClick={() => navigate("/roster/daily")}
+                  className="flex items-center gap-2 text-sm p-2.5 rounded-lg bg-background/50 hover:bg-background w-full text-left"
+                >
+                  <Clock className={`h-3.5 w-3.5 shrink-0 ${isOverdue ? "text-destructive" : "text-warning"}`} />
+                  <span className="flex-1">Confirm Roster — {task.venue_name}</span>
+                  <Badge variant={isOverdue ? "destructive" : "secondary"} className="text-[10px]">
+                    {isOverdue ? "OVERDUE" : `Due ${deadlineTime}`}
+                  </Badge>
+                </button>
+              );
+            })}
           </CardContent>
         </Card>
       )}
