@@ -30,11 +30,14 @@ serve(async (req) => {
 
       if (passwordError) {
         console.error('Password update error:', passwordError);
-        // Surface weak-password reason clearly
         if (passwordError.code === 'weak_password' || passwordError.name === 'AuthWeakPasswordError') {
           return new Response(
-            JSON.stringify({ error: 'Password is too weak or has been found in a data breach. Please choose a stronger, unique password.' }),
-            { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            JSON.stringify({
+              success: false,
+              code: 'weak_password',
+              error: 'Password is too weak or has been found in a data breach. Please choose a stronger, unique password.'
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
         throw passwordError;
