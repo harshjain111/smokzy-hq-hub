@@ -4,7 +4,7 @@ import {
   LayoutDashboard, CalendarDays, CalendarCheck, Package, History,
   BarChart3, ClipboardCheck, ClipboardList, UserCheck, AlertTriangle,
   Users, CalendarClock, GraduationCap, Wrench, Camera, Building2,
-  Leaf, Tag, Settings, Bell, User, TrendingUp, FileText,
+  Leaf, Tag, Settings, Bell, User, TrendingUp, FileText, ListChecks,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -43,6 +43,7 @@ const navGroups: NavGroup[] = [
     items: [
       { label: "New Inspection", icon: ClipboardCheck, route: "/inspections/new" },
       { label: "Inspection History", icon: ClipboardList, route: "/inspections" },
+      { label: "Inspection Checklist", icon: ListChecks, route: "/inspections/settings" },
       { label: "Staff Performance", icon: UserCheck, route: "/staff-performance" },
     ],
   },

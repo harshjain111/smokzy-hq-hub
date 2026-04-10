@@ -29,6 +29,7 @@ import InspectionForm from "@/pages/InspectionForm";
 import InspectionHistory from "@/pages/InspectionHistory";
 import StaffPerformance from "@/pages/StaffPerformance";
 import AccessoryTracker from "@/pages/AccessoryTracker";
+import InspectionSettings from "@/pages/InspectionSettings";
 import MyProfile from "@/pages/MyProfile";
 import NotFound from "@/pages/NotFound";
 import { Button } from "@/components/ui/button";
@@ -128,6 +129,7 @@ const AuthenticatedApp = () => {
         <Route path="/daily-report" element={guard([...INCHARGE_ROLES], <DailyClubReport />)} />
         <Route path="/inspections" element={guard([...INCHARGE_ROLES], <InspectionHistory />)} />
         <Route path="/inspections/new" element={guard([...INCHARGE_ROLES], <InspectionForm />)} />
+        <Route path="/inspections/settings" element={guard([...INCHARGE_ROLES], <InspectionSettings />)} />
         <Route path="/staff-performance" element={guard([...INCHARGE_ROLES], <StaffPerformance />)} />
         <Route path="/accessories" element={guard([...INCHARGE_ROLES], <AccessoryTracker />)} />
 
