@@ -5,7 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, Copy, Save, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Copy, Save, Loader2, FileDown } from "lucide-react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 interface Venue {
   id: string;
@@ -241,6 +243,56 @@ const WeeklyRoster = () => {
     setWeekStart(next);
   };
 
+  const handleExportWeeklyPDF = () => {
+    const doc = new jsPDF({ orientation: "landscape" });
+    const weekLabel = `${getDayLabel(weekStart)} — ${getDayLabel(weekDates[6])}`;
+
+    doc.setFontSize(16);
+    doc.text("Smokzy Weekly Roster", 14, 15);
+    doc.setFontSize(10);
+    doc.text(weekLabel, 14, 22);
+
+    const headers = ["Staff", ...weekDates.map(d => d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" }))];
+
+    const body = sortedEmployees.map(emp => {
+      return [
+        emp.full_name,
+        ...weekDates.map(d => {
+          const val = getCellValue(emp.user_id, d);
+          if (val === "OFF") return "OFF";
+          if (val === "LEAVE") return "LEAVE";
+          if (val) return venues.find(v => v.id === val)?.name || "—";
+          return "—";
+        }),
+      ];
+    });
+
+    autoTable(doc, {
+      startY: 28,
+      head: [headers],
+      body,
+      styles: { fontSize: 7, cellPadding: 2 },
+      headStyles: { fillColor: [99, 65, 214] },
+      didParseCell: (data: any) => {
+        if (data.section === "body" && data.column.index > 0) {
+          const txt = data.cell.raw;
+          if (txt === "OFF") { data.cell.styles.fillColor = [243, 244, 246]; data.cell.styles.textColor = [107, 114, 128]; }
+          else if (txt === "LEAVE") { data.cell.styles.fillColor = [254, 226, 226]; data.cell.styles.textColor = [185, 28, 28]; }
+        }
+      },
+    });
+
+    const pageCount = doc.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(7);
+      doc.text(`Generated on ${new Date().toLocaleString("en-IN")} | Page ${i}/${pageCount}`, 14, doc.internal.pageSize.height - 10);
+    }
+
+    doc.save(`Smokzy_Weekly_Roster_${formatDate(weekStart)}.pdf`);
+    toast.success("PDF downloaded");
+  };
+
   const getVenueChipColor = (venueId: string): string => {
     const colors = [
       "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
@@ -281,6 +333,12 @@ const WeeklyRoster = () => {
               <Copy className="mr-2 h-4 w-4" />
               Copy Previous Week
             </Button>
+            {!dirty && sortedEmployees.length > 0 && (
+              <Button variant="outline" onClick={handleExportWeeklyPDF}>
+                <FileDown className="mr-2 h-4 w-4" />
+                Export PDF
+              </Button>
+            )}
             <Button onClick={handleSave} disabled={!dirty || saving}>
               {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               Save Roster

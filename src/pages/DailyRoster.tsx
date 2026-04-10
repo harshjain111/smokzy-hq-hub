@@ -11,9 +11,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import {
   ChevronLeft, ChevronRight, UserPlus, Trash2, RotateCcw,
-  Calendar, Pencil, Plus, X, History, Check, Clock,
+  Calendar, Pencil, Plus, X, History, Check, Clock, FileDown,
 } from "lucide-react";
 import { toast } from "sonner";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 interface Venue { id: string; name: string; }
 interface StaffOption { id: string; full_name: string; }
@@ -403,6 +405,61 @@ const DailyRoster = () => {
     }
   };
 
+  const handleExportDailyPDF = () => {
+    const doc = new jsPDF();
+    const dateLabel = selectedDate.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
+    doc.setFontSize(16);
+    doc.text("Smokzy Daily Roster", 14, 15);
+    doc.setFontSize(10);
+    doc.text(dateLabel, 14, 22);
+
+    let yPos = 30;
+    const venuesToExport = selectedVenueId === "all" ? venues : venues.filter(v => v.id === selectedVenueId);
+
+    venuesToExport.forEach(venue => {
+      const vr = venueRosters.get(venue.id);
+      if (!vr) return;
+      const activeRows = vr.rows.filter(r => !r.is_removed);
+      if (activeRows.length === 0) return;
+
+      if (yPos > 250) { doc.addPage(); yPos = 15; }
+
+      doc.setFontSize(12);
+      doc.text(`${venue.name}`, 14, yPos);
+      doc.setFontSize(8);
+      doc.text(`Status: ${vr.status.toUpperCase()}${vr.edit_count > 0 ? ` | Edited ${vr.edit_count}x` : ""}`, 14, yPos + 5);
+      yPos += 8;
+
+      autoTable(doc, {
+        startY: yPos,
+        head: [["Staff", "Role", "Shift Start", "Shift End", "Source", "Note"]],
+        body: activeRows.map(r => [
+          r.staff_name,
+          r.role,
+          r.shift_start || "—",
+          r.shift_end || "—",
+          r.source,
+          r.note || "",
+        ]),
+        styles: { fontSize: 7 },
+        headStyles: { fillColor: [99, 65, 214] },
+      });
+
+      yPos = (doc as any).lastAutoTable?.finalY + 10 || yPos + 40;
+    });
+
+    const pageCount = doc.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(7);
+      doc.text(`Generated on ${new Date().toLocaleString("en-IN")} | Page ${i}/${pageCount}`, 14, doc.internal.pageSize.height - 10);
+    }
+
+    doc.save(`Smokzy_Daily_Roster_${dateStr}.pdf`);
+    toast.success("PDF downloaded");
+  };
+
   const filteredVenues = selectedVenueId === "all" ? venues : venues.filter(v => v.id === selectedVenueId);
 
   // Counts
@@ -433,6 +490,11 @@ const DailyRoster = () => {
               {venues.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
             </SelectContent>
           </Select>
+
+          <Button variant="outline" size="sm" className="h-10" onClick={handleExportDailyPDF}>
+            <FileDown className="h-4 w-4 mr-2" />
+            Export PDF
+          </Button>
         </div>
 
         {/* Venue Cards */}

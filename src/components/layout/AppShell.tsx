@@ -5,6 +5,8 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import AppSidebar from "./AppSidebar";
 import MobileBottomTabs from "./MobileBottomTabs";
 import TopBar from "./TopBar";
+import { PanelLeftClose, PanelLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
@@ -71,12 +73,18 @@ const AppShell = ({ children, user, role, pageTitle }: AppShellProps) => {
           sidebarCollapsed || isTablet ? "w-16" : "w-60"
         )}
       >
-        <div className="h-14 border-b flex items-center justify-center px-3">
-          {!sidebarCollapsed && !isTablet && (
-            <span className="text-sm font-bold text-primary tracking-tight">SMOKZY</span>
-          )}
-          {(sidebarCollapsed || isTablet) && (
-            <span className="text-lg font-bold text-primary">S</span>
+        <div className="h-14 border-b flex items-center justify-between px-3">
+          {!sidebarCollapsed && !isTablet ? (
+            <>
+              <span className="text-sm font-bold text-primary tracking-tight">SMOKZY</span>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSidebarCollapsed(true)}>
+                <PanelLeftClose className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            </>
+          ) : (
+            <Button variant="ghost" size="icon" className="h-8 w-8 mx-auto" onClick={() => setSidebarCollapsed(false)}>
+              <PanelLeft className="h-4 w-4 text-muted-foreground" />
+            </Button>
           )}
         </div>
         <AppSidebar collapsed={sidebarCollapsed || isTablet} role={role} />
