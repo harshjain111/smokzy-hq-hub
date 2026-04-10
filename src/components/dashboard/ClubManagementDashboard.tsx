@@ -82,10 +82,14 @@ const ClubManagementDashboard = ({ user, venueIds }: ClubManagementDashboardProp
   // Fetch venues
   useEffect(() => {
     const fetchVenues = async () => {
-      const { data } = await supabase
+      const query = supabase
         .from("venues")
         .select("id, name, location")
-        .in("id", venueIds);
+        .order("name");
+
+      const { data } = venueIds.length > 0
+        ? await query.in("id", venueIds)
+        : await query;
       
       if (data) {
         setVenues(data);
@@ -93,11 +97,11 @@ const ClubManagementDashboard = ({ user, venueIds }: ClubManagementDashboardProp
           setSelectedVenueId(data[0].id);
         }
       }
+
+      setLoading(false);
     };
     
-    if (venueIds.length > 0) {
-      fetchVenues();
-    }
+    fetchVenues();
   }, [venueIds]);
 
   // Get date range for query
@@ -125,12 +129,16 @@ const ClubManagementDashboard = ({ user, venueIds }: ClubManagementDashboardProp
 
   // Fetch live status
   const fetchLiveStatus = useCallback(async () => {
-    if (!selectedVenueId) return;
+    if (!selectedVenueId) {
+      setActiveSession(null);
+      setStaffOnDuty([]);
+      setActiveBreaks([]);
+      return;
+    }
 
-    // Fetch active session
     const { data: sessionData } = await supabase
       .from("club_sessions")
-      .select("*")
+      .select("id, started_at")
       .eq("venue_id", selectedVenueId)
       .eq("status", "open")
       .order("created_at", { ascending: false })
@@ -139,90 +147,86 @@ const ClubManagementDashboard = ({ user, venueIds }: ClubManagementDashboardProp
 
     setActiveSession(sessionData);
 
-    if (sessionData) {
-      // Fetch staff on duty for this session
-      const { data: attendanceData } = await supabase
+    if (!sessionData) {
+      setStaffOnDuty([]);
+      setActiveBreaks([]);
+      return;
+    }
+
+    const [{ data: attendanceData }, { data: breaksData }] = await Promise.all([
+      supabase
         .from("staff_attendance_blocks")
-        .select(`
-          id,
-          user_id,
-          check_in_time,
-          check_out_time,
-          session_id
-        `)
+        .select("id, user_id, check_in_time, check_out_time, session_id")
         .eq("session_id", sessionData.id)
-        .eq("is_break", false);
-
-      if (attendanceData) {
-        // Fetch profiles separately
-        const userIds = [...new Set(attendanceData.map(a => a.user_id))];
-        const { data: profiles } = await supabase
-          .from("profiles")
-          .select("id, full_name")
-          .in("id", userIds);
-
-        const profileMap = new Map(profiles?.map(p => [p.id, p.full_name]) || []);
-        
-        const enrichedAttendance = attendanceData.map(a => ({
-          ...a,
-          profiles: { full_name: profileMap.get(a.user_id) || "Unknown" }
-        }));
-        
-        setStaffOnDuty(enrichedAttendance);
-      }
-
-      // Fetch active breaks
-      const { data: breaksData } = await supabase
+        .eq("is_break", false),
+      supabase
         .from("staff_breaks")
         .select("user_id, break_start_time")
         .eq("session_id", sessionData.id)
-        .is("break_end_time", null);
+        .is("break_end_time", null),
+    ]);
 
-      setActiveBreaks(breaksData || []);
-    } else {
+    const attendanceRows = attendanceData || [];
+    setActiveBreaks(breaksData || []);
+
+    if (attendanceRows.length === 0) {
       setStaffOnDuty([]);
-      setActiveBreaks([]);
+      return;
     }
+
+    const userIds = [...new Set(attendanceRows.map((attendance) => attendance.user_id))];
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, full_name")
+      .in("id", userIds);
+
+    const profileMap = new Map(profiles?.map((profile) => [profile.id, profile.full_name]) || []);
+
+    setStaffOnDuty(
+      attendanceRows.map((attendance) => ({
+        ...attendance,
+        profiles: { full_name: profileMap.get(attendance.user_id) || "Unknown" },
+      }))
+    );
   }, [selectedVenueId]);
 
   // Fetch sales snapshot
   const fetchSalesSnapshot = useCallback(async () => {
-    if (!selectedVenueId) return;
+    if (!selectedVenueId) {
+      setTodaySales(0);
+      setYesterdaySales(0);
+      setMonthSales(0);
+      return;
+    }
 
-    const now = new Date();
-    
-    // Today's sales
     const todayRange = getDateRange('today');
-    const { data: todayData } = await supabase
-      .from("sales_reports")
-      .select("quantity_sold")
-      .eq("venue_id", selectedVenueId)
-      .gte("created_at", todayRange.start.toISOString())
-      .lte("created_at", todayRange.end.toISOString());
-    
-    setTodaySales(todayData?.reduce((sum, r) => sum + r.quantity_sold, 0) || 0);
-
-    // Yesterday's sales
     const yesterdayRange = getDateRange('yesterday');
-    const { data: yesterdayData } = await supabase
-      .from("sales_reports")
-      .select("quantity_sold")
-      .eq("venue_id", selectedVenueId)
-      .gte("created_at", yesterdayRange.start.toISOString())
-      .lte("created_at", yesterdayRange.end.toISOString());
-    
-    setYesterdaySales(yesterdayData?.reduce((sum, r) => sum + r.quantity_sold, 0) || 0);
-
-    // This month's sales
     const monthRange = getDateRange('this_month');
-    const { data: monthData } = await supabase
-      .from("sales_reports")
-      .select("quantity_sold")
-      .eq("venue_id", selectedVenueId)
-      .gte("created_at", monthRange.start.toISOString())
-      .lte("created_at", monthRange.end.toISOString());
-    
-    setMonthSales(monthData?.reduce((sum, r) => sum + r.quantity_sold, 0) || 0);
+
+    const [todayResponse, yesterdayResponse, monthResponse] = await Promise.all([
+      supabase
+        .from("sales_reports")
+        .select("quantity_sold")
+        .eq("venue_id", selectedVenueId)
+        .gte("created_at", todayRange.start.toISOString())
+        .lte("created_at", todayRange.end.toISOString()),
+      supabase
+        .from("sales_reports")
+        .select("quantity_sold")
+        .eq("venue_id", selectedVenueId)
+        .gte("created_at", yesterdayRange.start.toISOString())
+        .lte("created_at", yesterdayRange.end.toISOString()),
+      supabase
+        .from("sales_reports")
+        .select("quantity_sold")
+        .eq("venue_id", selectedVenueId)
+        .gte("created_at", monthRange.start.toISOString())
+        .lte("created_at", monthRange.end.toISOString()),
+    ]);
+
+    setTodaySales(todayResponse.data?.reduce((sum, row) => sum + row.quantity_sold, 0) || 0);
+    setYesterdaySales(yesterdayResponse.data?.reduce((sum, row) => sum + row.quantity_sold, 0) || 0);
+    setMonthSales(monthResponse.data?.reduce((sum, row) => sum + row.quantity_sold, 0) || 0);
   }, [selectedVenueId, getDateRange]);
 
   // Fetch sales report data
@@ -256,6 +260,11 @@ const ClubManagementDashboard = ({ user, venueIds }: ClubManagementDashboardProp
   // Initial fetch
   useEffect(() => {
     const fetchAll = async () => {
+      if (!selectedVenueId) {
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       await Promise.all([
         fetchLiveStatus(),
@@ -266,9 +275,7 @@ const ClubManagementDashboard = ({ user, venueIds }: ClubManagementDashboardProp
       setLoading(false);
     };
 
-    if (selectedVenueId) {
-      fetchAll();
-    }
+    fetchAll();
   }, [selectedVenueId, fetchLiveStatus, fetchSalesSnapshot, fetchSalesReport]);
 
   // Refresh function

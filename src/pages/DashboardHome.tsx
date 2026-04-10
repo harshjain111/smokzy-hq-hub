@@ -1,7 +1,10 @@
+import { lazy, Suspense } from "react";
 import { User } from "@supabase/supabase-js";
 import { UserRole } from "@/hooks/useUserRole";
-import AdminDashboard from "@/components/dashboard/AdminDashboard";
-import ClubManagementDashboard from "@/components/dashboard/ClubManagementDashboard";
+import LoadingSpinner from "@/components/LoadingSpinner";
+
+const AdminDashboard = lazy(() => import("@/components/dashboard/AdminDashboard"));
+const ClubManagementDashboard = lazy(() => import("@/components/dashboard/ClubManagementDashboard"));
 
 interface DashboardHomeProps {
   user: User;
@@ -10,11 +13,19 @@ interface DashboardHomeProps {
 
 const DashboardHome = ({ user, role }: DashboardHomeProps) => {
   if (role.role === "admin") {
-    return <AdminDashboard user={user} />;
+    return (
+      <Suspense fallback={<LoadingSpinner />}>
+        <AdminDashboard user={user} />
+      </Suspense>
+    );
   }
 
   if (role.role === "club_management") {
-    return <ClubManagementDashboard user={user} venueIds={role.venueIds} />;
+    return (
+      <Suspense fallback={<LoadingSpinner />}>
+        <ClubManagementDashboard user={user} venueIds={role.venueIds} />
+      </Suspense>
+    );
   }
 
   return (
