@@ -122,15 +122,15 @@ const AuthenticatedApp = () => {
           <Route path="/attendance-report" element={guard([...INCHARGE_PLUS_MGMT], <AttendanceReport />)} />
           <Route path="/counter-pictures" element={guard([...INCHARGE_PLUS_MGMT], <CounterPictures />)} />
           <Route path="/roster/weekly" element={guard([...INCHARGE_ROLES], <WeeklyRoster />)} />
-          <Route path="/roster/daily" element={guard([...INCHARGE_PLUS_MGMT], <DailyRoster />)} />
-          <Route path="/packet-dispatch" element={guard([...INCHARGE_PLUS_MGMT], <PacketDispatch />)} />
+          <Route path="/roster/daily" element={guard([...INCHARGE_ROLES], <DailyRoster />)} />
+          <Route path="/packet-dispatch" element={guard([...INCHARGE_ROLES], <PacketDispatch />)} />
           <Route path="/packet-dispatch/history" element={guard([...INCHARGE_ROLES], <DispatchHistory />)} />
-          <Route path="/daily-report" element={guard([...INCHARGE_PLUS_MGMT], <DailyClubReport />)} />
-          <Route path="/inspections" element={guard([...INCHARGE_PLUS_MGMT], <InspectionHistory />)} />
+          <Route path="/daily-report" element={guard([...INCHARGE_ROLES], <DailyClubReport />)} />
+          <Route path="/inspections" element={guard([...INCHARGE_ROLES], <InspectionHistory />)} />
           <Route path="/inspections/new" element={guard([...INCHARGE_ROLES], <InspectionForm />)} />
           <Route path="/inspections/settings" element={guard([...INCHARGE_ROLES], <InspectionSettings />)} />
           <Route path="/staff-performance" element={guard([...INCHARGE_ROLES], <StaffPerformance />)} />
-          <Route path="/accessories" element={guard([...INCHARGE_PLUS_MGMT], <AccessoryTracker />)} />
+          <Route path="/accessories" element={guard([...INCHARGE_ROLES], <AccessoryTracker />)} />
 
           <Route path="/my-profile" element={<MyProfile />} />
           <Route path="*" element={<NotFound />} />

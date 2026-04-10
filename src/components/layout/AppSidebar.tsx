@@ -96,15 +96,11 @@ const AppSidebar = ({ collapsed = false, onNavigate, role }: AppSidebarProps) =>
       })).filter(g => g.items.length > 0);
     }
     if (role === "club_management") {
+      // Club management: read-only access to dashboard + attendance + counter pictures
       const allowedRoutes = new Set([
         "/dashboard",
-        "/roster/daily",
-        "/packet-dispatch",
-        "/daily-report",
-        "/inspections",
         "/attendance-report",
         "/counter-pictures",
-        "/accessories",
       ]);
       return groups.map(g => ({
         ...g,
