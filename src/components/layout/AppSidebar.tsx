@@ -95,6 +95,18 @@ const AppSidebar = ({ collapsed = false, onNavigate, role }: AppSidebarProps) =>
         items: g.items.filter(i => i.route !== "/manage-employees"),
       })).filter(g => g.items.length > 0);
     }
+    if (role === "club_management") {
+      // Club management: read-only access to dashboard + attendance + counter pictures
+      const allowedRoutes = new Set([
+        "/dashboard",
+        "/attendance-report",
+        "/counter-pictures",
+      ]);
+      return groups.map(g => ({
+        ...g,
+        items: g.items.filter(i => allowedRoutes.has(i.route)),
+      })).filter(g => g.items.length > 0);
+    }
     return groups;
   };
 
