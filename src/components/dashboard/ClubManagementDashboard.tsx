@@ -17,7 +17,7 @@ import {
   CalendarCheck, Package, BarChart3, FileText, Activity, Users,
   TrendingUp, Clock, RefreshCw, Loader2, ChevronRight,
   CheckCircle2, AlertTriangle, Circle, ArrowUpRight, ArrowDownRight,
-  Camera,
+  
 } from "lucide-react";
 import { format, subDays, startOfMonth, startOfDay, endOfDay, differenceInMinutes } from "date-fns";
 import { toast } from "sonner";
