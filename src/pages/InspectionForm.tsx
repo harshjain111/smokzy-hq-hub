@@ -260,20 +260,25 @@ const InspectionForm = () => {
         if (scError) throw scError;
       }
 
-      // Auto-create violation if noted
-      if (violationNoted && violationType && violationStaffId) {
-        const { error: vioError } = await supabase
-          .from("staff_violations")
-          .insert({
-            staff_id: violationStaffId,
-            venue_id: selectedVenue,
-            type: violationType,
-            description: violationDesc || null,
-            severity: violationSeverity,
-            date: now.toISOString().split("T")[0],
-            reported_by: user.id,
-          });
-        if (vioError) console.error("Violation insert error:", vioError);
+      // Auto-create violations if noted
+      if (violationNoted && violations.length > 0) {
+        const validViolations = violations.filter((v) => v.type && v.staffId);
+        if (validViolations.length > 0) {
+          const { error: vioError } = await supabase
+            .from("staff_violations")
+            .insert(
+              validViolations.map((v) => ({
+                staff_id: v.staffId,
+                venue_id: selectedVenue,
+                type: v.type,
+                description: v.description || null,
+                severity: v.severity,
+                date: now.toISOString().split("T")[0],
+                reported_by: user.id,
+              }))
+            );
+          if (vioError) console.error("Violation insert error:", vioError);
+        }
       }
 
       toast.success(`Inspection submitted — Score: ${scorePercent}%`);
