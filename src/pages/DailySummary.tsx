@@ -168,6 +168,36 @@ const DailySummary = () => {
         </Card>
       )}
 
+      {/* Today's Tasks */}
+      {pendingTasks.length > 0 && (
+        <Card className="border-warning/30 bg-warning/5">
+          <CardHeader className="pb-2 pt-3 px-4">
+            <CardTitle className="text-sm flex items-center gap-2 text-warning">
+              <ListChecks className="h-4 w-4" /> Today's Tasks ({pendingTasks.length} pending)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 px-4 pb-3">
+            {pendingTasks.map(task => {
+              const isOverdue = task.status === "overdue";
+              const deadlineTime = new Date(task.deadline).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+              return (
+                <button
+                  key={task.id}
+                  onClick={() => navigate("/roster/daily")}
+                  className="flex items-center gap-2 text-sm p-2.5 rounded-lg bg-background/50 hover:bg-background w-full text-left"
+                >
+                  <Clock className={`h-3.5 w-3.5 shrink-0 ${isOverdue ? "text-destructive" : "text-warning"}`} />
+                  <span className="flex-1">Confirm Roster — {task.venue_name}</span>
+                  <Badge variant={isOverdue ? "destructive" : "secondary"} className="text-[10px]">
+                    {isOverdue ? "OVERDUE" : `Due ${deadlineTime}`}
+                  </Badge>
+                </button>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Quick Actions */}
       <div>
         <h3 className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-widest">Quick Actions</h3>
