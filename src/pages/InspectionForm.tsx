@@ -62,13 +62,31 @@ const InspectionForm = () => {
   const [loadingSpotChecks, setLoadingSpotChecks] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Violation fields
+  // Violation fields — support multiple
+  interface ViolationEntry {
+    staffId: string;
+    type: string;
+    severity: string;
+    description: string;
+  }
   const [violationNoted, setViolationNoted] = useState(false);
-  const [violationType, setViolationType] = useState("");
-  const [violationDesc, setViolationDesc] = useState("");
-  const [violationSeverity, setViolationSeverity] = useState("low");
-  const [violationStaffId, setViolationStaffId] = useState("");
+  const [violations, setViolations] = useState<ViolationEntry[]>([
+    { staffId: "", type: "", severity: "low", description: "" },
+  ]);
   const [venueStaff, setVenueStaff] = useState<{ id: string; name: string }[]>([]);
+
+  const addViolation = () => {
+    setViolations((prev) => [...prev, { staffId: "", type: "", severity: "low", description: "" }]);
+  };
+
+  const updateViolation = (index: number, field: keyof ViolationEntry, value: string) => {
+    setViolations((prev) => prev.map((v, i) => (i === index ? { ...v, [field]: value } : v)));
+  };
+
+  const removeViolation = (index: number) => {
+    setViolations((prev) => prev.filter((_, i) => i !== index));
+    if (violations.length <= 1) setViolationNoted(false);
+  };
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
