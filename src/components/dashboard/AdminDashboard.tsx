@@ -3,7 +3,7 @@ import { User } from "@supabase/supabase-js";
 import { useAdminStats } from "@/hooks/useAdminStats";
 import { KPIStrip } from "@/components/admin/KPIStrip";
 import { ClubGrid } from "@/components/admin/ClubGrid";
-import { AlertBar } from "@/components/admin/AlertBar";
+import AdminNotifications from "./admin/AdminNotifications";
 import { AnalyticsDashboard } from "./admin/AnalyticsDashboard";
 import { supabase } from "@/integrations/supabase/client";
 import { format, subDays } from "date-fns";
@@ -27,14 +27,16 @@ const AdminDashboard = ({ user }: AdminDashboardProps) => {
         .from("sales_reports")
         .select("quantity_sold")
         .eq("report_date", yesterday);
+      
       const total = data?.reduce((sum, s) => sum + s.quantity_sold, 0) || 0;
       setYesterdaySales(total);
     };
+
     fetchYesterdaySales();
   }, []);
 
   return (
-    <div className="space-y-4 md:space-y-5">
+    <div className="space-y-4 md:space-y-6">
       {/* Mode Toggle */}
       <div className="flex items-center justify-center">
         <div className="inline-flex rounded-lg bg-muted p-1">
@@ -63,10 +65,13 @@ const AdminDashboard = ({ user }: AdminDashboardProps) => {
 
       {mode === "today" ? (
         <>
-          {/* KPI Strip — hero */}
+          {/* Admin Notifications */}
+          <AdminNotifications />
+
+          {/* KPI Strip */}
           <KPIStrip kpis={kpis} loading={loading} />
 
-          {/* Yesterday's Sales */}
+          {/* Yesterday's Sales KPI */}
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-muted/50">
             <div className="flex items-center justify-center w-8 h-8 rounded-full bg-success/20">
               <DollarSign className="h-4 w-4 text-success" />
@@ -76,9 +81,6 @@ const AdminDashboard = ({ user }: AdminDashboardProps) => {
               <div className="text-xs text-muted-foreground">Yesterday's Total Sales (All Clubs)</div>
             </div>
           </div>
-
-          {/* Alert Bar */}
-          <AlertBar />
 
           {/* Club Tiles Grid */}
           <ClubGrid clubs={clubs} loading={loading} />
