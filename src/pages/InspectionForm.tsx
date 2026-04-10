@@ -24,7 +24,7 @@ interface CheckItem {
   icon: string;
 }
 
-const CHECKS: CheckItem[] = [
+const DEFAULT_CHECKS: CheckItem[] = [
   { key: "staff_grooming", label: "Staff Grooming", icon: "👔" },
   { key: "venue_cleanliness", label: "Venue Cleanliness", icon: "🧹" },
   { key: "hookah_quality", label: "Hookah Quality", icon: "💨" },
@@ -53,11 +53,8 @@ const InspectionForm = () => {
 
   const [venues, setVenues] = useState<{ id: string; name: string }[]>([]);
   const [selectedVenue, setSelectedVenue] = useState(preselectedVenue || "");
-  const [checks, setChecks] = useState<Record<string, boolean>>(() => {
-    const init: Record<string, boolean> = {};
-    CHECKS.forEach((c) => (init[c.key] = false));
-    return init;
-  });
+  const [CHECKS, setCHECKS] = useState<CheckItem[]>(DEFAULT_CHECKS);
+  const [checks, setChecks] = useState<Record<string, boolean>>({});
   const [remarks, setRemarks] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -77,6 +74,17 @@ const InspectionForm = () => {
 
   useEffect(() => {
     supabase.from("venues").select("id, name").order("name").then(({ data }) => setVenues(data || []));
+    // Load custom checklist from global_settings
+    supabase.from("global_settings").select("value").eq("key", "inspection_checklist").single().then(({ data }) => {
+      let checkItems = DEFAULT_CHECKS;
+      if (data?.value) {
+        try { checkItems = JSON.parse(data.value); } catch {}
+      }
+      setCHECKS(checkItems);
+      const init: Record<string, boolean> = {};
+      checkItems.forEach(c => (init[c.key] = false));
+      setChecks(init);
+    });
   }, []);
 
   // When venue changes, pick random spot-check flavours + fetch staff

@@ -29,6 +29,7 @@ const routeTitles: Record<string, string> = {
   "/daily-report": "Daily Club Report",
   "/inspections/new": "New Inspection",
   "/inspections": "Inspection History",
+  "/inspections/settings": "Inspection Checklist",
   "/staff-performance": "Staff Performance",
   "/manage-employees": "Manage Employees",
   "/attendance-report": "Attendance Report",
@@ -63,18 +64,21 @@ const AppShell = ({ children, user, role, pageTitle }: AppShellProps) => {
 
   // Check if we should use tablet collapsed mode (768-1023)
   const isTablet = typeof window !== "undefined" && window.innerWidth >= 768 && window.innerWidth < 1024;
+  const collapsed = sidebarCollapsed || isTablet;
+  const sidebarWidth = collapsed ? "w-16" : "w-60";
+  const sidebarPx = collapsed ? 64 : 240;
 
   return (
-    <div className="min-h-screen bg-background flex">
-      {/* Desktop sidebar */}
+    <div className="min-h-screen bg-background">
+      {/* Desktop sidebar — fixed */}
       <aside
         className={cn(
-          "hidden md:flex flex-col border-r bg-card h-screen sticky top-0 transition-all duration-200 shrink-0",
-          sidebarCollapsed || isTablet ? "w-16" : "w-60"
+          "hidden md:flex flex-col border-r bg-card fixed top-0 left-0 h-screen z-30 transition-all duration-200",
+          sidebarWidth
         )}
       >
-        <div className="h-14 border-b flex items-center justify-between px-3">
-          {!sidebarCollapsed && !isTablet ? (
+        <div className="h-14 border-b flex items-center justify-between px-3 shrink-0">
+          {!collapsed ? (
             <>
               <span className="text-sm font-bold text-primary tracking-tight">SMOKZY</span>
               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSidebarCollapsed(true)}>
@@ -88,7 +92,7 @@ const AppShell = ({ children, user, role, pageTitle }: AppShellProps) => {
           )}
         </div>
         <div className="flex-1 overflow-y-auto">
-          <AppSidebar collapsed={sidebarCollapsed || isTablet} role={role} />
+          <AppSidebar collapsed={collapsed} role={role} />
         </div>
       </aside>
 
@@ -102,8 +106,11 @@ const AppShell = ({ children, user, role, pageTitle }: AppShellProps) => {
         </SheetContent>
       </Sheet>
 
-      {/* Main content area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      {/* Main content area — offset by sidebar width */}
+      <div
+        className="flex flex-col min-h-screen transition-all duration-200"
+        style={{ marginLeft: isMobile ? 0 : sidebarPx }}
+      >
         <TopBar
           user={user}
           pageTitle={resolvedTitle}
@@ -113,7 +120,7 @@ const AppShell = ({ children, user, role, pageTitle }: AppShellProps) => {
 
         <main className={cn(
           "flex-1 p-4 md:p-6",
-          isMobile && "pb-20" // space for bottom tab bar
+          isMobile && "pb-20"
         )}>
           {children}
         </main>
