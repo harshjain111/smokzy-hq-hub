@@ -1,5 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import {
+  assertCallerIsAdmin,
+  assertValidRole,
+  errorResponse,
+  logAdminAudit,
+} from "../_shared/authz.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,15 +17,24 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+  let callerId: string | null = null;
+  let callerIp: string | null = null;
+
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    // 1. AuthZ: caller must be an admin (role resolved from DB, not JWT claims).
+    ({ callerId, ip: callerIp } = await assertCallerIsAdmin(req, supabaseAdmin));
 
-    const { fullName, phone, password, role, venueId } = await req.json();
+    const body = await req.json();
+    const { fullName, phone, password, role, venueId } = body ?? {};
 
-    console.log('Creating user:', { fullName, phone, role, venueId });
+    // 2. Validate role against hardcoded allowlist before any DB write.
+    assertValidRole(role);
+
+    console.log('Creating user:', { fullName, phone, role, venueId, callerId });
 
     // Create auth user
     const email = `${phone}@smokzy.com`;
@@ -76,18 +91,31 @@ serve(async (req) => {
 
     console.log('User role created');
 
+    logAdminAudit({
+      action: 'create_user',
+      caller_id: callerId,
+      target_user_id: authData.user.id,
+      old_role: null,
+      new_role: role,
+      ip: callerIp,
+      success: true,
+    });
+
     return new Response(
       JSON.stringify({ success: true, userId: authData.user.id }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
+    // Server-side: log the real reason. Client: generic safe message.
     console.error('Error creating user:', error);
-    return new Response(
-      JSON.stringify({ error: error.message || 'Failed to create user' }),
-      { 
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
-    );
+    logAdminAudit({
+      action: 'create_user',
+      caller_id: callerId ?? 'unknown',
+      target_user_id: null,
+      ip: callerIp,
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return errorResponse(error, corsHeaders);
   }
 });
