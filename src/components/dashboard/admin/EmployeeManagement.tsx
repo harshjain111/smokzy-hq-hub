@@ -283,6 +283,9 @@ const EmployeeManagement = () => {
                   required={!editingEmployee}
                   minLength={6}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Must be at least 6 characters. Use a mix of letters, numbers & symbols for a stronger password.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="role">Role</Label>
