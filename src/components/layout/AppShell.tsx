@@ -69,7 +69,7 @@ const AppShell = ({ children, user, role, pageTitle }: AppShellProps) => {
   const sidebarPx = collapsed ? 64 : 240;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background safe-top">
       {/* Desktop sidebar — fixed */}
       <aside
         className={cn(
