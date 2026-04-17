@@ -491,7 +491,7 @@ const DailyRoster = () => {
           r.staff_name,
           r.role,
           r.shift_start || "—",
-          r.shift_end || "—",
+          r.shift_end === "closing" ? "Till Closing" : (r.shift_end || "—"),
           r.source,
           r.note || "",
         ]),
@@ -663,13 +663,37 @@ const DailyRoster = () => {
                                   className="w-[110px] h-9 text-xs"
                                   placeholder="Start"
                                 />
-                                <Input
-                                  type="time"
-                                  value={row.shift_end || ""}
-                                  onChange={e => updateRow(venue.id, row.staff_id, "shift_end", e.target.value || null)}
-                                  className="w-[110px] h-9 text-xs"
-                                  placeholder="End"
-                                />
+                                {row.shift_end === "closing" ? (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => updateRow(venue.id, row.staff_id, "shift_end", null)}
+                                    className="w-[110px] h-9 text-xs font-medium border-primary text-primary"
+                                    title="Click to set a specific end time"
+                                  >
+                                    Till Closing
+                                  </Button>
+                                ) : (
+                                  <div className="flex items-center gap-1">
+                                    <Input
+                                      type="time"
+                                      value={row.shift_end || ""}
+                                      onChange={e => updateRow(venue.id, row.staff_id, "shift_end", e.target.value || null)}
+                                      className="w-[110px] h-9 text-xs"
+                                      placeholder="End"
+                                    />
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => updateRow(venue.id, row.staff_id, "shift_end", "closing")}
+                                      className="h-9 px-2 text-[10px] whitespace-nowrap"
+                                      title="Set as Till Closing"
+                                    >
+                                      Closing
+                                    </Button>
+                                  </div>
+                                )}
 
                                 <Input
                                   value={row.note}
