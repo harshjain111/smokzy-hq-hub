@@ -491,7 +491,7 @@ const DailyRoster = () => {
           r.staff_name,
           r.role,
           r.shift_start || "—",
-          r.shift_end || "—",
+          r.shift_end === "closing" ? "Till Closing" : (r.shift_end || "—"),
           r.source,
           r.note || "",
         ]),
