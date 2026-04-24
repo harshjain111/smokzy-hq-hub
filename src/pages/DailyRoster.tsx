@@ -659,6 +659,7 @@ const DailyRoster = () => {
                 {filteredVenues.map(venue => {
                   const vr = venueRosters.get(venue.id);
                   if (!vr) return null;
+                  const isEditable = vr.status === "draft" || editableVenueIds.has(venue.id);
                   const activeRows = vr.rows.filter(r => !r.is_removed);
                   const modifiedCount = activeRows.filter(r => r.source !== "weekly").length;
                   const assignedStaffIds = new Set(vr.rows.filter(r => !r.is_removed).map(r => r.staff_id));
@@ -671,14 +672,23 @@ const DailyRoster = () => {
                           <div className="flex items-center gap-3">
                             <CardTitle className="text-base">{venue.name}</CardTitle>
                             <Badge variant={vr.status === "confirmed" ? "default" : "secondary"}
-                              className={vr.status === "confirmed" ? "bg-green-600 text-white" : "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-200"}>
-                              {vr.status === "confirmed" ? "CONFIRMED" : "DRAFT"}
+                              className={vr.status === "confirmed" ? "bg-success text-success-foreground" : "bg-warning/15 text-warning border-warning/30"}>
+                              {vr.status === "confirmed" ? "SAVED" : "DRAFT"}
                             </Badge>
                             {vr.edit_count > 0 && (
                               <span className="text-xs text-muted-foreground">Edited {vr.edit_count}×</span>
                             )}
                           </div>
                           <div className="flex items-center gap-2">
+                            {vr.status === "confirmed" && !isEditable ? (
+                              <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => startEditingVenue(venue.id)}>
+                                <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                              </Button>
+                            ) : vr.status === "confirmed" ? (
+                              <Button variant="ghost" size="sm" className="h-9 text-xs" onClick={() => cancelEditingVenue(venue.id)}>
+                                Cancel
+                              </Button>
+                            ) : null}
                             <Button variant="ghost" size="sm" className="h-9 text-xs" onClick={() => fetchAuditLog(venue.id)}>
                               <History className="h-3.5 w-3.5 mr-1" /> History
                             </Button>
@@ -707,7 +717,7 @@ const DailyRoster = () => {
                           <p className="text-sm text-muted-foreground py-4 text-center">No staff assigned</p>
                         ) : (
                           activeRows.map(row => (
-                            <div key={row.staff_id} className={`flex flex-col sm:flex-row sm:items-center gap-2 p-3 rounded-lg border ${row.source === "modified" ? "border-orange-300 dark:border-orange-700 bg-orange-50/50 dark:bg-orange-950/20" : "bg-card"}`}>
+                            <div key={row.staff_id} className={cn("flex flex-col sm:flex-row sm:items-center gap-2 p-3 rounded-lg border", row.source === "modified" ? "border-warning/30 bg-warning/5" : "bg-card")}>
                               <div className="flex items-center gap-2 min-w-0 flex-1">
                                 <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary shrink-0">
                                   {row.staff_name.charAt(0)}
@@ -719,7 +729,7 @@ const DailyRoster = () => {
                               </div>
 
                               <div className="flex flex-wrap items-center gap-2">
-                                <Select value={row.role} onValueChange={v => updateRow(venue.id, row.staff_id, "role", v)}>
+                                <Select value={row.role} onValueChange={v => updateRow(venue.id, row.staff_id, "role", v)} disabled={!isEditable}>
                                   <SelectTrigger className="w-[130px] h-9 text-xs">
                                     <SelectValue />
                                   </SelectTrigger>
@@ -734,6 +744,7 @@ const DailyRoster = () => {
                                   onChange={e => updateRow(venue.id, row.staff_id, "shift_start", e.target.value || null)}
                                   className="w-[110px] h-9 text-xs"
                                   placeholder="Start"
+                                  disabled={!isEditable}
                                 />
                                 {row.shift_end === "closing" ? (
                                   <Button
@@ -742,6 +753,7 @@ const DailyRoster = () => {
                                     onClick={() => updateRow(venue.id, row.staff_id, "shift_end", null)}
                                     className="w-[110px] h-9 text-xs font-medium border-primary text-primary"
                                     title="Click to set a specific end time"
+                                    disabled={!isEditable}
                                   >
                                     Till Closing
                                   </Button>
@@ -753,6 +765,7 @@ const DailyRoster = () => {
                                       onChange={e => updateRow(venue.id, row.staff_id, "shift_end", e.target.value || null)}
                                       className="w-[110px] h-9 text-xs"
                                       placeholder="End"
+                                      disabled={!isEditable}
                                     />
                                     <Button
                                       type="button"
@@ -761,6 +774,7 @@ const DailyRoster = () => {
                                       onClick={() => updateRow(venue.id, row.staff_id, "shift_end", "closing")}
                                       className="h-9 px-2 text-[10px] whitespace-nowrap"
                                       title="Set as Till Closing"
+                                      disabled={!isEditable}
                                     >
                                       Closing
                                     </Button>
@@ -772,9 +786,10 @@ const DailyRoster = () => {
                                   onChange={e => updateRow(venue.id, row.staff_id, "note", e.target.value)}
                                   className="w-[150px] h-9 text-xs"
                                   placeholder="Note..."
+                                  disabled={!isEditable}
                                 />
 
-                                <Button variant="ghost" size="icon" className="h-9 w-9 text-destructive hover:text-destructive" onClick={() => removeRow(venue.id, row.staff_id)}>
+                                <Button variant="ghost" size="icon" className="h-9 w-9 text-destructive hover:text-destructive" onClick={() => removeRow(venue.id, row.staff_id)} disabled={!isEditable}>
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
                               </div>
@@ -782,7 +797,7 @@ const DailyRoster = () => {
                           ))
                         )}
 
-                        {availableStaff.length > 0 && (
+                        {isEditable && availableStaff.length > 0 && (
                           <Select onValueChange={v => addStaff(venue.id, v)}>
                             <SelectTrigger className="h-10 border-dashed">
                               <div className="flex items-center gap-2 text-muted-foreground">
@@ -802,10 +817,16 @@ const DailyRoster = () => {
                           <span className="text-xs text-muted-foreground">
                             {activeRows.length} staff scheduled{modifiedCount > 0 ? ` · ${modifiedCount} modified` : ""}
                           </span>
-                          <Button size="sm" className="h-10 min-w-[180px]" onClick={() => saveVenueRoster(venue.id)} disabled={saving}>
-                            {saving ? <Clock className="h-4 w-4 mr-2 animate-spin" /> : <Check className="h-4 w-4 mr-2" />}
-                            {vr.status === "draft" ? "Confirm & Save" : "Save Changes"}
-                          </Button>
+                          {isEditable ? (
+                            <Button size="sm" className="h-10 min-w-[180px]" onClick={() => saveVenueRoster(venue.id)} disabled={saving}>
+                              {saving ? <Clock className="h-4 w-4 mr-2 animate-spin" /> : <Check className="h-4 w-4 mr-2" />}
+                              {vr.status === "draft" ? "Save & Confirm" : "Save Changes"}
+                            </Button>
+                          ) : (
+                            <div className="text-xs text-muted-foreground">
+                              Final roster locked for viewing
+                            </div>
+                          )}
                         </div>
                       </CardContent>
                     </Card>
