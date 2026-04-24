@@ -93,9 +93,17 @@ const stripTillClosingNote = (note: string | null | undefined) => {
   return n.startsWith(TILL_CLOSING_MARKER) ? n.slice(TILL_CLOSING_MARKER.length).trim() : n;
 };
 
+const formatTimeDisplay = (t: string | null | undefined) => {
+  if (!t) return "—";
+  // DB time columns return "HH:MM:SS"; trim seconds for cleaner display
+  const parts = t.split(":");
+  if (parts.length >= 2) return `${parts[0]}:${parts[1]}`;
+  return t;
+};
+
 const getRosterRowSummary = (row: Pick<RosterRow, "shift_start" | "shift_end" | "note">) => {
-  const shiftStart = row.shift_start || "—";
-  const shiftEnd = isTillClosing(row) ? "Till Closing" : (row.shift_end || "—");
+  const shiftStart = formatTimeDisplay(row.shift_start);
+  const shiftEnd = isTillClosing(row) ? "Till Closing" : formatTimeDisplay(row.shift_end);
   return `${shiftStart} - ${shiftEnd}`;
 };
 
@@ -220,13 +228,18 @@ const DailyRoster = () => {
         } else {
           const rosterRows = venueRows.map(r => {
             const tillClosing = (r.note || "").startsWith(TILL_CLOSING_MARKER);
+            const trimTime = (t: string | null) => {
+              if (!t) return null;
+              const parts = t.split(":");
+              return parts.length >= 2 ? `${parts[0]}:${parts[1]}` : t;
+            };
             return {
               id: r.id,
               staff_id: r.staff_id,
               staff_name: profileMap.get(r.staff_id) || "Unknown",
               role: r.role || "Staff",
-              shift_start: r.shift_start,
-              shift_end: tillClosing ? "closing" : r.shift_end,
+              shift_start: trimTime(r.shift_start),
+              shift_end: tillClosing ? "closing" : trimTime(r.shift_end),
               source: (r.source as RosterRow["source"]) || "weekly",
               note: stripTillClosingNote(r.note),
               is_removed: r.is_removed || false,
@@ -1114,7 +1127,7 @@ const DailyRoster = () => {
       </div>
 
       {/* Bottom sticky summary bar — only in editor tab */}
-      {!loading && activeTab === "editor" && Array.from(venueRosters.entries()).some(([venueId, vr]) => (selectedVenueId === "all" || selectedVenueId === venueId) && vr.status === "draft") && (
+      {!loading && activeTab === "editor" && Array.from(venueRosters.entries()).some(([venueId, vr]) => (selectedVenueId === "all" || selectedVenueId === venueId) && (vr.status === "draft" || editableVenueIds.has(venueId))) && (
         <div className="fixed bottom-0 left-0 right-0 z-40 bg-background border-t px-4 py-3 flex items-center justify-between safe-area-bottom md:left-[240px] lg:left-[240px]">
           <span className="text-sm text-muted-foreground">
             {totalScheduled} staff total{totalModified > 0 ? ` · ${totalModified} modified` : ""}
@@ -1127,7 +1140,9 @@ const DailyRoster = () => {
               const errors: string[] = [];
               for (const venue of filteredVenues) {
                 const vr = venueRosters.get(venue.id);
-                if (!vr || vr.status !== "draft") continue;
+                if (!vr) continue;
+                const isInEditMode = vr.status === "draft" || editableVenueIds.has(venue.id);
+                if (!isInEditMode) continue;
                 const activeRows = vr.rows.filter(r => !r.is_removed);
                 // Skip empty venues entirely
                 if (activeRows.length === 0) continue;
