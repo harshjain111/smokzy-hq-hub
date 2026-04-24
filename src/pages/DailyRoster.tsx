@@ -1086,8 +1086,45 @@ const DailyRoster = () => {
           </span>
           <Button
             onClick={async () => {
+              setSaving(true);
+              let confirmedCount = 0;
+              let draftCount = 0;
+              const errors: string[] = [];
               for (const venue of filteredVenues) {
-                await saveVenueRoster(venue.id);
+                const vr = venueRosters.get(venue.id);
+                if (!vr || vr.status !== "draft") continue;
+                const activeRows = vr.rows.filter(r => !r.is_removed);
+                // Skip empty venues entirely
+                if (activeRows.length === 0) continue;
+                // Duplicate staff is a hard error — surface once
+                const staffIds = activeRows.map(r => r.staff_id);
+                if (new Set(staffIds).size !== staffIds.length) {
+                  errors.push(`${venue.name}: duplicate staff`);
+                  continue;
+                }
+                // Decide: complete = confirmed, incomplete = draft
+                const isComplete = activeRows.every(r =>
+                  r.shift_start && (r.shift_end || isTillClosing(r))
+                );
+                const res = await saveVenueRosterSilent(venue.id, isComplete ? "confirmed" : "draft");
+                if (res === "ok") {
+                  if (isComplete) confirmedCount++;
+                  else draftCount++;
+                } else if (res) {
+                  errors.push(`${venue.name}: ${res}`);
+                }
+              }
+              setSaving(false);
+              if (errors.length) {
+                toast.error(`Save issues: ${errors.join("; ")}`);
+              }
+              if (confirmedCount || draftCount) {
+                const parts: string[] = [];
+                if (confirmedCount) parts.push(`${confirmedCount} confirmed`);
+                if (draftCount) parts.push(`${draftCount} saved as draft`);
+                toast.success(`Daily Roster ${dateStr}: ${parts.join(" · ")}`);
+              } else if (!errors.length) {
+                toast.info("Nothing to save");
               }
             }}
             disabled={saving}
