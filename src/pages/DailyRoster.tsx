@@ -728,71 +728,74 @@ const DailyRoster = () => {
                                 </div>
                               </div>
 
-                              <div className="flex flex-wrap items-center gap-2">
-                                <Select value={row.role} onValueChange={v => updateRow(venue.id, row.staff_id, "role", v)} disabled={!isEditable}>
-                                  <SelectTrigger className="w-[130px] h-9 text-xs">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {ROLES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-                                  </SelectContent>
-                                </Select>
+                              {isEditable ? (
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <Select value={row.role} onValueChange={v => updateRow(venue.id, row.staff_id, "role", v)}>
+                                    <SelectTrigger className="w-[130px] h-9 text-xs">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {ROLES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                                    </SelectContent>
+                                  </Select>
 
-                                <Input
-                                  type="time"
-                                  value={row.shift_start || ""}
-                                  onChange={e => updateRow(venue.id, row.staff_id, "shift_start", e.target.value || null)}
-                                  className="w-[110px] h-9 text-xs"
-                                  placeholder="Start"
-                                  disabled={!isEditable}
-                                />
-                                {row.shift_end === "closing" ? (
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => updateRow(venue.id, row.staff_id, "shift_end", null)}
-                                    className="w-[110px] h-9 text-xs font-medium border-primary text-primary"
-                                    title="Click to set a specific end time"
-                                    disabled={!isEditable}
-                                  >
-                                    Till Closing
-                                  </Button>
-                                ) : (
-                                  <div className="flex items-center gap-1">
-                                    <Input
-                                      type="time"
-                                      value={row.shift_end || ""}
-                                      onChange={e => updateRow(venue.id, row.staff_id, "shift_end", e.target.value || null)}
-                                      className="w-[110px] h-9 text-xs"
-                                      placeholder="End"
-                                      disabled={!isEditable}
-                                    />
+                                  <Input
+                                    type="time"
+                                    value={row.shift_start || ""}
+                                    onChange={e => updateRow(venue.id, row.staff_id, "shift_start", e.target.value || null)}
+                                    className="w-[110px] h-9 text-xs"
+                                    placeholder="Start"
+                                  />
+                                  {row.shift_end === "closing" ? (
                                     <Button
                                       type="button"
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => updateRow(venue.id, row.staff_id, "shift_end", "closing")}
-                                      className="h-9 px-2 text-[10px] whitespace-nowrap"
-                                      title="Set as Till Closing"
-                                      disabled={!isEditable}
+                                      variant="outline"
+                                      onClick={() => updateRow(venue.id, row.staff_id, "shift_end", null)}
+                                      className="w-[110px] h-9 text-xs font-medium border-primary text-primary"
+                                      title="Click to set a specific end time"
                                     >
-                                      Closing
+                                      Till Closing
                                     </Button>
-                                  </div>
-                                )}
+                                  ) : (
+                                    <div className="flex items-center gap-1">
+                                      <Input
+                                        type="time"
+                                        value={row.shift_end || ""}
+                                        onChange={e => updateRow(venue.id, row.staff_id, "shift_end", e.target.value || null)}
+                                        className="w-[110px] h-9 text-xs"
+                                        placeholder="End"
+                                      />
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => updateRow(venue.id, row.staff_id, "shift_end", "closing")}
+                                        className="h-9 px-2 text-[10px] whitespace-nowrap"
+                                        title="Set as Till Closing"
+                                      >
+                                        Closing
+                                      </Button>
+                                    </div>
+                                  )}
 
-                                <Input
-                                  value={row.note}
-                                  onChange={e => updateRow(venue.id, row.staff_id, "note", e.target.value)}
-                                  className="w-[150px] h-9 text-xs"
-                                  placeholder="Note..."
-                                  disabled={!isEditable}
-                                />
+                                  <Input
+                                    value={row.note}
+                                    onChange={e => updateRow(venue.id, row.staff_id, "note", e.target.value)}
+                                    className="w-[150px] h-9 text-xs"
+                                    placeholder="Note..."
+                                  />
 
-                                <Button variant="ghost" size="icon" className="h-9 w-9 text-destructive hover:text-destructive" onClick={() => removeRow(venue.id, row.staff_id)} disabled={!isEditable}>
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
+                                  <Button variant="ghost" size="icon" className="h-9 w-9 text-destructive hover:text-destructive" onClick={() => removeRow(venue.id, row.staff_id)}>
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                                  <Badge variant="secondary" className="text-xs">{row.role}</Badge>
+                                  <Badge variant="outline" className="text-xs">{getRosterRowSummary(row)}</Badge>
+                                  {row.note && <Badge variant="outline" className="max-w-[220px] truncate text-xs">{row.note}</Badge>}
+                                </div>
+                              )}
                             </div>
                           ))
                         )}
