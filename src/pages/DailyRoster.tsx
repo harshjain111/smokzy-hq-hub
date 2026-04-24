@@ -152,9 +152,12 @@ const DailyRoster = () => {
         if (!byDate.has(row.date)) byDate.set(row.date, new Map());
         const dateMap = byDate.get(row.date)!;
         if (!dateMap.has(row.venue_id)) {
-          dateMap.set(row.venue_id, { status: row.status, staff_count: 0, edit_count: row.edit_count });
+          dateMap.set(row.venue_id, { status: "draft", staff_count: 0, edit_count: row.edit_count });
         }
         const entry = dateMap.get(row.venue_id)!;
+        if (row.status === "confirmed" && !row.is_removed) {
+          entry.status = "confirmed";
+        }
         if (!row.is_removed) entry.staff_count++;
       }
 
@@ -203,31 +206,33 @@ const DailyRoster = () => {
         const venueRows = existing.filter(r => r.venue_id === venue.id);
         if (venueRows.length === 0) {
           const rows = await prefillFromWeekly(venue.id, dateStr, profileMap);
-          map.set(venue.id, { status: "draft", confirmed_at: null, edit_count: 0, rows });
+          map.set(venue.id, { status: "draft", confirmed_at: null, edit_count: 0, rows, saved_rows: cloneRosterRows(rows) });
         } else {
+          const rosterRows = venueRows.map(r => ({
+            id: r.id,
+            staff_id: r.staff_id,
+            staff_name: profileMap.get(r.staff_id) || "Unknown",
+            role: r.role || "Staff",
+            shift_start: r.shift_start,
+            shift_end: r.shift_end,
+            source: (r.source as RosterRow["source"]) || "weekly",
+            note: r.note || "",
+            is_removed: r.is_removed || false,
+          }));
           const firstRow = venueRows[0];
           map.set(venue.id, {
-            status: (firstRow.status as "draft" | "confirmed") || "draft",
+            status: getVenueStatusFromRows(venueRows),
             confirmed_at: firstRow.confirmed_at,
             edit_count: firstRow.edit_count || 0,
-            rows: venueRows.map(r => ({
-              id: r.id,
-              staff_id: r.staff_id,
-              staff_name: profileMap.get(r.staff_id) || "Unknown",
-              role: r.role || "Staff",
-              shift_start: r.shift_start,
-              shift_end: r.shift_end,
-              source: (r.source as RosterRow["source"]) || "weekly",
-              note: r.note || "",
-              is_removed: r.is_removed || false,
-            })),
+            rows: rosterRows,
+            saved_rows: cloneRosterRows(rosterRows),
           });
         }
       }
     } else {
       for (const venue of venues) {
         const rows = await prefillFromWeekly(venue.id, dateStr, profileMap);
-        map.set(venue.id, { status: "draft", confirmed_at: null, edit_count: 0, rows });
+        map.set(venue.id, { status: "draft", confirmed_at: null, edit_count: 0, rows, saved_rows: cloneRosterRows(rows) });
       }
     }
 
