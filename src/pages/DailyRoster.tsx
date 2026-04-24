@@ -228,13 +228,18 @@ const DailyRoster = () => {
         } else {
           const rosterRows = venueRows.map(r => {
             const tillClosing = (r.note || "").startsWith(TILL_CLOSING_MARKER);
+            const trimTime = (t: string | null) => {
+              if (!t) return null;
+              const parts = t.split(":");
+              return parts.length >= 2 ? `${parts[0]}:${parts[1]}` : t;
+            };
             return {
               id: r.id,
               staff_id: r.staff_id,
               staff_name: profileMap.get(r.staff_id) || "Unknown",
               role: r.role || "Staff",
-              shift_start: r.shift_start,
-              shift_end: tillClosing ? "closing" : r.shift_end,
+              shift_start: trimTime(r.shift_start),
+              shift_end: tillClosing ? "closing" : trimTime(r.shift_end),
               source: (r.source as RosterRow["source"]) || "weekly",
               note: stripTillClosingNote(r.note),
               is_removed: r.is_removed || false,
