@@ -83,9 +83,19 @@ const cloneRosterRows = (rows: RosterRow[]): RosterRow[] =>
     _original: row._original ? { ...row._original } : undefined,
   }));
 
-const getRosterRowSummary = (row: Pick<RosterRow, "shift_start" | "shift_end">) => {
+const TILL_CLOSING_MARKER = "[TILL_CLOSING]";
+
+const isTillClosing = (row: Pick<RosterRow, "shift_end" | "note">) =>
+  row.shift_end === "closing" || (row.note || "").startsWith(TILL_CLOSING_MARKER);
+
+const stripTillClosingNote = (note: string | null | undefined) => {
+  const n = note || "";
+  return n.startsWith(TILL_CLOSING_MARKER) ? n.slice(TILL_CLOSING_MARKER.length).trim() : n;
+};
+
+const getRosterRowSummary = (row: Pick<RosterRow, "shift_start" | "shift_end" | "note">) => {
   const shiftStart = row.shift_start || "—";
-  const shiftEnd = row.shift_end === "closing" ? "Till Closing" : (row.shift_end || "—");
+  const shiftEnd = isTillClosing(row) ? "Till Closing" : (row.shift_end || "—");
   return `${shiftStart} - ${shiftEnd}`;
 };
 
@@ -208,17 +218,20 @@ const DailyRoster = () => {
           const rows = await prefillFromWeekly(venue.id, dateStr, profileMap);
           map.set(venue.id, { status: "draft", confirmed_at: null, edit_count: 0, rows, saved_rows: cloneRosterRows(rows) });
         } else {
-          const rosterRows = venueRows.map(r => ({
-            id: r.id,
-            staff_id: r.staff_id,
-            staff_name: profileMap.get(r.staff_id) || "Unknown",
-            role: r.role || "Staff",
-            shift_start: r.shift_start,
-            shift_end: r.shift_end,
-            source: (r.source as RosterRow["source"]) || "weekly",
-            note: r.note || "",
-            is_removed: r.is_removed || false,
-          }));
+          const rosterRows = venueRows.map(r => {
+            const tillClosing = (r.note || "").startsWith(TILL_CLOSING_MARKER);
+            return {
+              id: r.id,
+              staff_id: r.staff_id,
+              staff_name: profileMap.get(r.staff_id) || "Unknown",
+              role: r.role || "Staff",
+              shift_start: r.shift_start,
+              shift_end: tillClosing ? "closing" : r.shift_end,
+              source: (r.source as RosterRow["source"]) || "weekly",
+              note: stripTillClosingNote(r.note),
+              is_removed: r.is_removed || false,
+            };
+          });
           const firstRow = venueRows[0];
           map.set(venue.id, {
             status: getVenueStatusFromRows(venueRows),
@@ -372,23 +385,30 @@ const DailyRoster = () => {
 
       await supabase.from("daily_roster" as any).delete().eq("venue_id", venueId).eq("date", dateStr);
 
-      const rowsToInsert = vr.rows.map(r => ({
-        venue_id: venueId,
-        date: dateStr,
-        staff_id: r.staff_id,
-        role: r.role,
-        shift_start: r.shift_start,
-        shift_end: r.shift_end,
-        status: "confirmed" as const,
-        confirmed_by: userId,
-        confirmed_at: isFirstSave ? now : (vr.confirmed_at || now),
-        last_edited_by: userId,
-        last_edited_at: now,
-        edit_count: isFirstSave ? 0 : vr.edit_count + 1,
-        source: r.source,
-        note: r.note || null,
-        is_removed: r.is_removed,
-      }));
+      const rowsToInsert = vr.rows.map(r => {
+        const tillClosing = r.shift_end === "closing";
+        const cleanNote = stripTillClosingNote(r.note);
+        const finalNote = tillClosing
+          ? `${TILL_CLOSING_MARKER}${cleanNote ? " " + cleanNote : ""}`
+          : (cleanNote || null);
+        return {
+          venue_id: venueId,
+          date: dateStr,
+          staff_id: r.staff_id,
+          role: r.role,
+          shift_start: r.shift_start,
+          shift_end: tillClosing ? null : r.shift_end,
+          status: "confirmed" as const,
+          confirmed_by: userId,
+          confirmed_at: isFirstSave ? now : (vr.confirmed_at || now),
+          last_edited_by: userId,
+          last_edited_at: now,
+          edit_count: isFirstSave ? 0 : vr.edit_count + 1,
+          source: r.source,
+          note: finalNote,
+          is_removed: r.is_removed,
+        };
+      });
 
       const { error } = await supabase.from("daily_roster" as any).insert(rowsToInsert);
       if (error) throw error;
@@ -563,9 +583,9 @@ const DailyRoster = () => {
           r.staff_name,
           r.role,
           r.shift_start || "—",
-          r.shift_end === "closing" ? "Till Closing" : (r.shift_end || "—"),
+          isTillClosing(r) ? "Till Closing" : (r.shift_end || "—"),
           r.source,
-          r.note || "",
+          stripTillClosingNote(r.note),
         ]),
         styles: { fontSize: 7 },
         headStyles: { fillColor: [99, 65, 214] },
