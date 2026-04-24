@@ -44,6 +44,7 @@ interface VenueRoster {
   confirmed_at: string | null;
   edit_count: number;
   rows: RosterRow[];
+  saved_rows: RosterRow[];
 }
 
 interface AuditEntry {
@@ -76,11 +77,30 @@ const getTomorrow = () => {
   return d;
 };
 
+const cloneRosterRows = (rows: RosterRow[]): RosterRow[] =>
+  rows.map((row) => ({
+    ...row,
+    _original: row._original ? { ...row._original } : undefined,
+  }));
+
+const getRosterRowSummary = (row: Pick<RosterRow, "shift_start" | "shift_end">) => {
+  const shiftStart = row.shift_start || "—";
+  const shiftEnd = row.shift_end === "closing" ? "Till Closing" : (row.shift_end || "—");
+  return `${shiftStart} - ${shiftEnd}`;
+};
+
+const getVenueStatusFromRows = (rows: Array<{ status: string; is_removed: boolean | null }>) => {
+  const activeRows = rows.filter((row) => !row.is_removed);
+  if (activeRows.length === 0) return "draft" as const;
+  return activeRows.every((row) => row.status === "confirmed") ? "confirmed" as const : "draft" as const;
+};
+
 const DailyRoster = () => {
   const [selectedDate, setSelectedDate] = useState(() => getTomorrow());
   const [venues, setVenues] = useState<Venue[]>([]);
   const [selectedVenueId, setSelectedVenueId] = useState<string>("all");
   const [venueRosters, setVenueRosters] = useState<Map<string, VenueRoster>>(new Map());
+  const [editableVenueIds, setEditableVenueIds] = useState<Set<string>>(new Set());
   const [allStaff, setAllStaff] = useState<StaffOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -98,6 +118,7 @@ const DailyRoster = () => {
   useEffect(() => { fetchVenues(); fetchStaff(); }, []);
   useEffect(() => { if (venues.length > 0) fetchDailyData(); }, [selectedDate, venues]);
   useEffect(() => { if (activeTab === "history" && venues.length > 0) fetchSavedRosters(); }, [activeTab, venues]);
+  useEffect(() => { setEditableVenueIds(new Set()); }, [dateStr]);
 
   const fetchVenues = async () => {
     const { data } = await supabase.from("venues").select("id, name").order("name");
@@ -131,9 +152,12 @@ const DailyRoster = () => {
         if (!byDate.has(row.date)) byDate.set(row.date, new Map());
         const dateMap = byDate.get(row.date)!;
         if (!dateMap.has(row.venue_id)) {
-          dateMap.set(row.venue_id, { status: row.status, staff_count: 0, edit_count: row.edit_count });
+          dateMap.set(row.venue_id, { status: "draft", staff_count: 0, edit_count: row.edit_count });
         }
         const entry = dateMap.get(row.venue_id)!;
+        if (row.status === "confirmed" && !row.is_removed) {
+          entry.status = "confirmed";
+        }
         if (!row.is_removed) entry.staff_count++;
       }
 
@@ -182,31 +206,33 @@ const DailyRoster = () => {
         const venueRows = existing.filter(r => r.venue_id === venue.id);
         if (venueRows.length === 0) {
           const rows = await prefillFromWeekly(venue.id, dateStr, profileMap);
-          map.set(venue.id, { status: "draft", confirmed_at: null, edit_count: 0, rows });
+          map.set(venue.id, { status: "draft", confirmed_at: null, edit_count: 0, rows, saved_rows: cloneRosterRows(rows) });
         } else {
+          const rosterRows = venueRows.map(r => ({
+            id: r.id,
+            staff_id: r.staff_id,
+            staff_name: profileMap.get(r.staff_id) || "Unknown",
+            role: r.role || "Staff",
+            shift_start: r.shift_start,
+            shift_end: r.shift_end,
+            source: (r.source as RosterRow["source"]) || "weekly",
+            note: r.note || "",
+            is_removed: r.is_removed || false,
+          }));
           const firstRow = venueRows[0];
           map.set(venue.id, {
-            status: (firstRow.status as "draft" | "confirmed") || "draft",
+            status: getVenueStatusFromRows(venueRows),
             confirmed_at: firstRow.confirmed_at,
             edit_count: firstRow.edit_count || 0,
-            rows: venueRows.map(r => ({
-              id: r.id,
-              staff_id: r.staff_id,
-              staff_name: profileMap.get(r.staff_id) || "Unknown",
-              role: r.role || "Staff",
-              shift_start: r.shift_start,
-              shift_end: r.shift_end,
-              source: (r.source as RosterRow["source"]) || "weekly",
-              note: r.note || "",
-              is_removed: r.is_removed || false,
-            })),
+            rows: rosterRows,
+            saved_rows: cloneRosterRows(rosterRows),
           });
         }
       }
     } else {
       for (const venue of venues) {
         const rows = await prefillFromWeekly(venue.id, dateStr, profileMap);
-        map.set(venue.id, { status: "draft", confirmed_at: null, edit_count: 0, rows });
+        map.set(venue.id, { status: "draft", confirmed_at: null, edit_count: 0, rows, saved_rows: cloneRosterRows(rows) });
       }
     }
 
@@ -289,7 +315,7 @@ const DailyRoster = () => {
     if (!staff) return;
     setVenueRosters(prev => {
       const next = new Map(prev);
-      const vr = next.get(venueId) || { status: "draft" as const, confirmed_at: null, edit_count: 0, rows: [] };
+      const vr = next.get(venueId) || { status: "draft" as const, confirmed_at: null, edit_count: 0, rows: [], saved_rows: [] };
       const existingIdx = vr.rows.findIndex(r => r.staff_id === staffId);
       if (existingIdx >= 0) {
         const rows = [...vr.rows];
@@ -390,7 +416,14 @@ const DailyRoster = () => {
           status: "confirmed",
           confirmed_at: isFirstSave ? now : (vr.confirmed_at || now),
           edit_count: isFirstSave ? 0 : vr.edit_count + 1,
+          saved_rows: cloneRosterRows(vr.rows),
         });
+        return next;
+      });
+
+      setEditableVenueIds(prev => {
+        const next = new Set(prev);
+        next.delete(venueId);
         return next;
       });
 
@@ -422,12 +455,50 @@ const DailyRoster = () => {
 
     setVenueRosters(prev => {
       const next = new Map(prev);
-      next.set(venueId, { status: "draft", confirmed_at: null, edit_count: 0, rows });
+      next.set(venueId, { status: "draft", confirmed_at: null, edit_count: 0, rows, saved_rows: cloneRosterRows(rows) });
+      return next;
+    });
+
+    setEditableVenueIds(prev => {
+      const next = new Set(prev);
+      next.delete(venueId);
       return next;
     });
 
     await supabase.from("daily_roster" as any).delete().eq("venue_id", venueId).eq("date", dateStr);
     toast.success("Reset to weekly roster");
+  };
+
+  const startEditingVenue = (venueId: string) => {
+    setVenueRosters(prev => {
+      const next = new Map(prev);
+      const vr = next.get(venueId);
+      if (!vr) return prev;
+      next.set(venueId, { ...vr, rows: cloneRosterRows(vr.saved_rows) });
+      return next;
+    });
+
+    setEditableVenueIds(prev => {
+      const next = new Set(prev);
+      next.add(venueId);
+      return next;
+    });
+  };
+
+  const cancelEditingVenue = (venueId: string) => {
+    setVenueRosters(prev => {
+      const next = new Map(prev);
+      const vr = next.get(venueId);
+      if (!vr) return prev;
+      next.set(venueId, { ...vr, rows: cloneRosterRows(vr.saved_rows) });
+      return next;
+    });
+
+    setEditableVenueIds(prev => {
+      const next = new Set(prev);
+      next.delete(venueId);
+      return next;
+    });
   };
 
   const fetchAuditLog = async (venueId: string) => {
@@ -588,6 +659,7 @@ const DailyRoster = () => {
                 {filteredVenues.map(venue => {
                   const vr = venueRosters.get(venue.id);
                   if (!vr) return null;
+                  const isEditable = vr.status === "draft" || editableVenueIds.has(venue.id);
                   const activeRows = vr.rows.filter(r => !r.is_removed);
                   const modifiedCount = activeRows.filter(r => r.source !== "weekly").length;
                   const assignedStaffIds = new Set(vr.rows.filter(r => !r.is_removed).map(r => r.staff_id));
@@ -600,14 +672,23 @@ const DailyRoster = () => {
                           <div className="flex items-center gap-3">
                             <CardTitle className="text-base">{venue.name}</CardTitle>
                             <Badge variant={vr.status === "confirmed" ? "default" : "secondary"}
-                              className={vr.status === "confirmed" ? "bg-green-600 text-white" : "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-200"}>
-                              {vr.status === "confirmed" ? "CONFIRMED" : "DRAFT"}
+                              className={vr.status === "confirmed" ? "bg-success text-success-foreground" : "bg-warning/15 text-warning border-warning/30"}>
+                              {vr.status === "confirmed" ? "SAVED" : "DRAFT"}
                             </Badge>
                             {vr.edit_count > 0 && (
                               <span className="text-xs text-muted-foreground">Edited {vr.edit_count}×</span>
                             )}
                           </div>
                           <div className="flex items-center gap-2">
+                            {vr.status === "confirmed" && !isEditable ? (
+                              <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => startEditingVenue(venue.id)}>
+                                <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                              </Button>
+                            ) : vr.status === "confirmed" ? (
+                              <Button variant="ghost" size="sm" className="h-9 text-xs" onClick={() => cancelEditingVenue(venue.id)}>
+                                Cancel
+                              </Button>
+                            ) : null}
                             <Button variant="ghost" size="sm" className="h-9 text-xs" onClick={() => fetchAuditLog(venue.id)}>
                               <History className="h-3.5 w-3.5 mr-1" /> History
                             </Button>
@@ -636,7 +717,7 @@ const DailyRoster = () => {
                           <p className="text-sm text-muted-foreground py-4 text-center">No staff assigned</p>
                         ) : (
                           activeRows.map(row => (
-                            <div key={row.staff_id} className={`flex flex-col sm:flex-row sm:items-center gap-2 p-3 rounded-lg border ${row.source === "modified" ? "border-orange-300 dark:border-orange-700 bg-orange-50/50 dark:bg-orange-950/20" : "bg-card"}`}>
+                            <div key={row.staff_id} className={cn("flex flex-col sm:flex-row sm:items-center gap-2 p-3 rounded-lg border", row.source === "modified" ? "border-warning/30 bg-warning/5" : "bg-card")}>
                               <div className="flex items-center gap-2 min-w-0 flex-1">
                                 <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary shrink-0">
                                   {row.staff_name.charAt(0)}
@@ -647,71 +728,79 @@ const DailyRoster = () => {
                                 </div>
                               </div>
 
-                              <div className="flex flex-wrap items-center gap-2">
-                                <Select value={row.role} onValueChange={v => updateRow(venue.id, row.staff_id, "role", v)}>
-                                  <SelectTrigger className="w-[130px] h-9 text-xs">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {ROLES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-                                  </SelectContent>
-                                </Select>
+                              {isEditable ? (
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <Select value={row.role} onValueChange={v => updateRow(venue.id, row.staff_id, "role", v)}>
+                                    <SelectTrigger className="w-[130px] h-9 text-xs">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {ROLES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                                    </SelectContent>
+                                  </Select>
 
-                                <Input
-                                  type="time"
-                                  value={row.shift_start || ""}
-                                  onChange={e => updateRow(venue.id, row.staff_id, "shift_start", e.target.value || null)}
-                                  className="w-[110px] h-9 text-xs"
-                                  placeholder="Start"
-                                />
-                                {row.shift_end === "closing" ? (
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => updateRow(venue.id, row.staff_id, "shift_end", null)}
-                                    className="w-[110px] h-9 text-xs font-medium border-primary text-primary"
-                                    title="Click to set a specific end time"
-                                  >
-                                    Till Closing
-                                  </Button>
-                                ) : (
-                                  <div className="flex items-center gap-1">
-                                    <Input
-                                      type="time"
-                                      value={row.shift_end || ""}
-                                      onChange={e => updateRow(venue.id, row.staff_id, "shift_end", e.target.value || null)}
-                                      className="w-[110px] h-9 text-xs"
-                                      placeholder="End"
-                                    />
+                                  <Input
+                                    type="time"
+                                    value={row.shift_start || ""}
+                                    onChange={e => updateRow(venue.id, row.staff_id, "shift_start", e.target.value || null)}
+                                    className="w-[110px] h-9 text-xs"
+                                    placeholder="Start"
+                                  />
+                                  {row.shift_end === "closing" ? (
                                     <Button
                                       type="button"
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => updateRow(venue.id, row.staff_id, "shift_end", "closing")}
-                                      className="h-9 px-2 text-[10px] whitespace-nowrap"
-                                      title="Set as Till Closing"
+                                      variant="outline"
+                                      onClick={() => updateRow(venue.id, row.staff_id, "shift_end", null)}
+                                      className="w-[110px] h-9 text-xs font-medium border-primary text-primary"
+                                      title="Click to set a specific end time"
                                     >
-                                      Closing
+                                      Till Closing
                                     </Button>
-                                  </div>
-                                )}
+                                  ) : (
+                                    <div className="flex items-center gap-1">
+                                      <Input
+                                        type="time"
+                                        value={row.shift_end || ""}
+                                        onChange={e => updateRow(venue.id, row.staff_id, "shift_end", e.target.value || null)}
+                                        className="w-[110px] h-9 text-xs"
+                                        placeholder="End"
+                                      />
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => updateRow(venue.id, row.staff_id, "shift_end", "closing")}
+                                        className="h-9 px-2 text-[10px] whitespace-nowrap"
+                                        title="Set as Till Closing"
+                                      >
+                                        Closing
+                                      </Button>
+                                    </div>
+                                  )}
 
-                                <Input
-                                  value={row.note}
-                                  onChange={e => updateRow(venue.id, row.staff_id, "note", e.target.value)}
-                                  className="w-[150px] h-9 text-xs"
-                                  placeholder="Note..."
-                                />
+                                  <Input
+                                    value={row.note}
+                                    onChange={e => updateRow(venue.id, row.staff_id, "note", e.target.value)}
+                                    className="w-[150px] h-9 text-xs"
+                                    placeholder="Note..."
+                                  />
 
-                                <Button variant="ghost" size="icon" className="h-9 w-9 text-destructive hover:text-destructive" onClick={() => removeRow(venue.id, row.staff_id)}>
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
+                                  <Button variant="ghost" size="icon" className="h-9 w-9 text-destructive hover:text-destructive" onClick={() => removeRow(venue.id, row.staff_id)}>
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                                  <Badge variant="secondary" className="text-xs">{row.role}</Badge>
+                                  <Badge variant="outline" className="text-xs">{getRosterRowSummary(row)}</Badge>
+                                  {row.note && <Badge variant="outline" className="max-w-[220px] truncate text-xs">{row.note}</Badge>}
+                                </div>
+                              )}
                             </div>
                           ))
                         )}
 
-                        {availableStaff.length > 0 && (
+                        {isEditable && availableStaff.length > 0 && (
                           <Select onValueChange={v => addStaff(venue.id, v)}>
                             <SelectTrigger className="h-10 border-dashed">
                               <div className="flex items-center gap-2 text-muted-foreground">
@@ -731,10 +820,20 @@ const DailyRoster = () => {
                           <span className="text-xs text-muted-foreground">
                             {activeRows.length} staff scheduled{modifiedCount > 0 ? ` · ${modifiedCount} modified` : ""}
                           </span>
-                          <Button size="sm" className="h-10 min-w-[180px]" onClick={() => saveVenueRoster(venue.id)} disabled={saving}>
-                            {saving ? <Clock className="h-4 w-4 mr-2 animate-spin" /> : <Check className="h-4 w-4 mr-2" />}
-                            {vr.status === "draft" ? "Confirm & Save" : "Save Changes"}
-                          </Button>
+                          {vr.status === "confirmed" && isEditable ? (
+                            <Button size="sm" className="h-10 min-w-[180px]" onClick={() => saveVenueRoster(venue.id)} disabled={saving}>
+                              {saving ? <Clock className="h-4 w-4 mr-2 animate-spin" /> : <Check className="h-4 w-4 mr-2" />}
+                              Save Changes
+                            </Button>
+                          ) : vr.status === "draft" ? (
+                            <div className="text-xs text-muted-foreground">
+                              Review this venue, then use the final save below
+                            </div>
+                          ) : (
+                            <div className="text-xs text-muted-foreground">
+                              Final roster locked for viewing
+                            </div>
+                          )}
                         </div>
                       </CardContent>
                     </Card>
@@ -771,7 +870,7 @@ const DailyRoster = () => {
                 const goNextMonth = () => setHistoryMonth(new Date(historyMonth.getFullYear(), historyMonth.getMonth() + 1, 1));
 
                 const recent = [...savedRosters]
-                  .filter(sr => sr.date <= tomorrowStr || sr.date === tomorrowStr)
+                  .filter(sr => sr.date <= tomorrowStr)
                   .slice(0, 10);
 
                 return (
@@ -783,7 +882,7 @@ const DailyRoster = () => {
                           <div>
                             <CardTitle className="text-base">Roster Calendar</CardTitle>
                             <p className="text-xs text-muted-foreground mt-1">
-                              Tap any day to view or edit its roster
+                              Open any day to review the final roster, and edit only when needed
                             </p>
                           </div>
                           <div className="flex items-center gap-2">
@@ -799,10 +898,10 @@ const DailyRoster = () => {
                         {/* Legend */}
                         <div className="flex flex-wrap items-center gap-3 mb-3 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1.5">
-                            <span className="inline-block w-3 h-3 rounded-full bg-green-600" /> Saved
+                            <span className="inline-block w-3 h-3 rounded-full bg-success" /> Saved
                           </span>
                           <span className="flex items-center gap-1.5">
-                            <span className="inline-block w-3 h-3 rounded-full bg-orange-500" /> Pending
+                            <span className="inline-block w-3 h-3 rounded-full bg-warning" /> Pending
                           </span>
                           <span className="flex items-center gap-1.5">
                             <span className="inline-block w-3 h-3 rounded-full bg-muted-foreground/30" /> Past · no roster
@@ -837,16 +936,16 @@ const DailyRoster = () => {
                             let label = "";
 
                             if (sr && allConfirmed) {
-                              bg = "bg-green-50 dark:bg-green-950/30 hover:bg-green-100 dark:hover:bg-green-950/50 border-green-300 dark:border-green-800";
-                              dotColor = "bg-green-600";
+                              bg = "bg-success/10 hover:bg-success/15 border-success/30";
+                              dotColor = "bg-success";
                               label = `${totalStaff} staff`;
                             } else if (sr && !allConfirmed) {
-                              bg = "bg-orange-50 dark:bg-orange-950/30 hover:bg-orange-100 border-orange-300 dark:border-orange-800";
-                              dotColor = "bg-orange-500";
-                              label = "Partial";
+                              bg = "bg-warning/10 hover:bg-warning/15 border-warning/30";
+                              dotColor = "bg-warning";
+                              label = "Draft";
                             } else if (isTomorrow) {
-                              bg = "bg-orange-50 dark:bg-orange-950/30 hover:bg-orange-100 border-orange-300 dark:border-orange-800";
-                              dotColor = "bg-orange-500";
+                              bg = "bg-warning/10 hover:bg-warning/15 border-warning/30";
+                              dotColor = "bg-warning";
                               label = "Pending";
                             } else if (isPast) {
                               dotColor = "bg-muted-foreground/30";
@@ -914,12 +1013,12 @@ const DailyRoster = () => {
                                   <div className="flex items-center gap-3">
                                     <div className={cn(
                                       "w-12 h-12 rounded-lg flex flex-col items-center justify-center",
-                                      allConfirmed ? "bg-green-100 dark:bg-green-950/40" : "bg-orange-100 dark:bg-orange-950/40"
+                                      allConfirmed ? "bg-success/10" : "bg-warning/10"
                                     )}>
-                                      <span className={cn("text-xs font-medium", allConfirmed ? "text-green-700 dark:text-green-300" : "text-orange-700 dark:text-orange-300")}>
+                                      <span className={cn("text-xs font-medium", allConfirmed ? "text-success" : "text-warning")}>
                                         {d.toLocaleDateString("en-IN", { weekday: "short" })}
                                       </span>
-                                      <span className={cn("text-lg font-bold leading-tight", allConfirmed ? "text-green-700 dark:text-green-300" : "text-orange-700 dark:text-orange-300")}>
+                                      <span className={cn("text-lg font-bold leading-tight", allConfirmed ? "text-success" : "text-warning")}>
                                         {d.getDate()}
                                       </span>
                                     </div>
@@ -935,8 +1034,8 @@ const DailyRoster = () => {
                                     </div>
                                   </div>
                                   <Badge variant={allConfirmed ? "default" : "secondary"}
-                                    className={allConfirmed ? "bg-green-600 text-white" : "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-200"}>
-                                    {allConfirmed ? "SAVED" : "PARTIAL"}
+                                    className={allConfirmed ? "bg-success text-success-foreground" : "bg-warning/15 text-warning border-warning/30"}>
+                                    {allConfirmed ? "SAVED" : "DRAFT"}
                                   </Badge>
                                 </div>
                               </CardContent>
@@ -960,7 +1059,7 @@ const DailyRoster = () => {
       </div>
 
       {/* Bottom sticky summary bar — only in editor tab */}
-      {!loading && activeTab === "editor" && (
+      {!loading && activeTab === "editor" && Array.from(venueRosters.entries()).some(([venueId, vr]) => (selectedVenueId === "all" || selectedVenueId === venueId) && vr.status === "draft") && (
         <div className="fixed bottom-0 left-0 right-0 z-40 bg-background border-t px-4 py-3 flex items-center justify-between safe-area-bottom md:left-[240px] lg:left-[240px]">
           <span className="text-sm text-muted-foreground">
             {totalScheduled} staff total{totalModified > 0 ? ` · ${totalModified} modified` : ""}
@@ -975,7 +1074,7 @@ const DailyRoster = () => {
             className="h-11 px-6"
           >
             {saving ? <Clock className="h-4 w-4 mr-2 animate-spin" /> : <Check className="h-4 w-4 mr-2" />}
-            Confirm All
+            Save & Confirm All
           </Button>
         </div>
       )}
