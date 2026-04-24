@@ -91,6 +91,7 @@ const DailyRoster = () => {
   const [savedRosters, setSavedRosters] = useState<SavedRosterSummary[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [historyMonth, setHistoryMonth] = useState<Date>(new Date());
 
   const dateStr = formatDate(selectedDate);
 
