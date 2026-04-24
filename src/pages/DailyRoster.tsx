@@ -1114,7 +1114,7 @@ const DailyRoster = () => {
       </div>
 
       {/* Bottom sticky summary bar — only in editor tab */}
-      {!loading && activeTab === "editor" && Array.from(venueRosters.entries()).some(([venueId, vr]) => (selectedVenueId === "all" || selectedVenueId === venueId) && vr.status === "draft") && (
+      {!loading && activeTab === "editor" && Array.from(venueRosters.entries()).some(([venueId, vr]) => (selectedVenueId === "all" || selectedVenueId === venueId) && (vr.status === "draft" || editableVenueIds.has(venueId))) && (
         <div className="fixed bottom-0 left-0 right-0 z-40 bg-background border-t px-4 py-3 flex items-center justify-between safe-area-bottom md:left-[240px] lg:left-[240px]">
           <span className="text-sm text-muted-foreground">
             {totalScheduled} staff total{totalModified > 0 ? ` · ${totalModified} modified` : ""}
@@ -1127,7 +1127,9 @@ const DailyRoster = () => {
               const errors: string[] = [];
               for (const venue of filteredVenues) {
                 const vr = venueRosters.get(venue.id);
-                if (!vr || vr.status !== "draft") continue;
+                if (!vr) continue;
+                const isInEditMode = vr.status === "draft" || editableVenueIds.has(venue.id);
+                if (!isInEditMode) continue;
                 const activeRows = vr.rows.filter(r => !r.is_removed);
                 // Skip empty venues entirely
                 if (activeRows.length === 0) continue;
