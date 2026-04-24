@@ -371,9 +371,40 @@ const DailyRoster = () => {
     }
 
     setSaving(true);
+    const result = await persistVenueRoster(venueId, "confirmed");
+    setSaving(false);
+    if (result === "ok") {
+      const vrAfter = venueRosters.get(venueId);
+      const editN = vrAfter?.edit_count ?? 0;
+      toast.success(vr.status === "draft"
+        ? `Daily Roster confirmed for ${dateStr}`
+        : `Changes saved (edit #${editN})`);
+    } else if (result) {
+      toast.error(result);
+    }
+  };
+
+  // Silent save used by bulk "Save & Confirm All". Returns "ok" or error string.
+  const saveVenueRosterSilent = async (
+    venueId: string,
+    targetStatus: "draft" | "confirmed"
+  ): Promise<string> => {
+    return persistVenueRoster(venueId, targetStatus);
+  };
+
+  // Core persistence — no toasts, no setSaving. Returns "ok" or error string.
+  const persistVenueRoster = async (
+    venueId: string,
+    targetStatus: "draft" | "confirmed"
+  ): Promise<string> => {
+    const vr = venueRosters.get(venueId);
+    if (!vr) return "venue not found";
+    const activeRows = vr.rows.filter(r => !r.is_removed);
+    if (activeRows.length === 0) return "no staff assigned";
+
     const { data: { session } } = await supabase.auth.getSession();
     const userId = session?.user?.id;
-    const isFirstSave = vr.status === "draft";
+    const isFirstSave = vr.status === "draft" && targetStatus === "confirmed";
     const now = new Date().toISOString();
 
     try {
@@ -398,9 +429,11 @@ const DailyRoster = () => {
           role: r.role,
           shift_start: r.shift_start,
           shift_end: tillClosing ? null : r.shift_end,
-          status: "confirmed" as const,
-          confirmed_by: userId,
-          confirmed_at: isFirstSave ? now : (vr.confirmed_at || now),
+          status: targetStatus,
+          confirmed_by: targetStatus === "confirmed" ? userId : null,
+          confirmed_at: targetStatus === "confirmed"
+            ? (isFirstSave ? now : (vr.confirmed_at || now))
+            : null,
           last_edited_by: userId,
           last_edited_at: now,
           edit_count: isFirstSave ? 0 : vr.edit_count + 1,
@@ -416,45 +449,47 @@ const DailyRoster = () => {
       await supabase.from("roster_audit_log" as any).insert({
         venue_id: venueId,
         roster_date: dateStr,
-        action: isFirstSave ? "confirmed" : "edited",
+        action: targetStatus === "draft"
+          ? "draft_saved"
+          : (isFirstSave ? "confirmed" : "edited"),
         user_id: userId,
         before_data: beforeData || [],
         after_data: rowsToInsert,
       });
 
-      await supabase.from("incharge_daily_tasks" as any)
-        .update({ status: "completed", completed_at: now })
-        .eq("venue_id", venueId)
-        .eq("task_date", dateStr)
-        .eq("task_type", "confirm_daily_roster")
-        .eq("status", "pending");
+      if (targetStatus === "confirmed") {
+        await supabase.from("incharge_daily_tasks" as any)
+          .update({ status: "completed", completed_at: now })
+          .eq("venue_id", venueId)
+          .eq("task_date", dateStr)
+          .eq("task_type", "confirm_daily_roster")
+          .eq("status", "pending");
+      }
 
       setVenueRosters(prev => {
         const next = new Map(prev);
         next.set(venueId, {
           ...vr,
-          status: "confirmed",
-          confirmed_at: isFirstSave ? now : (vr.confirmed_at || now),
+          status: targetStatus,
+          confirmed_at: targetStatus === "confirmed"
+            ? (isFirstSave ? now : (vr.confirmed_at || now))
+            : null,
           edit_count: isFirstSave ? 0 : vr.edit_count + 1,
           saved_rows: cloneRosterRows(vr.rows),
         });
         return next;
       });
 
-      setEditableVenueIds(prev => {
-        const next = new Set(prev);
-        next.delete(venueId);
-        return next;
-      });
-
-      toast.success(isFirstSave
-        ? `Daily Roster confirmed for ${dateStr}`
-        : `Changes saved (edit #${vr.edit_count + 1})`
-      );
+      if (targetStatus === "confirmed") {
+        setEditableVenueIds(prev => {
+          const next = new Set(prev);
+          next.delete(venueId);
+          return next;
+        });
+      }
+      return "ok";
     } catch (err: any) {
-      toast.error(err.message || "Failed to save");
-    } finally {
-      setSaving(false);
+      return err?.message || "Failed to save";
     }
   };
 
@@ -1086,8 +1121,45 @@ const DailyRoster = () => {
           </span>
           <Button
             onClick={async () => {
+              setSaving(true);
+              let confirmedCount = 0;
+              let draftCount = 0;
+              const errors: string[] = [];
               for (const venue of filteredVenues) {
-                await saveVenueRoster(venue.id);
+                const vr = venueRosters.get(venue.id);
+                if (!vr || vr.status !== "draft") continue;
+                const activeRows = vr.rows.filter(r => !r.is_removed);
+                // Skip empty venues entirely
+                if (activeRows.length === 0) continue;
+                // Duplicate staff is a hard error — surface once
+                const staffIds = activeRows.map(r => r.staff_id);
+                if (new Set(staffIds).size !== staffIds.length) {
+                  errors.push(`${venue.name}: duplicate staff`);
+                  continue;
+                }
+                // Decide: complete = confirmed, incomplete = draft
+                const isComplete = activeRows.every(r =>
+                  r.shift_start && (r.shift_end || isTillClosing(r))
+                );
+                const res = await saveVenueRosterSilent(venue.id, isComplete ? "confirmed" : "draft");
+                if (res === "ok") {
+                  if (isComplete) confirmedCount++;
+                  else draftCount++;
+                } else if (res) {
+                  errors.push(`${venue.name}: ${res}`);
+                }
+              }
+              setSaving(false);
+              if (errors.length) {
+                toast.error(`Save issues: ${errors.join("; ")}`);
+              }
+              if (confirmedCount || draftCount) {
+                const parts: string[] = [];
+                if (confirmedCount) parts.push(`${confirmedCount} confirmed`);
+                if (draftCount) parts.push(`${draftCount} saved as draft`);
+                toast.success(`Daily Roster ${dateStr}: ${parts.join(" · ")}`);
+              } else if (!errors.length) {
+                toast.info("Nothing to save");
               }
             }}
             disabled={saving}
