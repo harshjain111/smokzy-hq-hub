@@ -93,9 +93,17 @@ const stripTillClosingNote = (note: string | null | undefined) => {
   return n.startsWith(TILL_CLOSING_MARKER) ? n.slice(TILL_CLOSING_MARKER.length).trim() : n;
 };
 
+const formatTimeDisplay = (t: string | null | undefined) => {
+  if (!t) return "—";
+  // DB time columns return "HH:MM:SS"; trim seconds for cleaner display
+  const parts = t.split(":");
+  if (parts.length >= 2) return `${parts[0]}:${parts[1]}`;
+  return t;
+};
+
 const getRosterRowSummary = (row: Pick<RosterRow, "shift_start" | "shift_end" | "note">) => {
-  const shiftStart = row.shift_start || "—";
-  const shiftEnd = isTillClosing(row) ? "Till Closing" : (row.shift_end || "—");
+  const shiftStart = formatTimeDisplay(row.shift_start);
+  const shiftEnd = isTillClosing(row) ? "Till Closing" : formatTimeDisplay(row.shift_end);
   return `${shiftStart} - ${shiftEnd}`;
 };
 
