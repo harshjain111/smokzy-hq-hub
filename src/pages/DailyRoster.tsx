@@ -820,11 +820,15 @@ const DailyRoster = () => {
                           <span className="text-xs text-muted-foreground">
                             {activeRows.length} staff scheduled{modifiedCount > 0 ? ` · ${modifiedCount} modified` : ""}
                           </span>
-                          {isEditable ? (
+                          {vr.status === "confirmed" && isEditable ? (
                             <Button size="sm" className="h-10 min-w-[180px]" onClick={() => saveVenueRoster(venue.id)} disabled={saving}>
                               {saving ? <Clock className="h-4 w-4 mr-2 animate-spin" /> : <Check className="h-4 w-4 mr-2" />}
-                              {vr.status === "draft" ? "Save & Confirm" : "Save Changes"}
+                              Save Changes
                             </Button>
+                          ) : vr.status === "draft" ? (
+                            <div className="text-xs text-muted-foreground">
+                              Review this venue, then use the final save below
+                            </div>
                           ) : (
                             <div className="text-xs text-muted-foreground">
                               Final roster locked for viewing
@@ -1055,7 +1059,7 @@ const DailyRoster = () => {
       </div>
 
       {/* Bottom sticky summary bar — only in editor tab */}
-      {!loading && activeTab === "editor" && (
+      {!loading && activeTab === "editor" && Array.from(venueRosters.entries()).some(([venueId, vr]) => (selectedVenueId === "all" || selectedVenueId === venueId) && vr.status === "draft") && (
         <div className="fixed bottom-0 left-0 right-0 z-40 bg-background border-t px-4 py-3 flex items-center justify-between safe-area-bottom md:left-[240px] lg:left-[240px]">
           <span className="text-sm text-muted-foreground">
             {totalScheduled} staff total{totalModified > 0 ? ` · ${totalModified} modified` : ""}
@@ -1070,7 +1074,7 @@ const DailyRoster = () => {
             className="h-11 px-6"
           >
             {saving ? <Clock className="h-4 w-4 mr-2 animate-spin" /> : <Check className="h-4 w-4 mr-2" />}
-            Confirm All
+            Save & Confirm All
           </Button>
         </div>
       )}
