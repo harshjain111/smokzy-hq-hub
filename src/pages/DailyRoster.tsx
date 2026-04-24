@@ -83,9 +83,19 @@ const cloneRosterRows = (rows: RosterRow[]): RosterRow[] =>
     _original: row._original ? { ...row._original } : undefined,
   }));
 
-const getRosterRowSummary = (row: Pick<RosterRow, "shift_start" | "shift_end">) => {
+const TILL_CLOSING_MARKER = "[TILL_CLOSING]";
+
+const isTillClosing = (row: Pick<RosterRow, "shift_end" | "note">) =>
+  row.shift_end === "closing" || (row.note || "").startsWith(TILL_CLOSING_MARKER);
+
+const stripTillClosingNote = (note: string | null | undefined) => {
+  const n = note || "";
+  return n.startsWith(TILL_CLOSING_MARKER) ? n.slice(TILL_CLOSING_MARKER.length).trim() : n;
+};
+
+const getRosterRowSummary = (row: Pick<RosterRow, "shift_start" | "shift_end" | "note">) => {
   const shiftStart = row.shift_start || "—";
-  const shiftEnd = row.shift_end === "closing" ? "Till Closing" : (row.shift_end || "—");
+  const shiftEnd = isTillClosing(row) ? "Till Closing" : (row.shift_end || "—");
   return `${shiftStart} - ${shiftEnd}`;
 };
 
