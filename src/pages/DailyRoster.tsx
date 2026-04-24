@@ -218,17 +218,20 @@ const DailyRoster = () => {
           const rows = await prefillFromWeekly(venue.id, dateStr, profileMap);
           map.set(venue.id, { status: "draft", confirmed_at: null, edit_count: 0, rows, saved_rows: cloneRosterRows(rows) });
         } else {
-          const rosterRows = venueRows.map(r => ({
-            id: r.id,
-            staff_id: r.staff_id,
-            staff_name: profileMap.get(r.staff_id) || "Unknown",
-            role: r.role || "Staff",
-            shift_start: r.shift_start,
-            shift_end: r.shift_end,
-            source: (r.source as RosterRow["source"]) || "weekly",
-            note: r.note || "",
-            is_removed: r.is_removed || false,
-          }));
+          const rosterRows = venueRows.map(r => {
+            const tillClosing = (r.note || "").startsWith(TILL_CLOSING_MARKER);
+            return {
+              id: r.id,
+              staff_id: r.staff_id,
+              staff_name: profileMap.get(r.staff_id) || "Unknown",
+              role: r.role || "Staff",
+              shift_start: r.shift_start,
+              shift_end: tillClosing ? "closing" : r.shift_end,
+              source: (r.source as RosterRow["source"]) || "weekly",
+              note: stripTillClosingNote(r.note),
+              is_removed: r.is_removed || false,
+            };
+          });
           const firstRow = venueRows[0];
           map.set(venue.id, {
             status: getVenueStatusFromRows(venueRows),
