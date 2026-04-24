@@ -745,69 +745,215 @@ const DailyRoster = () => {
           </TabsContent>
 
           <TabsContent value="history" className="space-y-4">
-            <p className="text-sm text-muted-foreground">Previously saved daily rosters. Click on a date to view or edit it.</p>
-
             {historyLoading ? (
               <div className="space-y-3">
                 {[1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="h-20 rounded-xl" />)}
               </div>
-            ) : savedRosters.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                No saved rosters found.
-              </div>
             ) : (
-              <div className="space-y-3">
-                {savedRosters.map(sr => {
-                  const d = new Date(sr.date + "T00:00:00");
-                  const isToday = formatDate(new Date()) === sr.date;
-                  const isTomorrow = formatDate(getTomorrow()) === sr.date;
-                  const totalStaff = sr.venues.reduce((s, v) => s + v.staff_count, 0);
-                  const allConfirmed = sr.venues.every(v => v.status === "confirmed");
+              (() => {
+                const todayStr = formatDate(new Date());
+                const tomorrowStr = formatDate(getTomorrow());
+                const savedMap = new Map(savedRosters.map(sr => [sr.date, sr]));
 
-                  return (
-                    <Card
-                      key={sr.date}
-                      className="rounded-xl cursor-pointer hover:bg-muted/50 transition-colors"
-                      onClick={() => handleSelectHistoryDate(sr.date)}
-                    >
-                      <CardContent className="p-4">
+                // Build calendar grid for historyMonth
+                const monthStart = new Date(historyMonth.getFullYear(), historyMonth.getMonth(), 1);
+                const monthEnd = new Date(historyMonth.getFullYear(), historyMonth.getMonth() + 1, 0);
+                const startWeekday = monthStart.getDay(); // 0 = Sun
+                const daysInMonth = monthEnd.getDate();
+                const cells: (Date | null)[] = [];
+                for (let i = 0; i < startWeekday; i++) cells.push(null);
+                for (let d = 1; d <= daysInMonth; d++) {
+                  cells.push(new Date(historyMonth.getFullYear(), historyMonth.getMonth(), d));
+                }
+                while (cells.length % 7 !== 0) cells.push(null);
+
+                const goPrevMonth = () => setHistoryMonth(new Date(historyMonth.getFullYear(), historyMonth.getMonth() - 1, 1));
+                const goNextMonth = () => setHistoryMonth(new Date(historyMonth.getFullYear(), historyMonth.getMonth() + 1, 1));
+
+                const recent = [...savedRosters]
+                  .filter(sr => sr.date <= tomorrowStr || sr.date === tomorrowStr)
+                  .slice(0, 10);
+
+                return (
+                  <>
+                    {/* Calendar Card */}
+                    <Card className="rounded-xl">
+                      <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 rounded-lg bg-primary/10 flex flex-col items-center justify-center">
-                              <span className="text-xs font-medium text-primary">{d.toLocaleDateString("en-IN", { weekday: "short" })}</span>
-                              <span className="text-lg font-bold text-primary leading-tight">{d.getDate()}</span>
-                            </div>
-                            <div>
-                              <p className="font-medium text-sm">
-                                {d.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
-                                {isToday && <Badge variant="secondary" className="ml-2 text-xs">Today</Badge>}
-                                {isTomorrow && <Badge variant="secondary" className="ml-2 text-xs">Tomorrow</Badge>}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {sr.venues.length} venue{sr.venues.length > 1 ? "s" : ""} · {totalStaff} staff
-                              </p>
-                            </div>
+                          <div>
+                            <CardTitle className="text-base">Roster Calendar</CardTitle>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Tap any day to view or edit its roster
+                            </p>
                           </div>
                           <div className="flex items-center gap-2">
-                            <Badge variant={allConfirmed ? "default" : "secondary"}
-                              className={allConfirmed ? "bg-green-600 text-white" : "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-200"}>
-                              {allConfirmed ? "CONFIRMED" : "DRAFT"}
-                            </Badge>
+                            <Button variant="outline" size="sm" className="h-9 w-9 p-0" onClick={goPrevMonth}>‹</Button>
+                            <span className="text-sm font-medium min-w-[120px] text-center">
+                              {historyMonth.toLocaleDateString("en-IN", { month: "long", year: "numeric" })}
+                            </span>
+                            <Button variant="outline" size="sm" className="h-9 w-9 p-0" onClick={goNextMonth}>›</Button>
                           </div>
                         </div>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {sr.venues.map(v => (
-                            <span key={v.venue_id} className="text-xs bg-muted px-2 py-1 rounded-full">
-                              {v.venue_name}: {v.staff_count} staff
-                              {v.edit_count > 0 && ` · ${v.edit_count} edits`}
-                            </span>
+                      </CardHeader>
+                      <CardContent>
+                        {/* Legend */}
+                        <div className="flex flex-wrap items-center gap-3 mb-3 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1.5">
+                            <span className="inline-block w-3 h-3 rounded-full bg-green-600" /> Saved
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <span className="inline-block w-3 h-3 rounded-full bg-orange-500" /> Pending
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <span className="inline-block w-3 h-3 rounded-full bg-muted-foreground/30" /> Past · no roster
+                          </span>
+                        </div>
+
+                        {/* Weekday header */}
+                        <div className="grid grid-cols-7 gap-1 mb-1">
+                          {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(w => (
+                            <div key={w} className="text-center text-[10px] font-medium text-muted-foreground py-1">{w}</div>
                           ))}
+                        </div>
+
+                        {/* Days grid */}
+                        <div className="grid grid-cols-7 gap-1">
+                          {cells.map((cell, i) => {
+                            if (!cell) return <div key={i} className="aspect-square" />;
+                            const cellStr = formatDate(cell);
+                            const sr = savedMap.get(cellStr);
+                            const isToday = cellStr === todayStr;
+                            const isTomorrow = cellStr === tomorrowStr;
+                            const isPast = cellStr < todayStr;
+                            const isFarFuture = cellStr > tomorrowStr;
+                            const isSelected = cellStr === dateStr;
+
+                            // Determine state
+                            const allConfirmed = sr?.venues.every(v => v.status === "confirmed");
+                            const totalStaff = sr?.venues.reduce((s, v) => s + v.staff_count, 0) || 0;
+
+                            let bg = "bg-card hover:bg-muted/50";
+                            let dotColor = "";
+                            let label = "";
+
+                            if (sr && allConfirmed) {
+                              bg = "bg-green-50 dark:bg-green-950/30 hover:bg-green-100 dark:hover:bg-green-950/50 border-green-300 dark:border-green-800";
+                              dotColor = "bg-green-600";
+                              label = `${totalStaff} staff`;
+                            } else if (sr && !allConfirmed) {
+                              bg = "bg-orange-50 dark:bg-orange-950/30 hover:bg-orange-100 border-orange-300 dark:border-orange-800";
+                              dotColor = "bg-orange-500";
+                              label = "Partial";
+                            } else if (isTomorrow) {
+                              bg = "bg-orange-50 dark:bg-orange-950/30 hover:bg-orange-100 border-orange-300 dark:border-orange-800";
+                              dotColor = "bg-orange-500";
+                              label = "Pending";
+                            } else if (isPast) {
+                              dotColor = "bg-muted-foreground/30";
+                            }
+
+                            if (isFarFuture) {
+                              bg = "bg-muted/20 hover:bg-muted/40";
+                            }
+
+                            return (
+                              <button
+                                key={i}
+                                type="button"
+                                onClick={() => handleSelectHistoryDate(cellStr)}
+                                className={cn(
+                                  "aspect-square rounded-lg border text-left p-1.5 flex flex-col justify-between transition-colors touch-manipulation",
+                                  bg,
+                                  isSelected && "ring-2 ring-primary",
+                                  isToday && "border-primary border-2"
+                                )}
+                              >
+                                <div className="flex items-start justify-between">
+                                  <span className={cn(
+                                    "text-xs font-semibold",
+                                    isToday && "text-primary",
+                                    isFarFuture && "text-muted-foreground"
+                                  )}>
+                                    {cell.getDate()}
+                                  </span>
+                                  {dotColor && (
+                                    <span className={cn("inline-block w-2 h-2 rounded-full", dotColor)} />
+                                  )}
+                                </div>
+                                {label && (
+                                  <span className="text-[9px] text-muted-foreground leading-tight truncate">
+                                    {label}
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
                         </div>
                       </CardContent>
                     </Card>
-                  );
-                })}
-              </div>
+
+                    {/* Recent saved rosters list */}
+                    {recent.length > 0 && (
+                      <div className="space-y-3">
+                        <h3 className="text-sm font-medium text-muted-foreground">Recent</h3>
+                        {recent.map(sr => {
+                          const d = new Date(sr.date + "T00:00:00");
+                          const isToday = todayStr === sr.date;
+                          const isTomorrow = tomorrowStr === sr.date;
+                          const totalStaff = sr.venues.reduce((s, v) => s + v.staff_count, 0);
+                          const allConfirmed = sr.venues.every(v => v.status === "confirmed");
+
+                          return (
+                            <Card
+                              key={sr.date}
+                              className="rounded-xl cursor-pointer hover:bg-muted/50 transition-colors"
+                              onClick={() => handleSelectHistoryDate(sr.date)}
+                            >
+                              <CardContent className="p-4">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <div className={cn(
+                                      "w-12 h-12 rounded-lg flex flex-col items-center justify-center",
+                                      allConfirmed ? "bg-green-100 dark:bg-green-950/40" : "bg-orange-100 dark:bg-orange-950/40"
+                                    )}>
+                                      <span className={cn("text-xs font-medium", allConfirmed ? "text-green-700 dark:text-green-300" : "text-orange-700 dark:text-orange-300")}>
+                                        {d.toLocaleDateString("en-IN", { weekday: "short" })}
+                                      </span>
+                                      <span className={cn("text-lg font-bold leading-tight", allConfirmed ? "text-green-700 dark:text-green-300" : "text-orange-700 dark:text-orange-300")}>
+                                        {d.getDate()}
+                                      </span>
+                                    </div>
+                                    <div>
+                                      <p className="font-medium text-sm">
+                                        {d.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
+                                        {isToday && <Badge variant="secondary" className="ml-2 text-xs">Today</Badge>}
+                                        {isTomorrow && <Badge variant="secondary" className="ml-2 text-xs">Tomorrow</Badge>}
+                                      </p>
+                                      <p className="text-xs text-muted-foreground">
+                                        {sr.venues.length} venue{sr.venues.length > 1 ? "s" : ""} · {totalStaff} staff
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <Badge variant={allConfirmed ? "default" : "secondary"}
+                                    className={allConfirmed ? "bg-green-600 text-white" : "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-200"}>
+                                    {allConfirmed ? "SAVED" : "PARTIAL"}
+                                  </Badge>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {savedRosters.length === 0 && (
+                      <div className="text-center py-8 text-muted-foreground text-sm">
+                        No rosters saved yet. Create one in the "Create / Edit Roster" tab.
+                      </div>
+                    )}
+                  </>
+                );
+              })()
             )}
           </TabsContent>
         </Tabs>
