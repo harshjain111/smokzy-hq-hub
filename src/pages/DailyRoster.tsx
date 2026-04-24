@@ -385,23 +385,30 @@ const DailyRoster = () => {
 
       await supabase.from("daily_roster" as any).delete().eq("venue_id", venueId).eq("date", dateStr);
 
-      const rowsToInsert = vr.rows.map(r => ({
-        venue_id: venueId,
-        date: dateStr,
-        staff_id: r.staff_id,
-        role: r.role,
-        shift_start: r.shift_start,
-        shift_end: r.shift_end,
-        status: "confirmed" as const,
-        confirmed_by: userId,
-        confirmed_at: isFirstSave ? now : (vr.confirmed_at || now),
-        last_edited_by: userId,
-        last_edited_at: now,
-        edit_count: isFirstSave ? 0 : vr.edit_count + 1,
-        source: r.source,
-        note: r.note || null,
-        is_removed: r.is_removed,
-      }));
+      const rowsToInsert = vr.rows.map(r => {
+        const tillClosing = r.shift_end === "closing";
+        const cleanNote = stripTillClosingNote(r.note);
+        const finalNote = tillClosing
+          ? `${TILL_CLOSING_MARKER}${cleanNote ? " " + cleanNote : ""}`
+          : (cleanNote || null);
+        return {
+          venue_id: venueId,
+          date: dateStr,
+          staff_id: r.staff_id,
+          role: r.role,
+          shift_start: r.shift_start,
+          shift_end: tillClosing ? null : r.shift_end,
+          status: "confirmed" as const,
+          confirmed_by: userId,
+          confirmed_at: isFirstSave ? now : (vr.confirmed_at || now),
+          last_edited_by: userId,
+          last_edited_at: now,
+          edit_count: isFirstSave ? 0 : vr.edit_count + 1,
+          source: r.source,
+          note: finalNote,
+          is_removed: r.is_removed,
+        };
+      });
 
       const { error } = await supabase.from("daily_roster" as any).insert(rowsToInsert);
       if (error) throw error;
