@@ -315,7 +315,7 @@ const DailyRoster = () => {
     if (!staff) return;
     setVenueRosters(prev => {
       const next = new Map(prev);
-      const vr = next.get(venueId) || { status: "draft" as const, confirmed_at: null, edit_count: 0, rows: [] };
+      const vr = next.get(venueId) || { status: "draft" as const, confirmed_at: null, edit_count: 0, rows: [], saved_rows: [] };
       const existingIdx = vr.rows.findIndex(r => r.staff_id === staffId);
       if (existingIdx >= 0) {
         const rows = [...vr.rows];
@@ -416,7 +416,14 @@ const DailyRoster = () => {
           status: "confirmed",
           confirmed_at: isFirstSave ? now : (vr.confirmed_at || now),
           edit_count: isFirstSave ? 0 : vr.edit_count + 1,
+          saved_rows: cloneRosterRows(vr.rows),
         });
+        return next;
+      });
+
+      setEditableVenueIds(prev => {
+        const next = new Set(prev);
+        next.delete(venueId);
         return next;
       });
 
@@ -448,12 +455,50 @@ const DailyRoster = () => {
 
     setVenueRosters(prev => {
       const next = new Map(prev);
-      next.set(venueId, { status: "draft", confirmed_at: null, edit_count: 0, rows });
+      next.set(venueId, { status: "draft", confirmed_at: null, edit_count: 0, rows, saved_rows: cloneRosterRows(rows) });
+      return next;
+    });
+
+    setEditableVenueIds(prev => {
+      const next = new Set(prev);
+      next.delete(venueId);
       return next;
     });
 
     await supabase.from("daily_roster" as any).delete().eq("venue_id", venueId).eq("date", dateStr);
     toast.success("Reset to weekly roster");
+  };
+
+  const startEditingVenue = (venueId: string) => {
+    setVenueRosters(prev => {
+      const next = new Map(prev);
+      const vr = next.get(venueId);
+      if (!vr) return prev;
+      next.set(venueId, { ...vr, rows: cloneRosterRows(vr.saved_rows) });
+      return next;
+    });
+
+    setEditableVenueIds(prev => {
+      const next = new Set(prev);
+      next.add(venueId);
+      return next;
+    });
+  };
+
+  const cancelEditingVenue = (venueId: string) => {
+    setVenueRosters(prev => {
+      const next = new Map(prev);
+      const vr = next.get(venueId);
+      if (!vr) return prev;
+      next.set(venueId, { ...vr, rows: cloneRosterRows(vr.saved_rows) });
+      return next;
+    });
+
+    setEditableVenueIds(prev => {
+      const next = new Set(prev);
+      next.delete(venueId);
+      return next;
+    });
   };
 
   const fetchAuditLog = async (venueId: string) => {
