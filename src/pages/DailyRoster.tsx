@@ -863,7 +863,7 @@ const DailyRoster = () => {
                 const goNextMonth = () => setHistoryMonth(new Date(historyMonth.getFullYear(), historyMonth.getMonth() + 1, 1));
 
                 const recent = [...savedRosters]
-                  .filter(sr => sr.date <= tomorrowStr || sr.date === tomorrowStr)
+                  .filter(sr => sr.date <= tomorrowStr)
                   .slice(0, 10);
 
                 return (
@@ -875,7 +875,7 @@ const DailyRoster = () => {
                           <div>
                             <CardTitle className="text-base">Roster Calendar</CardTitle>
                             <p className="text-xs text-muted-foreground mt-1">
-                              Tap any day to view or edit its roster
+                              Open any day to review the final roster, and edit only when needed
                             </p>
                           </div>
                           <div className="flex items-center gap-2">
@@ -891,10 +891,10 @@ const DailyRoster = () => {
                         {/* Legend */}
                         <div className="flex flex-wrap items-center gap-3 mb-3 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1.5">
-                            <span className="inline-block w-3 h-3 rounded-full bg-green-600" /> Saved
+                            <span className="inline-block w-3 h-3 rounded-full bg-success" /> Saved
                           </span>
                           <span className="flex items-center gap-1.5">
-                            <span className="inline-block w-3 h-3 rounded-full bg-orange-500" /> Pending
+                            <span className="inline-block w-3 h-3 rounded-full bg-warning" /> Pending
                           </span>
                           <span className="flex items-center gap-1.5">
                             <span className="inline-block w-3 h-3 rounded-full bg-muted-foreground/30" /> Past · no roster
@@ -929,16 +929,16 @@ const DailyRoster = () => {
                             let label = "";
 
                             if (sr && allConfirmed) {
-                              bg = "bg-green-50 dark:bg-green-950/30 hover:bg-green-100 dark:hover:bg-green-950/50 border-green-300 dark:border-green-800";
-                              dotColor = "bg-green-600";
+                              bg = "bg-success/10 hover:bg-success/15 border-success/30";
+                              dotColor = "bg-success";
                               label = `${totalStaff} staff`;
                             } else if (sr && !allConfirmed) {
-                              bg = "bg-orange-50 dark:bg-orange-950/30 hover:bg-orange-100 border-orange-300 dark:border-orange-800";
-                              dotColor = "bg-orange-500";
-                              label = "Partial";
+                              bg = "bg-warning/10 hover:bg-warning/15 border-warning/30";
+                              dotColor = "bg-warning";
+                              label = "Draft";
                             } else if (isTomorrow) {
-                              bg = "bg-orange-50 dark:bg-orange-950/30 hover:bg-orange-100 border-orange-300 dark:border-orange-800";
-                              dotColor = "bg-orange-500";
+                              bg = "bg-warning/10 hover:bg-warning/15 border-warning/30";
+                              dotColor = "bg-warning";
                               label = "Pending";
                             } else if (isPast) {
                               dotColor = "bg-muted-foreground/30";
@@ -1006,12 +1006,12 @@ const DailyRoster = () => {
                                   <div className="flex items-center gap-3">
                                     <div className={cn(
                                       "w-12 h-12 rounded-lg flex flex-col items-center justify-center",
-                                      allConfirmed ? "bg-green-100 dark:bg-green-950/40" : "bg-orange-100 dark:bg-orange-950/40"
+                                      allConfirmed ? "bg-success/10" : "bg-warning/10"
                                     )}>
-                                      <span className={cn("text-xs font-medium", allConfirmed ? "text-green-700 dark:text-green-300" : "text-orange-700 dark:text-orange-300")}>
+                                      <span className={cn("text-xs font-medium", allConfirmed ? "text-success" : "text-warning")}>
                                         {d.toLocaleDateString("en-IN", { weekday: "short" })}
                                       </span>
-                                      <span className={cn("text-lg font-bold leading-tight", allConfirmed ? "text-green-700 dark:text-green-300" : "text-orange-700 dark:text-orange-300")}>
+                                      <span className={cn("text-lg font-bold leading-tight", allConfirmed ? "text-success" : "text-warning")}>
                                         {d.getDate()}
                                       </span>
                                     </div>
@@ -1027,8 +1027,8 @@ const DailyRoster = () => {
                                     </div>
                                   </div>
                                   <Badge variant={allConfirmed ? "default" : "secondary"}
-                                    className={allConfirmed ? "bg-green-600 text-white" : "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-200"}>
-                                    {allConfirmed ? "SAVED" : "PARTIAL"}
+                                    className={allConfirmed ? "bg-success text-success-foreground" : "bg-warning/15 text-warning border-warning/30"}>
+                                    {allConfirmed ? "SAVED" : "DRAFT"}
                                   </Badge>
                                 </div>
                               </CardContent>
