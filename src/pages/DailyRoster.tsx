@@ -44,6 +44,7 @@ interface VenueRoster {
   confirmed_at: string | null;
   edit_count: number;
   rows: RosterRow[];
+  saved_rows: RosterRow[];
 }
 
 interface AuditEntry {
@@ -76,11 +77,30 @@ const getTomorrow = () => {
   return d;
 };
 
+const cloneRosterRows = (rows: RosterRow[]): RosterRow[] =>
+  rows.map((row) => ({
+    ...row,
+    _original: row._original ? { ...row._original } : undefined,
+  }));
+
+const getRosterRowSummary = (row: Pick<RosterRow, "shift_start" | "shift_end">) => {
+  const shiftStart = row.shift_start || "—";
+  const shiftEnd = row.shift_end === "closing" ? "Till Closing" : (row.shift_end || "—");
+  return `${shiftStart} - ${shiftEnd}`;
+};
+
+const getVenueStatusFromRows = (rows: Array<{ status: string; is_removed: boolean | null }>) => {
+  const activeRows = rows.filter((row) => !row.is_removed);
+  if (activeRows.length === 0) return "draft" as const;
+  return activeRows.every((row) => row.status === "confirmed") ? "confirmed" as const : "draft" as const;
+};
+
 const DailyRoster = () => {
   const [selectedDate, setSelectedDate] = useState(() => getTomorrow());
   const [venues, setVenues] = useState<Venue[]>([]);
   const [selectedVenueId, setSelectedVenueId] = useState<string>("all");
   const [venueRosters, setVenueRosters] = useState<Map<string, VenueRoster>>(new Map());
+  const [editableVenueIds, setEditableVenueIds] = useState<Set<string>>(new Set());
   const [allStaff, setAllStaff] = useState<StaffOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -98,6 +118,7 @@ const DailyRoster = () => {
   useEffect(() => { fetchVenues(); fetchStaff(); }, []);
   useEffect(() => { if (venues.length > 0) fetchDailyData(); }, [selectedDate, venues]);
   useEffect(() => { if (activeTab === "history" && venues.length > 0) fetchSavedRosters(); }, [activeTab, venues]);
+  useEffect(() => { setEditableVenueIds(new Set()); }, [dateStr]);
 
   const fetchVenues = async () => {
     const { data } = await supabase.from("venues").select("id, name").order("name");
