@@ -66,4 +66,16 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          charts: ["recharts"],
+          maps: ["leaflet", "react-leaflet"],
+          export: ["xlsx", "jspdf", "jspdf-autotable"],
+          vendor: ["react", "react-dom", "react-router-dom", "@tanstack/react-query"],
+        },
+      },
+    },
+  },
 }));
