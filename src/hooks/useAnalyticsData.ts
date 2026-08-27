@@ -70,7 +70,7 @@ export const useAnalyticsData = () => {
       // Fetch all sales reports for analysis
       const { data: allSales } = await supabase
         .from("sales_reports")
-        .select("*")
+        .select("report_date, quantity_sold, venue_id")
         .gte("report_date", format(lastMonthStart, "yyyy-MM-dd"))
         .lte("report_date", format(thisMonthEnd, "yyyy-MM-dd"));
 
@@ -158,12 +158,12 @@ export const useAnalyticsData = () => {
       const thirtyDaysAgo = subDays(now, 30);
       const { data: attendanceBlocks } = await supabase
         .from("staff_attendance_blocks")
-        .select("*")
+        .select("user_id, session_id, check_in_time, check_out_time, is_break")
         .gte("check_in_time", format(thirtyDaysAgo, "yyyy-MM-dd"));
 
       const { data: breaks } = await supabase
         .from("staff_breaks")
-        .select("*")
+        .select("user_id, duration_minutes")
         .gte("break_start_time", format(thirtyDaysAgo, "yyyy-MM-dd"));
 
       const { data: profiles } = await supabase
@@ -269,7 +269,7 @@ export const useAnalyticsData = () => {
       // Fetch exceptions
       const { data: sessions } = await supabase
         .from("club_sessions")
-        .select("*")
+        .select("venue_id, force_close_reason, session_date")
         .gte("session_date", format(thirtyDaysAgo, "yyyy-MM-dd"));
 
       const exceptionsList: ComplianceException[] = [];

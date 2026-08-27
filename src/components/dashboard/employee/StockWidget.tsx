@@ -102,7 +102,7 @@ const StockWidget = ({ user, venueId }: StockWidgetProps) => {
   const fetchStock = async () => {
     const { data } = await supabase
       .from("stock")
-      .select("*")
+      .select("id, item_name, category, quantity, low_stock_threshold, unit, created_at, updated_at")
       .eq("venue_id", venueId)
       .order("category")
       .order("item_name");

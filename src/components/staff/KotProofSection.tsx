@@ -71,7 +71,7 @@ const KotProofSection = ({ user, venueId, sessionId }: KotProofSectionProps) => 
     setLoading(true);
     const { data } = await supabase
       .from("kot_entries")
-      .select("*")
+      .select("id, entry_type, photo_url")
       .eq("session_id", sessionId)
       .order("created_at", { ascending: false });
     
