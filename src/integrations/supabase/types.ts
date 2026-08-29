@@ -664,8 +664,11 @@ export type Database = {
           dispatched_by: string
           flavour_id: string
           id: string
+          photo_url: string | null
           quantity_sent: number
+          received_by_name: string | null
           received_by_staff_id: string | null
+          unit: string
           venue_id: string
         }
         Insert: {
@@ -674,8 +677,11 @@ export type Database = {
           dispatched_by: string
           flavour_id: string
           id?: string
+          photo_url?: string | null
           quantity_sent?: number
+          received_by_name?: string | null
           received_by_staff_id?: string | null
+          unit?: string
           venue_id: string
         }
         Update: {
@@ -684,8 +690,11 @@ export type Database = {
           dispatched_by?: string
           flavour_id?: string
           id?: string
+          photo_url?: string | null
           quantity_sent?: number
+          received_by_name?: string | null
           received_by_staff_id?: string | null
+          unit?: string
           venue_id?: string
         }
         Relationships: [

@@ -341,7 +341,13 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
       }
 
       await updateSessionTask('stock', user.id);
-      
+
+      // Fire-and-forget: check today's consumption vs sales for this venue and notify
+      // admins if it's outside tolerance. Safe to fail silently -- it's a background
+      // check, not part of the staff-facing submit flow.
+      supabase.functions.invoke("check-stock-discrepancy", { body: { venue_id: venueId } })
+        .catch((err) => console.error("Discrepancy check failed:", err));
+
       haptic('success');
       if (isEditing) {
         toast.success("Stock updated successfully! ✓");

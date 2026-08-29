@@ -26,13 +26,13 @@ const CounterPictures = lazy(() => import("@/pages/CounterPictures"));
 const WeeklyRoster = lazy(() => import("@/pages/WeeklyRoster"));
 const DailyRoster = lazy(() => import("@/pages/DailyRoster"));
 const PacketDispatch = lazy(() => import("@/pages/PacketDispatch"));
-const DispatchHistory = lazy(() => import("@/pages/DispatchHistory"));
 const DailyClubReport = lazy(() => import("@/pages/DailyClubReport"));
 const InspectionForm = lazy(() => import("@/pages/InspectionForm"));
 const InspectionHistory = lazy(() => import("@/pages/InspectionHistory"));
 const StaffPerformance = lazy(() => import("@/pages/StaffPerformance"));
 const AccessoryTracker = lazy(() => import("@/pages/AccessoryTracker"));
 const InspectionSettings = lazy(() => import("@/pages/InspectionSettings"));
+const DispatchSettings = lazy(() => import("@/pages/DispatchSettings"));
 const MyProfile = lazy(() => import("@/pages/MyProfile"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
@@ -124,7 +124,7 @@ const AuthenticatedApp = () => {
           <Route path="/roster/weekly" element={guard([...INCHARGE_ROLES], <WeeklyRoster />)} />
           <Route path="/roster/daily" element={guard([...INCHARGE_PLUS_MGMT], <DailyRoster />)} />
           <Route path="/packet-dispatch" element={guard([...INCHARGE_PLUS_MGMT], <PacketDispatch />)} />
-          <Route path="/packet-dispatch/history" element={guard([...INCHARGE_ROLES], <DispatchHistory />)} />
+          <Route path="/dispatch-settings" element={guard([...INCHARGE_ROLES], <DispatchSettings />)} />
           <Route path="/daily-report" element={guard([...INCHARGE_PLUS_MGMT], <DailyClubReport />)} />
           <Route path="/inspections" element={guard([...INCHARGE_PLUS_MGMT], <InspectionHistory />)} />
           <Route path="/inspections/new" element={guard([...INCHARGE_ROLES], <InspectionForm />)} />

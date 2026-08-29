@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { Settings, Building2, Users, Tag, CalendarClock, Camera, Leaf, CalendarDays, CalendarCheck, Package, History, BarChart3, ClipboardCheck, UserCheck, TrendingUp, Wrench } from "lucide-react";
+import { Settings, Building2, Users, Tag, CalendarClock, Camera, Leaf, CalendarDays, CalendarCheck, Package, SlidersHorizontal, BarChart3, ClipboardCheck, UserCheck, TrendingUp, Wrench } from "lucide-react";
 
 const AdminSettingsMenu = () => {
   const navigate = useNavigate();
@@ -62,9 +62,9 @@ const AdminSettingsMenu = () => {
           <Package className="mr-2 h-4 w-4" />
           Packet Dispatch
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => navigate("/packet-dispatch/history")}>
-          <History className="mr-2 h-4 w-4" />
-          Dispatch History
+        <DropdownMenuItem onClick={() => navigate("/dispatch-settings")}>
+          <SlidersHorizontal className="mr-2 h-4 w-4" />
+          Dispatch Settings
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => navigate("/daily-report")}>
           <BarChart3 className="mr-2 h-4 w-4" />
