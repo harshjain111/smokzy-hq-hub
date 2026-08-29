@@ -26,3 +26,6 @@ dist-ssr
 .env
 .env.*
 !.env.example
+
+# Supabase CLI local cache (may include project-ref/pooler metadata)
+supabase/.temp
