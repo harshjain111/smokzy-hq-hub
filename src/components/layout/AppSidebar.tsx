@@ -1,10 +1,11 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
-  LayoutDashboard, CalendarDays, CalendarCheck, Package, History,
+  LayoutDashboard, CalendarDays, CalendarCheck, Package,
   BarChart3, ClipboardCheck, ClipboardList, UserCheck, AlertTriangle,
   Users, CalendarClock, GraduationCap, Wrench, Camera, Building2,
   Leaf, Tag, Settings, Bell, User, TrendingUp, FileText, ListChecks,
+  SlidersHorizontal,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -34,7 +35,7 @@ const navGroups: NavGroup[] = [
       { label: "Weekly Roster", icon: CalendarDays, route: "/roster/weekly" },
       { label: "Daily Roster", icon: CalendarCheck, route: "/roster/daily" },
       { label: "Packet Dispatch", icon: Package, route: "/packet-dispatch" },
-      { label: "Dispatch History", icon: History, route: "/packet-dispatch/history" },
+      { label: "Dispatch Settings", icon: SlidersHorizontal, route: "/dispatch-settings" },
       { label: "Daily Club Report", icon: BarChart3, route: "/daily-report" },
     ],
   },
