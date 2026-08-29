@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -87,7 +87,11 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
   
   // Collapsed categories state
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
-  
+
+  // Manage mode: hides per-item edit/delete + add-item controls during normal fast entry
+  const [manageMode, setManageMode] = useState(false);
+  const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
   // Add item state
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [bulkAddDialogOpen, setBulkAddDialogOpen] = useState(false);
@@ -366,6 +370,24 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
     }))
     .filter(group => group.items.length > 0);
 
+  // Order of visible (non-collapsed) items, top to bottom, for Enter-to-advance.
+  const visibleItemOrder = groupedItems
+    .filter(group => !collapsedCategories[group.category])
+    .flatMap(group => group.items.map(item => item.id));
+
+  const focusNextItem = (currentItemId: string) => {
+    const idx = visibleItemOrder.indexOf(currentItemId);
+    const nextId = idx >= 0 ? visibleItemOrder[idx + 1] : undefined;
+    if (nextId) {
+      inputRefs.current[nextId]?.focus();
+      inputRefs.current[nextId]?.select();
+    } else {
+      inputRefs.current[currentItemId]?.blur();
+    }
+  };
+
+  const enteredCount = stock.filter(item => quantities[item.id] !== '' && quantities[item.id] !== undefined).length;
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh]">
@@ -498,77 +520,109 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
               placeholder="Search items..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-12 h-14 text-base rounded-2xl bg-muted/50 border-0"
+              className="pl-12 h-12 text-base rounded-2xl bg-muted/50 border-0"
             />
           </div>
-          
-          {/* Single Add Button */}
-          <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button 
-                size="icon" 
-                className="h-14 w-14 rounded-2xl bg-gradient-to-r from-gradient-start to-gradient-end hover:opacity-90 shrink-0"
-                title="Add Item"
-              >
-                <Plus className="w-6 h-6" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="mx-4 rounded-3xl">
-              <DialogHeader>
-                <DialogTitle className="text-xl">Add Stock Item</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-6 pt-4">
-                <div className="space-y-2">
-                  <Label htmlFor="itemName2" className="text-sm font-medium">Item Name</Label>
-                  <Input
-                    id="itemName2"
-                    placeholder="e.g., Mint, Blueberry Mix"
-                    value={newItemName}
-                    onChange={(e) => setNewItemName(e.target.value)}
-                    className="h-14 text-base rounded-xl"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="category2" className="text-sm font-medium">Category</Label>
-                  <Select value={newItemCategory} onValueChange={(v) => setNewItemCategory(v as StockCategory)}>
-                    <SelectTrigger className="h-14 text-base rounded-xl">
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-popover z-50">
-                      {Object.entries(CATEGORY_CONFIG).map(([key, config]) => (
-                        <SelectItem key={key} value={key} className="h-12">
-                          {config.label} ({config.unit})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button
-                  onClick={handleAddItem}
-                  disabled={addingItem || !newItemName.trim() || !newItemCategory}
-                  className="w-full h-14 text-base font-semibold rounded-2xl bg-gradient-to-r from-gradient-start to-gradient-end hover:opacity-90"
-                >
-                  {addingItem ? <Loader2 className="w-5 h-5 animate-spin" /> : "Add Item"}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-          
-          {/* Bulk Add Button */}
-          <Button 
+
+          {/* Manage toggle: reveals add-item / edit / delete controls, hidden by default */}
+          <Button
             size="icon"
-            variant="outline"
-            onClick={() => setBulkAddDialogOpen(true)}
-            className="h-14 w-14 rounded-2xl border-border/50 hover:bg-muted shrink-0"
-            title="Bulk Add (Grid)"
+            variant={manageMode ? "default" : "outline"}
+            onClick={() => setManageMode(v => !v)}
+            className="h-12 w-12 rounded-2xl border-border/50 shrink-0"
+            title="Manage items (add/edit/delete)"
           >
-            <Grid3X3 className="w-5 h-5" />
+            <MoreVertical className="w-5 h-5" />
           </Button>
         </div>
-        
-        <p className="text-sm text-muted-foreground">
-          Enter current quantities. Tap category to collapse.
-        </p>
+
+        {manageMode && (
+          <div className="flex items-center gap-2">
+            {/* Add Item */}
+            <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="flex-1 h-11 rounded-xl gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Item
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="mx-4 rounded-3xl">
+                <DialogHeader>
+                  <DialogTitle className="text-xl">Add Stock Item</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-6 pt-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="itemName2" className="text-sm font-medium">Item Name</Label>
+                    <Input
+                      id="itemName2"
+                      placeholder="e.g., Mint, Blueberry Mix"
+                      value={newItemName}
+                      onChange={(e) => setNewItemName(e.target.value)}
+                      className="h-14 text-base rounded-xl"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="category2" className="text-sm font-medium">Category</Label>
+                    <Select value={newItemCategory} onValueChange={(v) => setNewItemCategory(v as StockCategory)}>
+                      <SelectTrigger className="h-14 text-base rounded-xl">
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-popover z-50">
+                        {Object.entries(CATEGORY_CONFIG).map(([key, config]) => (
+                          <SelectItem key={key} value={key} className="h-12">
+                            {config.label} ({config.unit})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    onClick={handleAddItem}
+                    disabled={addingItem || !newItemName.trim() || !newItemCategory}
+                    className="w-full h-14 text-base font-semibold rounded-2xl bg-gradient-to-r from-gradient-start to-gradient-end hover:opacity-90"
+                  >
+                    {addingItem ? <Loader2 className="w-5 h-5 animate-spin" /> : "Add Item"}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            {/* Bulk Add */}
+            <Button
+              variant="outline"
+              onClick={() => setBulkAddDialogOpen(true)}
+              className="flex-1 h-11 rounded-xl gap-2"
+            >
+              <Grid3X3 className="w-4 h-4" />
+              Bulk Add
+            </Button>
+          </div>
+        )}
+
+        {/* Progress */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-sm">
+            <span className="font-medium text-foreground">
+              {enteredCount} of {stock.length} entered
+            </span>
+            {enteredCount === stock.length && stock.length > 0 && (
+              <span className="text-success font-medium flex items-center gap-1">
+                <Check className="w-3.5 h-3.5" /> All done
+              </span>
+            )}
+          </div>
+          <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+            <motion.div
+              className="h-full bg-gradient-to-r from-gradient-start to-gradient-end rounded-full"
+              initial={false}
+              animate={{ width: stock.length > 0 ? `${(enteredCount / stock.length) * 100}%` : "0%" }}
+              transition={{ duration: 0.2 }}
+            />
+          </div>
+        </div>
       </motion.div>
 
       {/* Stock items by category */}
@@ -585,15 +639,19 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
               {/* Collapsible category header */}
               <button
                 onClick={() => toggleCategory(group.category)}
-                className="flex items-center justify-between w-full px-1 py-2 group"
+                className="flex items-center justify-between w-full px-1 py-1.5 group"
               >
                 <div className="flex items-center gap-2">
                   <div className="w-1 h-4 bg-gradient-to-b from-gradient-start to-gradient-end rounded-full" />
                   <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
                     {group.label}
                   </h3>
-                  <span className="text-xs text-muted-foreground/60">
-                    ({group.items.length})
+                  <span className={`text-xs font-medium ${
+                    group.items.every(item => quantities[item.id] !== '' && quantities[item.id] !== undefined)
+                      ? 'text-success'
+                      : 'text-muted-foreground/60'
+                  }`}>
+                    ({group.items.filter(item => quantities[item.id] !== '' && quantities[item.id] !== undefined).length}/{group.items.length})
                   </span>
                 </div>
                 <motion.div
@@ -614,81 +672,95 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
                     transition={{ duration: 0.25, ease: "easeInOut" }}
                     className="overflow-hidden"
                   >
-                    <div className="space-y-2">
-                      {group.items.map((item, itemIndex) => (
+                    <div className="space-y-1.5">
+                      {group.items.map((item, itemIndex) => {
+                        const isFilled = quantities[item.id] !== '' && quantities[item.id] !== undefined;
+                        return (
                         <motion.div
                           key={item.id}
                           initial={{ opacity: 0, x: -10 }}
                           animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: itemIndex * 0.03 }}
-                          className={`flex items-center justify-between py-4 px-5 bg-card rounded-2xl border shadow-sm transition-colors ${
-                            validationErrors[item.id] 
-                              ? 'border-destructive bg-destructive/5' 
-                              : 'border-border/50'
+                          transition={{ delay: Math.min(itemIndex * 0.015, 0.3) }}
+                          className={`flex items-center justify-between py-2 px-3 rounded-xl border shadow-sm transition-colors ${
+                            validationErrors[item.id]
+                              ? 'border-destructive bg-destructive/5'
+                              : isFilled
+                                ? 'border-success/30 bg-success/5'
+                                : 'border-border/50 bg-card'
                           }`}
                         >
-                          <div className="flex-1 min-w-0 pr-2">
-                            <div className="flex items-center gap-2">
-                              <p className="font-medium text-foreground truncate">{item.item_name}</p>
-                              {item.isPending && (
-                                <span className="text-xs px-2 py-0.5 bg-gradient-to-r from-gradient-start/20 to-gradient-end/20 text-primary rounded-full shrink-0 font-medium">
-                                  New
-                                </span>
-                              )}
-                            </div>
-                            {validationErrors[item.id] && (
-                              <p className="text-xs text-destructive mt-0.5">Required</p>
+                          <div className="flex-1 min-w-0 pr-2 flex items-center gap-1.5">
+                            {isFilled && !validationErrors[item.id] && (
+                              <Check className="w-3.5 h-3.5 text-success shrink-0" />
+                            )}
+                            <p className="font-medium text-foreground truncate text-sm">{item.item_name}</p>
+                            {item.isPending && (
+                              <span className="text-xs px-2 py-0.5 bg-gradient-to-r from-gradient-start/20 to-gradient-end/20 text-primary rounded-full shrink-0 font-medium">
+                                New
+                              </span>
                             )}
                           </div>
-                          
+
                           {/* Quantity input with unit */}
                           <div className="flex items-center gap-2 shrink-0">
                             <Input
+                              ref={(el) => { inputRefs.current[item.id] = el; }}
                               type="text"
                               inputMode="numeric"
                               pattern="[0-9]*"
+                              enterKeyHint="next"
                               value={quantities[item.id] ?? ''}
                               onChange={(e) => handleQuantityChange(item.id, e.target.value)}
-                              className={`w-20 h-12 text-center text-lg font-semibold rounded-xl bg-muted/50 border focus:border-primary/50 focus:ring-primary/20 ${
+                              onFocus={(e) => e.target.select()}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  focusNextItem(item.id);
+                                }
+                              }}
+                              className={`w-16 h-10 text-center text-base font-semibold rounded-lg bg-muted/50 border focus:border-primary/50 focus:ring-primary/20 ${
                                 validationErrors[item.id] ? 'border-destructive' : 'border-border/50'
                               }`}
                               placeholder="—"
                             />
-                            <span className="text-xs text-muted-foreground w-10 text-center">
+                            <span className="text-xs text-muted-foreground w-9 text-center shrink-0">
                               {item.unit}
                             </span>
-                            
-                            {/* Actions dropdown */}
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  className="h-10 w-10 text-muted-foreground hover:text-foreground shrink-0"
-                                >
-                                  <MoreVertical className="w-4 h-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="rounded-xl">
-                                <DropdownMenuItem 
-                                  onClick={() => openEditDialog(item)}
-                                  className="gap-2 py-3"
-                                >
-                                  <Pencil className="w-4 h-4" />
-                                  Edit Item
-                                </DropdownMenuItem>
-                                <DropdownMenuItem 
-                                  onClick={() => openDeleteDialog(item)}
-                                  className="gap-2 py-3 text-destructive focus:text-destructive"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                  Delete Item
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+
+                            {/* Actions dropdown — manage mode only */}
+                            {manageMode && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-9 w-9 text-muted-foreground hover:text-foreground shrink-0"
+                                  >
+                                    <MoreVertical className="w-4 h-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="rounded-xl">
+                                  <DropdownMenuItem
+                                    onClick={() => openEditDialog(item)}
+                                    className="gap-2 py-3"
+                                  >
+                                    <Pencil className="w-4 h-4" />
+                                    Edit Item
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => openDeleteDialog(item)}
+                                    className="gap-2 py-3 text-destructive focus:text-destructive"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                    Delete Item
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
                           </div>
                         </motion.div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </motion.div>
                 )}
