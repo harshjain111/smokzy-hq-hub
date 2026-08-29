@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { format, subDays, startOfMonth, endOfMonth, differenceInMinutes } from "date-fns";
 import { toast } from "sonner";
-import * as XLSX from "xlsx";
+import { exportToXlsx } from "@/lib/exportXlsx";
 
 interface ReportType {
   id: string;
@@ -255,10 +255,7 @@ export const ReportsSection = () => {
       }
 
       // Generate Excel file
-      const worksheet = XLSX.utils.json_to_sheet(data);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Report");
-      XLSX.writeFile(workbook, filename);
+      await exportToXlsx(data, filename, "Report");
 
       toast.success("Report downloaded successfully");
     } catch (error) {

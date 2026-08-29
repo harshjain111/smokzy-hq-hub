@@ -71,7 +71,7 @@ export default defineConfig(({ mode }) => ({
       output: {
         manualChunks: {
           charts: ["recharts"],
-          export: ["xlsx", "jspdf", "jspdf-autotable"],
+          export: ["write-excel-file/browser", "jspdf", "jspdf-autotable"],
           vendor: ["react", "react-dom", "react-router-dom", "@tanstack/react-query"],
         },
       },

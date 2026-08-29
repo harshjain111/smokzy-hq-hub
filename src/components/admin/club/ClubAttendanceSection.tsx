@@ -16,7 +16,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import * as XLSX from "xlsx";
+import { exportToXlsx } from "@/lib/exportXlsx";
 
 interface ClubAttendanceSectionProps {
   clubId: string;
@@ -289,7 +289,7 @@ export const ClubAttendanceSection = ({ clubId, currentSession }: ClubAttendance
     return 'text-destructive';
   };
 
-  const exportAttendance = () => {
+  const exportAttendance = async () => {
     const exportData = attendance.map(r => ({
       "Session Date": r.session_date,
       "Staff": r.full_name,
@@ -306,10 +306,7 @@ export const ClubAttendanceSection = ({ clubId, currentSession }: ClubAttendance
       ].filter(Boolean).join("; ") || "-"
     }));
 
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Attendance");
-    XLSX.writeFile(wb, `Attendance_${clubId}_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+    await exportToXlsx(exportData, `Attendance_${clubId}_${format(new Date(), "yyyy-MM-dd")}.xlsx`, "Attendance");
     toast.success("Attendance report exported");
   };
 

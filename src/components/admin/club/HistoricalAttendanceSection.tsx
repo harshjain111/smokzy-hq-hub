@@ -31,7 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import * as XLSX from "xlsx";
+import { exportToXlsx } from "@/lib/exportXlsx";
 
 interface HistoricalSession {
   id: string;
@@ -213,7 +213,7 @@ export const HistoricalAttendanceSection = ({ session, clubId, clubName }: Histo
     }
   };
 
-  const downloadExcel = () => {
+  const downloadExcel = async () => {
     const exportData = records.map(r => ({
       Staff: r.staff_name,
       "Check In": format(new Date(r.check_in_time), "HH:mm"),
@@ -223,10 +223,7 @@ export const HistoricalAttendanceSection = ({ session, clubId, clubName }: Histo
       Flags: r.flags.join(", ") || "—",
     }));
 
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Attendance");
-    XLSX.writeFile(wb, `${clubName}_Attendance_${session.session_date}.xlsx`);
+    await exportToXlsx(exportData, `${clubName}_Attendance_${session.session_date}.xlsx`, "Attendance");
   };
 
   const missedCheckouts = records.filter(r => !r.check_out_time).length;

@@ -8,7 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { CalendarIcon, Download, CheckCircle2, XCircle, AlertTriangle, ChevronRight, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
-import * as XLSX from "xlsx";
+import { exportToXlsx } from "@/lib/exportXlsx";
 import { PeriodSummaryPanel } from "./PeriodSummaryPanel";
 
 interface HistoricalSession {
@@ -82,7 +82,7 @@ export const SessionHistoryList = ({ clubId, clubName, onSelectSession }: Sessio
     }
   };
 
-  const downloadExcel = () => {
+  const downloadExcel = async () => {
     const exportData = sessions.map(session => ({
       Date: format(parseISO(session.session_date), "dd MMM yyyy"),
       "Start Time": format(new Date(session.started_at), "HH:mm"),
@@ -95,10 +95,7 @@ export const SessionHistoryList = ({ clubId, clubName, onSelectSession }: Sessio
       "Force Close Reason": session.force_close_reason || "-",
     }));
 
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Sessions");
-    XLSX.writeFile(wb, `${clubName}_Session_History.xlsx`);
+    await exportToXlsx(exportData, `${clubName}_Session_History.xlsx`, "Sessions");
   };
 
   const getCompletionStatus = (session: HistoricalSession) => {

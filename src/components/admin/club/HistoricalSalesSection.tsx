@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format, subDays, parseISO } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Download, TrendingUp, TrendingDown, Minus } from "lucide-react";
-import * as XLSX from "xlsx";
+import { exportToXlsx } from "@/lib/exportXlsx";
 
 interface HistoricalSession {
   id: string;
@@ -89,7 +89,7 @@ export const HistoricalSalesSection = ({ session, clubId, clubName }: Historical
     }
   };
 
-  const downloadExcel = () => {
+  const downloadExcel = async () => {
     const exportData = categoryBreakdown.map(cat => ({
       Category: cat.category_name,
       "Quantity Sold": cat.quantity,
@@ -100,10 +100,7 @@ export const HistoricalSalesSection = ({ session, clubId, clubName }: Historical
       "Quantity Sold": totalSales,
     });
 
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Sales");
-    XLSX.writeFile(wb, `${clubName}_Sales_${session.session_date}.xlsx`);
+    await exportToXlsx(exportData, `${clubName}_Sales_${session.session_date}.xlsx`, "Sales");
   };
 
   const getComparisonIndicator = (current: number, previous: number) => {

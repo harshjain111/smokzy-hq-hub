@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Download, AlertTriangle, Package } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import * as XLSX from "xlsx";
+import { exportToXlsx } from "@/lib/exportXlsx";
 
 interface HistoricalSession {
   id: string;
@@ -99,7 +99,7 @@ export const HistoricalStockSection = ({ session, clubId, clubName }: Historical
     }
   };
 
-  const downloadExcel = () => {
+  const downloadExcel = async () => {
     const exportData = stockItems.map(item => ({
       Item: item.item_name,
       "Opening (g)": item.opening,
@@ -109,10 +109,7 @@ export const HistoricalStockSection = ({ session, clubId, clubName }: Historical
       Status: item.status === "match" ? "OK" : item.status === "mismatch" ? "Mismatch" : "Unknown",
     }));
 
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Stock");
-    XLSX.writeFile(wb, `${clubName}_Stock_${session.session_date}.xlsx`);
+    await exportToXlsx(exportData, `${clubName}_Stock_${session.session_date}.xlsx`, "Stock");
   };
 
   const mismatchCount = stockItems.filter(i => i.status === "mismatch").length;
