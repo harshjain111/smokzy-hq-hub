@@ -3,14 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, RefreshCw, Users } from "lucide-react";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-import { ClubOverviewSection } from "@/components/admin/club/ClubOverviewSection";
+import { ArrowLeft, RefreshCw, Users, Activity, TrendingUp, TrendingDown, Package } from "lucide-react";
+import { ClubOverviewSection, SessionHealth } from "@/components/admin/club/ClubOverviewSection";
 import { ClubSalesSection } from "@/components/admin/club/ClubSalesSection";
 import { ClubStockSection } from "@/components/admin/club/ClubStockSection";
 import { ClubAttendanceSection } from "@/components/admin/club/ClubAttendanceSection";
@@ -37,6 +31,10 @@ export interface ClubSession {
 
 type ViewMode = "live" | "history";
 
+interface SalesSummary { today: number; yesterday: number }
+interface StockSummary { score: number; lowCount: number; outCount: number }
+interface AttendanceSummary { onDuty: number; onBreak: number; rosteredTotal: number | null; notCheckedIn: number }
+
 const ClubDetail = () => {
   const { clubId } = useParams();
   const navigate = useNavigate();
@@ -45,9 +43,14 @@ const ClubDetail = () => {
   const [staffOnDuty, setStaffOnDuty] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [expandedSection, setExpandedSection] = useState<string>("overview");
   const [viewMode, setViewMode] = useState<ViewMode>("live");
   const [selectedHistoryDate, setSelectedHistoryDate] = useState<Date>(subDays(new Date(), 1));
+
+  // Fed by the section components' own callbacks so the KPI strip reuses their existing calculations
+  const [sessionHealth, setSessionHealth] = useState<SessionHealth | null>(null);
+  const [salesSummary, setSalesSummary] = useState<SalesSummary | null>(null);
+  const [stockSummary, setStockSummary] = useState<StockSummary | null>(null);
+  const [attendanceSummary, setAttendanceSummary] = useState<AttendanceSummary | null>(null);
 
   useEffect(() => {
     if (clubId) {
@@ -111,7 +114,7 @@ const ClubDetail = () => {
           <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => navigate("/dashboard")}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          
+
           <div className="flex flex-col items-center flex-1 min-w-0 px-2">
             <h1 className="text-sm font-semibold truncate max-w-[180px]">{clubName || "Loading..."}</h1>
             <div className="flex items-center gap-2 mt-0.5">
@@ -122,7 +125,7 @@ const ClubDetail = () => {
               </div>
             </div>
           </div>
-          
+
           <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={refresh}>
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>
@@ -133,8 +136,8 @@ const ClubDetail = () => {
           <button
             onClick={() => setViewMode("live")}
             className={`flex-1 py-2.5 text-xs font-medium transition-colors ${
-              viewMode === "live" 
-                ? "bg-primary text-primary-foreground" 
+              viewMode === "live"
+                ? "bg-primary text-primary-foreground"
                 : "bg-muted/50 text-muted-foreground hover:bg-muted"
             }`}
           >
@@ -143,8 +146,8 @@ const ClubDetail = () => {
           <button
             onClick={() => setViewMode("history")}
             className={`flex-1 py-2.5 text-xs font-medium transition-colors ${
-              viewMode === "history" 
-                ? "bg-primary text-primary-foreground" 
+              viewMode === "history"
+                ? "bg-primary text-primary-foreground"
                 : "bg-muted/50 text-muted-foreground hover:bg-muted"
             }`}
           >
@@ -156,64 +159,56 @@ const ClubDetail = () => {
       {/* Content */}
       <div className="p-3 pb-8">
         {viewMode === "live" ? (
-          <Accordion
-            type="single"
-            collapsible
-            value={expandedSection}
-            onValueChange={(value) => setExpandedSection(value)}
-            className="space-y-2"
-          >
-            <AccordionItem value="overview" className="border rounded-lg overflow-hidden bg-card">
-              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
-                <span className="text-sm font-medium">Overview</span>
-              </AccordionTrigger>
-              <AccordionContent className="px-4 pb-4">
-                <ClubOverviewSection clubId={clubId!} session={currentSession} loading={loading} />
-              </AccordionContent>
-            </AccordionItem>
+          <div className="space-y-4">
+            <KpiStrip
+              sessionHealth={sessionHealth}
+              sales={salesSummary}
+              stock={stockSummary}
+              attendance={attendanceSummary}
+            />
 
-            <AccordionItem value="sales" className="border rounded-lg overflow-hidden bg-card">
-              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
-                <span className="text-sm font-medium">Sales</span>
-              </AccordionTrigger>
-              <AccordionContent className="px-4 pb-4">
-                <ClubSalesSection clubId={clubId!} clubName={clubName} session={currentSession} />
-              </AccordionContent>
-            </AccordionItem>
+            <SectionCard title="Session Status">
+              <ClubOverviewSection
+                clubId={clubId!}
+                session={currentSession}
+                loading={loading}
+                onHealthChange={setSessionHealth}
+              />
+            </SectionCard>
 
-            <AccordionItem value="stock" className="border rounded-lg overflow-hidden bg-card">
-              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
-                <span className="text-sm font-medium">Stock</span>
-              </AccordionTrigger>
-              <AccordionContent className="px-4 pb-4">
-                <ClubStockSection clubId={clubId!} clubName={clubName} session={currentSession} />
-              </AccordionContent>
-            </AccordionItem>
+            <SectionCard title="Sales Intelligence">
+              <ClubSalesSection
+                clubId={clubId!}
+                clubName={clubName}
+                session={currentSession}
+                onSummaryChange={setSalesSummary}
+              />
+            </SectionCard>
 
-            <AccordionItem value="attendance" className="border rounded-lg overflow-hidden bg-card">
-              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
-                <span className="text-sm font-medium">Attendance</span>
-              </AccordionTrigger>
-              <AccordionContent className="px-4 pb-4">
-                <ClubAttendanceSection 
-                  clubId={clubId!} 
-                  currentSession={currentSession ? { id: currentSession.id, session_date: currentSession.session_date } : null} 
-                />
-              </AccordionContent>
-            </AccordionItem>
+            <SectionCard title="Attendance Command Center">
+              <ClubAttendanceSection
+                clubId={clubId!}
+                currentSession={currentSession ? { id: currentSession.id, session_date: currentSession.session_date } : null}
+                onSummaryChange={setAttendanceSummary}
+              />
+            </SectionCard>
 
-            <AccordionItem value="activity" className="border rounded-lg overflow-hidden bg-card">
-              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
-                <span className="text-sm font-medium">Activity Log</span>
-              </AccordionTrigger>
-              <AccordionContent className="px-4 pb-4">
-                <ClubActivitySection 
-                  clubId={clubId!} 
-                  currentSession={currentSession ? { id: currentSession.id, session_date: currentSession.session_date } : null}
-                />
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
+            <SectionCard title="Stock & Inventory">
+              <ClubStockSection
+                clubId={clubId!}
+                clubName={clubName}
+                session={currentSession}
+                onSummaryChange={setStockSummary}
+              />
+            </SectionCard>
+
+            <SectionCard title="Activity Log">
+              <ClubActivitySection
+                clubId={clubId!}
+                currentSession={currentSession ? { id: currentSession.id, session_date: currentSession.session_date } : null}
+              />
+            </SectionCard>
+          </div>
         ) : (
           <div className="space-y-3">
             <DateNavigationStrip
@@ -231,5 +226,104 @@ const ClubDetail = () => {
     </div>
   );
 };
+
+// Always-visible container replacing the old collapsible accordion sections
+const SectionCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
+  <div className="rounded-lg border bg-card overflow-hidden">
+    <div className="px-4 py-2.5 border-b bg-muted/30">
+      <span className="text-sm font-semibold">{title}</span>
+    </div>
+    <div className="p-4">{children}</div>
+  </div>
+);
+
+const KpiStrip = ({
+  sessionHealth,
+  sales,
+  stock,
+  attendance,
+}: {
+  sessionHealth: SessionHealth | null;
+  sales: SalesSummary | null;
+  stock: StockSummary | null;
+  attendance: AttendanceSummary | null;
+}) => {
+  const healthLabel = sessionHealth
+    ? sessionHealth.status === 'excellent' ? 'Healthy'
+      : sessionHealth.status === 'good' ? 'Good'
+      : sessionHealth.status === 'needs_attention' ? 'Needs Attention'
+      : 'Critical'
+    : 'No Session';
+
+  const salesDelta = sales
+    ? sales.yesterday === 0
+      ? (sales.today > 0 ? '+100%' : '0%')
+      : `${sales.today - sales.yesterday >= 0 ? '+' : ''}${Math.round(((sales.today - sales.yesterday) / sales.yesterday) * 100)}%`
+    : null;
+
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+      <KpiTile
+        icon={<Activity className="h-4 w-4" />}
+        label="Session Health"
+        value={sessionHealth ? `${sessionHealth.score}%` : "—"}
+        sub={healthLabel}
+        tone={
+          !sessionHealth ? 'muted'
+            : sessionHealth.status === 'excellent' ? 'success'
+            : sessionHealth.status === 'good' ? 'primary'
+            : sessionHealth.status === 'needs_attention' ? 'warning'
+            : 'destructive'
+        }
+      />
+      <KpiTile
+        icon={sales && salesDelta?.startsWith('-') ? <TrendingDown className="h-4 w-4" /> : <TrendingUp className="h-4 w-4" />}
+        label="Today's Sales"
+        value={sales ? String(sales.today) : "—"}
+        sub={salesDelta ? `${salesDelta} vs yesterday` : "No data yet"}
+        tone={!sales ? 'muted' : salesDelta?.startsWith('-') ? 'destructive' : 'success'}
+      />
+      <KpiTile
+        icon={<Package className="h-4 w-4" />}
+        label="Stock Health"
+        value={stock ? `${stock.score}%` : "—"}
+        sub={stock ? `${stock.lowCount} low-stock item${stock.lowCount === 1 ? '' : 's'}` : "No data yet"}
+        tone={!stock ? 'muted' : stock.score >= 80 ? 'success' : stock.score >= 50 ? 'warning' : 'destructive'}
+      />
+      <KpiTile
+        icon={<Users className="h-4 w-4" />}
+        label="Staff On Duty"
+        value={attendance ? (attendance.rosteredTotal !== null ? `${attendance.onDuty}/${attendance.rosteredTotal}` : String(attendance.onDuty)) : "—"}
+        sub={attendance ? `${attendance.onBreak} break · ${attendance.notCheckedIn} missing` : "No data yet"}
+        tone={!attendance ? 'muted' : attendance.notCheckedIn > 0 ? 'warning' : 'success'}
+      />
+    </div>
+  );
+};
+
+type KpiTone = 'success' | 'warning' | 'destructive' | 'primary' | 'muted';
+
+const toneClasses: Record<KpiTone, string> = {
+  success: 'border-success/20 bg-success/5 text-success',
+  warning: 'border-warning/20 bg-warning/5 text-warning',
+  destructive: 'border-destructive/20 bg-destructive/5 text-destructive',
+  primary: 'border-primary/20 bg-primary/5 text-primary',
+  muted: 'border-border bg-muted/30 text-muted-foreground',
+};
+
+const KpiTile = ({
+  icon, label, value, sub, tone,
+}: {
+  icon: React.ReactNode; label: string; value: string; sub: string; tone: KpiTone;
+}) => (
+  <div className={`p-3 rounded-lg border ${toneClasses[tone]}`}>
+    <div className="flex items-center gap-1.5 mb-1.5">
+      {icon}
+      <span className="text-[11px] font-medium opacity-90">{label}</span>
+    </div>
+    <div className="text-xl font-bold text-foreground">{value}</div>
+    <p className="text-[10px] mt-0.5 opacity-80">{sub}</p>
+  </div>
+);
 
 export default ClubDetail;

@@ -2,25 +2,19 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { format, differenceInMinutes, differenceInHours, subDays } from "date-fns";
-import { 
-  Users, AlertTriangle, Clock, Coffee, Download, ChevronRight, 
-  TrendingUp, TrendingDown, Award, UserX, Timer, Eye
+import { format, differenceInMinutes, differenceInHours } from "date-fns";
+import {
+  Users, AlertTriangle, Coffee, Download,
+  Award, Timer, Info
 } from "lucide-react";
 import { toast } from "sonner";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { exportToXlsx } from "@/lib/exportXlsx";
 
 interface ClubAttendanceSectionProps {
   clubId: string;
   currentSession?: { id: string; session_date: string } | null;
+  onSummaryChange?: (data: { onDuty: number; onBreak: number; rosteredTotal: number | null; notCheckedIn: number } | null) => void;
 }
 
 interface AttendanceRecord {
@@ -56,24 +50,37 @@ interface AttendanceInsight {
   message: string;
 }
 
-export const ClubAttendanceSection = ({ clubId, currentSession }: ClubAttendanceSectionProps) => {
+type RowStatus = 'on_duty' | 'on_break' | 'checked_out' | 'not_checked_in' | 'leave_off';
+
+interface ReconciledRow {
+  staff_id: string;
+  full_name: string;
+  role: string | null;
+  check_in_time: string | null;
+  check_out_time: string | null;
+  hours: number | null;
+  status: RowStatus;
+  leaveLabel?: string;
+  offRoster?: boolean;
+}
+
+export const ClubAttendanceSection = ({ clubId, currentSession, onSummaryChange }: ClubAttendanceSectionProps) => {
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [staffPerformance, setStaffPerformance] = useState<StaffPerformance[]>([]);
   const [insights, setInsights] = useState<AttendanceInsight[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showDetailDialog, setShowDetailDialog] = useState(false);
-  const [showPerformanceDialog, setShowPerformanceDialog] = useState(false);
-  const [selectedStaff, setSelectedStaff] = useState<string | null>(null);
+  const [reconciledRows, setReconciledRows] = useState<ReconciledRow[]>([]);
+  const [rosterFound, setRosterFound] = useState(true);
 
   useEffect(() => {
     fetchAttendance();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clubId, currentSession?.id]);
 
   const fetchAttendance = async () => {
     setLoading(true);
 
     try {
-      // Fetch recent sessions for this club (last 14 sessions)
       const { data: recentSessions } = await supabase
         .from("club_sessions")
         .select("id, session_date, started_at")
@@ -83,30 +90,28 @@ export const ClubAttendanceSection = ({ clubId, currentSession }: ClubAttendance
 
       if (!recentSessions || recentSessions.length === 0) {
         setAttendance([]);
+        await fetchRosterReconciliation([]);
         setLoading(false);
         return;
       }
 
       const sessionIds = recentSessions.map(s => s.id);
       const sessionMap: Record<string, { date: string; start: string }> = {};
-      recentSessions.forEach(s => { 
-        sessionMap[s.id] = { date: s.session_date, start: s.started_at }; 
+      recentSessions.forEach(s => {
+        sessionMap[s.id] = { date: s.session_date, start: s.started_at };
       });
 
-      // Fetch attendance blocks by session_id
       const { data: blocks } = await supabase
         .from("staff_attendance_blocks")
         .select("*")
         .in("session_id", sessionIds)
         .order("check_in_time", { ascending: false });
 
-      // Fetch all breaks for these sessions
       const { data: breaks } = await supabase
         .from("staff_breaks")
         .select("*")
         .in("session_id", sessionIds);
 
-      // Fetch profiles for staff names
       const userIds = [...new Set(blocks?.map(b => b.user_id) || [])];
       const { data: profiles } = await supabase
         .from("profiles")
@@ -116,22 +121,22 @@ export const ClubAttendanceSection = ({ clubId, currentSession }: ClubAttendance
       const profileMap: Record<string, string> = {};
       profiles?.forEach(p => { profileMap[p.id] = p.full_name; });
 
-      // Fetch venue settings for late threshold
       const { data: settings } = await supabase
         .from("venue_settings")
         .select("core_hours_start")
         .eq("venue_id", clubId)
         .single();
 
-      const coreHoursStart = settings?.core_hours_start || 18; // Default 6 PM
+      const coreHoursStart = settings?.core_hours_start || 18; // Default 6 PM (kept for parity, not currently used in the calc below)
+      void coreHoursStart;
 
+      let records: AttendanceRecord[] = [];
       if (blocks) {
-        const records: AttendanceRecord[] = blocks.map((block) => {
+        records = blocks.map((block) => {
           const checkInDate = new Date(block.check_in_time);
           const checkOutDate = block.check_out_time ? new Date(block.check_out_time) : null;
           const sessionInfo = sessionMap[block.session_id];
-          
-          // Get breaks for this specific attendance block
+
           const blockBreaks = breaks?.filter(b => b.attendance_block_id === block.id) || [];
           const totalBreakMinutes = blockBreaks.reduce((sum, b) => sum + (b.duration_minutes || 0), 0);
 
@@ -141,7 +146,6 @@ export const ClubAttendanceSection = ({ clubId, currentSession }: ClubAttendance
           }
           const totalHours = totalMinutes / 60;
 
-          // Check if late (more than 30 mins after core hours start or session start)
           const sessionStart = sessionInfo ? new Date(sessionInfo.start) : checkInDate;
           const lateMinutes = Math.max(0, differenceInMinutes(checkInDate, sessionStart) - 30);
           const isLate = lateMinutes > 0;
@@ -149,11 +153,10 @@ export const ClubAttendanceSection = ({ clubId, currentSession }: ClubAttendance
           const hasLongBreak = blockBreaks.some(b => (b.duration_minutes || 0) > 45);
           const missedCheckout = !block.check_out_time && differenceInHours(new Date(), checkInDate) > 12;
 
-          // Efficiency: (work time) / (total time including breaks)
-          const totalTimeIncludingBreaks = checkOutDate 
-            ? differenceInMinutes(checkOutDate, checkInDate) 
+          const totalTimeIncludingBreaks = checkOutDate
+            ? differenceInMinutes(checkOutDate, checkInDate)
             : differenceInMinutes(new Date(), checkInDate);
-          const efficiency = totalTimeIncludingBreaks > 0 
+          const efficiency = totalTimeIncludingBreaks > 0
             ? Math.round(((totalTimeIncludingBreaks - totalBreakMinutes) / totalTimeIncludingBreaks) * 100)
             : 100;
 
@@ -176,18 +179,126 @@ export const ClubAttendanceSection = ({ clubId, currentSession }: ClubAttendance
         });
 
         setAttendance(records);
-
-        // Calculate staff performance
         calculateStaffPerformance(records);
-        
-        // Generate insights
         generateInsights(records);
       }
+
+      const activeBreakUserIds = new Set(
+        (breaks || []).filter(b => currentSession && b.session_id === currentSession.id && !b.break_end_time).map(b => b.user_id)
+      );
+
+      await fetchRosterReconciliation(records, activeBreakUserIds);
     } catch (error) {
       console.error("Error fetching attendance:", error);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Cross-references today's roster against actual attendance for the day.
+  // No formal leave-approval workflow exists — 'leave'/'off' below is only a manually-typed roster_assignments flag.
+  const fetchRosterReconciliation = async (records: AttendanceRecord[], activeBreakUserIds?: Set<string>) => {
+    const targetDate = currentSession?.session_date || format(new Date(), "yyyy-MM-dd");
+    const breakSet = activeBreakUserIds || new Set<string>();
+
+    const [{ data: rosterRows }, { data: assignmentRows }] = await Promise.all([
+      supabase.from("daily_roster").select("staff_id, role").eq("venue_id", clubId).eq("date", targetDate).eq("is_removed", false),
+      supabase.from("roster_assignments").select("staff_id, status").eq("venue_id", clubId).eq("date", targetDate),
+    ]);
+
+    const todaysRecords = records.filter(r => r.session_date === targetDate);
+    const recordsByStaff = new Map<string, AttendanceRecord[]>();
+    todaysRecords.forEach(r => {
+      const arr = recordsByStaff.get(r.user_id) || [];
+      arr.push(r);
+      recordsByStaff.set(r.user_id, arr);
+    });
+    const pickRecord = (staffId: string) => {
+      const recs = recordsByStaff.get(staffId);
+      if (!recs || recs.length === 0) return null;
+      const active = recs.find(r => !r.check_out_time);
+      if (active) return active;
+      return recs.reduce((latest, r) => (new Date(r.check_in_time) > new Date(latest.check_in_time) ? r : latest), recs[0]);
+    };
+
+    const roster = rosterRows || [];
+    setRosterFound(roster.length > 0);
+
+    const rosterStaffIds = new Set(roster.map(r => r.staff_id));
+    const leaveMap = new Map(
+      (assignmentRows || [])
+        .filter(a => a.status === 'leave' || a.status === 'off')
+        .map(a => [a.staff_id, a.status])
+    );
+
+    // Fetch names for rostered staff who may not have any attendance record (so no name from `records`)
+    const missingProfileIds = roster.map(r => r.staff_id);
+    const profileMap = new Map<string, string>();
+    if (missingProfileIds.length > 0) {
+      const { data: profiles } = await supabase.from("profiles").select("id, full_name").in("id", missingProfileIds);
+      profiles?.forEach(p => profileMap.set(p.id, p.full_name));
+    }
+
+    const rows: ReconciledRow[] = roster.map(rs => {
+      const rec = pickRecord(rs.staff_id);
+      const fullName = profileMap.get(rs.staff_id) || rec?.full_name || "Unknown";
+
+      if (rec) {
+        const status: RowStatus = rec.check_out_time ? 'checked_out' : breakSet.has(rs.staff_id) ? 'on_break' : 'on_duty';
+        return {
+          staff_id: rs.staff_id,
+          full_name: fullName,
+          role: rs.role,
+          check_in_time: rec.check_in_time,
+          check_out_time: rec.check_out_time,
+          hours: rec.check_out_time ? rec.total_hours : null,
+          status,
+        };
+      }
+
+      const leave = leaveMap.get(rs.staff_id);
+      if (leave) {
+        return {
+          staff_id: rs.staff_id, full_name: fullName, role: rs.role,
+          check_in_time: null, check_out_time: null, hours: null,
+          status: 'leave_off', leaveLabel: leave,
+        };
+      }
+
+      return {
+        staff_id: rs.staff_id, full_name: fullName, role: rs.role,
+        check_in_time: null, check_out_time: null, hours: null,
+        status: 'not_checked_in',
+      };
+    });
+
+    // Staff who attended today but weren't in today's roster — surfaced, not silently dropped
+    const offRosterRows: ReconciledRow[] = [];
+    recordsByStaff.forEach((_, staffId) => {
+      if (rosterStaffIds.has(staffId)) return;
+      const rec = pickRecord(staffId);
+      if (!rec) return;
+      const status: RowStatus = rec.check_out_time ? 'checked_out' : breakSet.has(staffId) ? 'on_break' : 'on_duty';
+      offRosterRows.push({
+        staff_id: staffId, full_name: rec.full_name, role: null,
+        check_in_time: rec.check_in_time, check_out_time: rec.check_out_time,
+        hours: rec.check_out_time ? rec.total_hours : null, status, offRoster: true,
+      });
+    });
+
+    const allRows = [...rows, ...offRosterRows];
+    setReconciledRows(allRows);
+
+    const onDutyCount = allRows.filter(r => r.status === 'on_duty').length;
+    const onBreakCount = allRows.filter(r => r.status === 'on_break').length;
+    const notCheckedInCount = rows.filter(r => r.status === 'not_checked_in').length;
+
+    onSummaryChange?.({
+      onDuty: onDutyCount,
+      onBreak: onBreakCount,
+      rosteredTotal: roster.length > 0 ? rows.length : null,
+      notCheckedIn: notCheckedInCount,
+    });
   };
 
   const calculateStaffPerformance = (records: AttendanceRecord[]) => {
@@ -214,26 +325,23 @@ export const ClubAttendanceSection = ({ clubId, currentSession }: ClubAttendance
       staffMap.set(r.user_id, existing);
     });
 
-    // Calculate punctuality score
     staffMap.forEach(staff => {
       const latePenalty = staff.late_count * 10;
       const missedPenalty = staff.missed_checkouts * 20;
       staff.punctuality_score = Math.max(0, 100 - latePenalty - missedPenalty);
     });
 
-    // Sort by sessions present (descending)
     const sorted = Array.from(staffMap.values()).sort((a, b) => b.sessions_present - a.sessions_present);
     setStaffPerformance(sorted);
   };
 
   const generateInsights = (records: AttendanceRecord[]) => {
     const newInsights: AttendanceInsight[] = [];
-    
-    const currentRecords = currentSession 
+
+    const currentRecords = currentSession
       ? records.filter(r => r.session_id === currentSession.id)
       : [];
 
-    // Current session insights
     const onDuty = currentRecords.filter(r => !r.check_out_time).length;
     const checkedOut = currentRecords.filter(r => r.check_out_time).length;
 
@@ -244,19 +352,16 @@ export const ClubAttendanceSection = ({ clubId, currentSession }: ClubAttendance
       newInsights.push({ type: 'neutral', message: `${checkedOut} staff completed shifts today` });
     }
 
-    // Late check-ins today
     const lateToday = currentRecords.filter(r => r.is_late).length;
     if (lateToday > 0) {
       newInsights.push({ type: 'negative', message: `${lateToday} late check-in${lateToday > 1 ? 's' : ''} today` });
     }
 
-    // Long breaks trend
     const longBreaks = records.filter(r => r.has_long_break).length;
     if (longBreaks > 3) {
       newInsights.push({ type: 'negative', message: `${longBreaks} long breaks (>45m) in last 14 sessions` });
     }
 
-    // Missed checkouts
     const missed = records.filter(r => r.missed_checkout).length;
     if (missed > 0) {
       newInsights.push({ type: 'negative', message: `${missed} missed checkout${missed > 1 ? 's' : ''} requiring attention` });
@@ -264,18 +369,6 @@ export const ClubAttendanceSection = ({ clubId, currentSession }: ClubAttendance
 
     setInsights(newInsights);
   };
-
-  // Summary metrics based on current session
-  const currentSessionRecords = currentSession 
-    ? attendance.filter(r => r.session_id === currentSession.id)
-    : [];
-
-  const staffCheckedInThisSession = currentSessionRecords.length;
-  const staffOnDuty = currentSessionRecords.filter(r => !r.check_out_time).length;
-  const lateToday = currentSessionRecords.filter(r => r.is_late).length;
-  const avgEfficiency = currentSessionRecords.length > 0
-    ? Math.round(currentSessionRecords.reduce((sum, r) => sum + r.efficiency, 0) / currentSessionRecords.length)
-    : 0;
 
   const formatDuration = (hours: number) => {
     const h = Math.floor(hours);
@@ -320,45 +413,43 @@ export const ClubAttendanceSection = ({ clubId, currentSession }: ClubAttendance
     );
   }
 
+  const rosteredRows = reconciledRows.filter(r => !r.offRoster);
+  const offRosterRows = reconciledRows.filter(r => r.offRoster);
+  const onDutyCount = reconciledRows.filter(r => r.status === 'on_duty').length;
+  const onBreakCount = reconciledRows.filter(r => r.status === 'on_break').length;
+  const checkedOutCount = reconciledRows.filter(r => r.status === 'checked_out').length;
+  const notCheckedInCount = rosteredRows.filter(r => r.status === 'not_checked_in').length;
+  const leaveOffCount = rosteredRows.filter(r => r.status === 'leave_off').length;
+
+  const statusBadge = (row: ReconciledRow) => {
+    switch (row.status) {
+      case 'on_duty':
+        return <Badge className="bg-success/15 text-success border-success/30 text-[10px]">On Duty</Badge>;
+      case 'on_break':
+        return <Badge className="bg-warning/15 text-warning border-warning/30 text-[10px]">On Break</Badge>;
+      case 'checked_out':
+        return <Badge variant="secondary" className="text-[10px]">Checked Out</Badge>;
+      case 'leave_off':
+        return <Badge variant="outline" className="text-[10px] text-muted-foreground capitalize">{row.leaveLabel}</Badge>;
+      case 'not_checked_in':
+      default:
+        return <Badge variant="outline" className="text-[10px] text-destructive/80 border-destructive/30">Not Checked In</Badge>;
+    }
+  };
+
   return (
     <div className="space-y-4">
-      {/* Summary Metrics */}
-      <div className="grid grid-cols-2 gap-2">
-        <div className="p-3 rounded-lg bg-success/10 text-center">
-          <div className="flex items-center justify-center gap-1.5">
-            <Users className="h-4 w-4 text-success" />
-            <span className="text-xl font-bold">{staffOnDuty}</span>
-          </div>
-          <p className="text-[10px] text-muted-foreground mt-0.5">On Duty Now</p>
-        </div>
-        <div className="p-3 rounded-lg bg-muted/30 text-center">
-          <div className="flex items-center justify-center gap-1.5">
-            <Clock className="h-4 w-4 text-muted-foreground" />
-            <span className="text-xl font-bold">{staffCheckedInThisSession}</span>
-          </div>
-          <p className="text-[10px] text-muted-foreground mt-0.5">Total This Session</p>
-        </div>
-        <div className={`p-3 rounded-lg text-center ${lateToday > 0 ? 'bg-warning/10' : 'bg-muted/30'}`}>
-          <div className="flex items-center justify-center gap-1.5">
-            <Timer className={`h-4 w-4 ${lateToday > 0 ? 'text-warning' : 'text-muted-foreground'}`} />
-            <span className="text-xl font-bold">{lateToday}</span>
-          </div>
-          <p className="text-[10px] text-muted-foreground mt-0.5">Late Today</p>
-        </div>
-        <div className="p-3 rounded-lg bg-muted/30 text-center">
-          <div className="flex items-center justify-center gap-1.5">
-            <span className={`text-xl font-bold ${getScoreColor(avgEfficiency)}`}>{avgEfficiency}%</span>
-          </div>
-          <p className="text-[10px] text-muted-foreground mt-0.5">Avg Efficiency</p>
-        </div>
-      </div>
+      <Button variant="outline" size="sm" onClick={exportAttendance} className="w-full">
+        <Download className="h-4 w-4 mr-2" />
+        Export Attendance Report
+      </Button>
 
       {/* Smart Insights */}
       {insights.length > 0 && (
         <div className="space-y-1.5">
           {insights.slice(0, 3).map((insight, i) => (
-            <div 
-              key={i} 
+            <div
+              key={i}
               className={`flex items-center gap-2 p-2 rounded-lg text-xs ${
                 insight.type === 'positive' ? 'bg-success/10 text-success' :
                 insight.type === 'negative' ? 'bg-destructive/10 text-destructive' :
@@ -374,183 +465,128 @@ export const ClubAttendanceSection = ({ clubId, currentSession }: ClubAttendance
         </div>
       )}
 
-      {/* Staff Performance - Tap for details */}
-      <Dialog open={showPerformanceDialog} onOpenChange={setShowPerformanceDialog}>
-        <DialogTrigger asChild>
-          <button className="w-full text-left">
-            <div className="p-3 rounded-lg border hover:bg-muted/30 transition-colors">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium">Staff Performance (14 Sessions)</span>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </div>
-              <div className="flex -space-x-2">
-                {staffPerformance.slice(0, 5).map((staff, i) => (
-                  <div 
-                    key={staff.user_id}
-                    className="w-8 h-8 rounded-full bg-primary/20 border-2 border-background flex items-center justify-center text-xs font-medium"
-                    title={staff.full_name}
-                  >
-                    {staff.full_name.charAt(0)}
-                  </div>
-                ))}
-                {staffPerformance.length > 5 && (
-                  <div className="w-8 h-8 rounded-full bg-muted border-2 border-background flex items-center justify-center text-xs">
-                    +{staffPerformance.length - 5}
-                  </div>
-                )}
-              </div>
-            </div>
-          </button>
-        </DialogTrigger>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-base">Staff Performance Report</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 max-h-[60vh] overflow-auto">
-            {staffPerformance.map(staff => (
-              <div key={staff.user_id} className="p-3 rounded-lg border">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-medium text-sm">{staff.full_name}</span>
-                  <Badge 
-                    variant="outline" 
-                    className={`text-[10px] ${getScoreColor(staff.punctuality_score)}`}
-                  >
-                    {staff.punctuality_score}% Punctuality
-                  </Badge>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="flex items-center gap-1">
-                    <Users className="h-3 w-3 text-muted-foreground" />
-                    <span>{staff.sessions_present} sessions</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-3 w-3 text-muted-foreground" />
-                    <span>{formatDuration(staff.total_hours)}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Coffee className="h-3 w-3 text-muted-foreground" />
-                    <span>{Math.round(staff.avg_break_minutes)}m avg break</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Timer className={`h-3 w-3 ${staff.late_count > 0 ? 'text-warning' : 'text-muted-foreground'}`} />
-                    <span className={staff.late_count > 0 ? 'text-warning' : ''}>{staff.late_count} late</span>
-                  </div>
-                </div>
-                {staff.missed_checkouts > 0 && (
-                  <div className="mt-2 flex items-center gap-1 text-[10px] text-destructive">
-                    <AlertTriangle className="h-3 w-3" />
-                    {staff.missed_checkouts} missed checkout{staff.missed_checkouts > 1 ? 's' : ''}
-                  </div>
-                )}
-              </div>
+      {!rosterFound && (
+        <div className="flex items-center gap-2 p-2.5 rounded-lg bg-muted/50 text-xs text-muted-foreground">
+          <Info className="h-3.5 w-3.5 shrink-0" />
+          <span>Roster not available for today — showing checked-in staff only.</span>
+        </div>
+      )}
+
+      {/* Summary strip — plain labeled numbers, not another row of cards */}
+      <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-xs px-0.5">
+        {rosterFound && (
+          <span><span className="font-semibold">{rosteredRows.length}</span> <span className="text-muted-foreground">rostered</span></span>
+        )}
+        <span><span className="font-semibold text-success">{onDutyCount}</span> <span className="text-muted-foreground">on duty</span></span>
+        <span><span className="font-semibold text-warning">{onBreakCount}</span> <span className="text-muted-foreground">on break</span></span>
+        <span><span className="font-semibold">{checkedOutCount}</span> <span className="text-muted-foreground">checked out</span></span>
+        {rosterFound && (
+          <>
+            <span><span className="font-semibold text-destructive">{notCheckedInCount}</span> <span className="text-muted-foreground">not checked in</span></span>
+            <span><span className="font-semibold">{leaveOffCount}</span> <span className="text-muted-foreground">leave/off</span></span>
+          </>
+        )}
+      </div>
+
+      {/* Attendance table — real rows and columns, no dialog */}
+      <div className="border rounded-lg overflow-auto max-h-[420px]">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="text-xs sticky left-0 top-0 bg-background z-10">Staff</TableHead>
+              <TableHead className="text-xs sticky top-0 bg-background z-10">Role</TableHead>
+              <TableHead className="text-xs sticky top-0 bg-background z-10">Check-in</TableHead>
+              <TableHead className="text-xs sticky top-0 bg-background z-10">Check-out</TableHead>
+              <TableHead className="text-xs text-center sticky top-0 bg-background z-10">Hours</TableHead>
+              <TableHead className="text-xs sticky top-0 bg-background z-10">Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {reconciledRows.map(row => (
+              <TableRow key={row.staff_id}>
+                <TableCell className="text-xs font-medium sticky left-0 bg-background">
+                  {row.full_name}
+                  {row.offRoster && (
+                    <Badge variant="outline" className="ml-1.5 text-[8px] px-1 text-muted-foreground">Off-roster</Badge>
+                  )}
+                </TableCell>
+                <TableCell className="text-xs text-muted-foreground capitalize">{row.role || "-"}</TableCell>
+                <TableCell className="text-xs">
+                  {row.check_in_time ? format(new Date(row.check_in_time), "hh:mm a") : "—"}
+                </TableCell>
+                <TableCell className="text-xs">
+                  {row.check_out_time ? format(new Date(row.check_out_time), "hh:mm a") : "—"}
+                </TableCell>
+                <TableCell className="text-xs text-center font-medium">
+                  {row.hours !== null ? formatDuration(row.hours) : "—"}
+                </TableCell>
+                <TableCell>{statusBadge(row)}</TableCell>
+              </TableRow>
             ))}
-          </div>
-        </DialogContent>
-      </Dialog>
+            {reconciledRows.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center text-muted-foreground py-6 text-xs">
+                  No staff checked in today
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+      {leaveOffCount > 0 && (
+        <p className="text-[10px] text-muted-foreground -mt-2">
+          * Leave/Off is a manually-set roster flag, not a formal approval workflow.
+        </p>
+      )}
 
-      {/* View Detailed Table Button */}
-      <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
-        <DialogTrigger asChild>
-          <Button variant="outline" size="sm" className="w-full">
-            View Attendance Records
-            <ChevronRight className="h-4 w-4 ml-2" />
-          </Button>
-        </DialogTrigger>
-        <DialogContent className="max-w-3xl max-h-[80vh]">
-          <DialogHeader className="pb-2">
-            <DialogTitle className="text-base">Attendance Records (Last 14 Sessions)</DialogTitle>
-          </DialogHeader>
-          
-          <div className="flex justify-end pb-3 border-b">
-            <Button variant="outline" size="sm" onClick={exportAttendance} className="h-8 text-xs">
-              <Download className="h-3.5 w-3.5 mr-1.5" />
-              Export
-            </Button>
-          </div>
-
-          <div className="flex-1 overflow-auto">
+      {/* Staff Performance — inline, no dialog */}
+      {staffPerformance.length > 0 && (
+        <div className="space-y-2">
+          <span className="text-sm font-medium">Staff Performance (Last 14 Sessions)</span>
+          <div className="border rounded-lg overflow-auto max-h-[300px]">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-xs sticky left-0 bg-background">Session</TableHead>
-                  <TableHead className="text-xs">Staff</TableHead>
-                  <TableHead className="text-xs">Check-in</TableHead>
-                  <TableHead className="text-xs">Check-out</TableHead>
-                  <TableHead className="text-xs text-center">Hours</TableHead>
-                  <TableHead className="text-xs text-center">Breaks</TableHead>
-                  <TableHead className="text-xs text-center">Eff %</TableHead>
-                  <TableHead className="text-xs">Flags</TableHead>
+                  <TableHead className="text-xs sticky left-0 top-0 bg-background z-10">Staff</TableHead>
+                  <TableHead className="text-xs text-center sticky top-0 bg-background z-10">Sessions</TableHead>
+                  <TableHead className="text-xs text-center sticky top-0 bg-background z-10">Hours</TableHead>
+                  <TableHead className="text-xs text-center sticky top-0 bg-background z-10">Avg Break</TableHead>
+                  <TableHead className="text-xs text-center sticky top-0 bg-background z-10">Late</TableHead>
+                  <TableHead className="text-xs text-center sticky top-0 bg-background z-10">Missed</TableHead>
+                  <TableHead className="text-xs text-center sticky top-0 bg-background z-10">Punctuality</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {attendance.map(record => (
-                  <TableRow key={record.id}>
-                    <TableCell className="text-xs font-medium sticky left-0 bg-background">
-                      {format(new Date(record.session_date), "MMM dd")}
-                    </TableCell>
-                    <TableCell className="text-xs">{record.full_name}</TableCell>
-                    <TableCell className="text-xs">
-                      {format(new Date(record.check_in_time), "hh:mm a")}
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      {record.check_out_time ? (
-                        format(new Date(record.check_out_time), "hh:mm a")
-                      ) : (
-                        <Badge variant="outline" className="text-[9px] text-success">Active</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-xs text-center font-medium">
-                      {record.check_out_time ? formatDuration(record.total_hours) : "-"}
-                    </TableCell>
+                {staffPerformance.map(staff => (
+                  <TableRow key={staff.user_id}>
+                    <TableCell className="text-xs font-medium sticky left-0 bg-background">{staff.full_name}</TableCell>
+                    <TableCell className="text-xs text-center">{staff.sessions_present}</TableCell>
+                    <TableCell className="text-xs text-center">{formatDuration(staff.total_hours)}</TableCell>
                     <TableCell className="text-xs text-center">
-                      {record.total_break_minutes > 0 ? (
-                        <span className={record.has_long_break ? "text-warning" : ""}>
-                          {record.total_break_minutes}m
-                        </span>
-                      ) : "-"}
+                      <span className="inline-flex items-center gap-1">
+                        <Coffee className="h-3 w-3 text-muted-foreground" />
+                        {Math.round(staff.avg_break_minutes)}m
+                      </span>
                     </TableCell>
-                    <TableCell className={`text-xs text-center font-medium ${getScoreColor(record.efficiency)}`}>
-                      {record.efficiency}%
+                    <TableCell className={`text-xs text-center ${staff.late_count > 0 ? 'text-warning' : ''}`}>
+                      <span className="inline-flex items-center gap-1">
+                        <Timer className="h-3 w-3" />
+                        {staff.late_count}
+                      </span>
                     </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1 flex-wrap">
-                        {record.is_late && (
-                          <Badge variant="outline" className="text-[8px] px-1 text-warning border-warning">
-                            Late {record.late_minutes}m
-                          </Badge>
-                        )}
-                        {record.has_long_break && (
-                          <Badge variant="outline" className="text-[8px] px-1 text-warning border-warning">
-                            Long Break
-                          </Badge>
-                        )}
-                        {record.missed_checkout && (
-                          <Badge variant="destructive" className="text-[8px] px-1">
-                            Missed
-                          </Badge>
-                        )}
-                      </div>
+                    <TableCell className={`text-xs text-center ${staff.missed_checkouts > 0 ? 'text-destructive' : ''}`}>
+                      {staff.missed_checkouts}
+                    </TableCell>
+                    <TableCell className={`text-xs text-center font-medium ${getScoreColor(staff.punctuality_score)}`}>
+                      {staff.punctuality_score}%
                     </TableCell>
                   </TableRow>
                 ))}
-                {attendance.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8 text-sm">
-                      No attendance records found
-                    </TableCell>
-                  </TableRow>
-                )}
               </TableBody>
             </Table>
           </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Download Button */}
-      <Button variant="ghost" size="sm" onClick={exportAttendance} className="w-full text-muted-foreground">
-        <Download className="h-4 w-4 mr-2" />
-        Export Full Report
-      </Button>
+        </div>
+      )}
     </div>
   );
 };
