@@ -1,73 +1,45 @@
-# Welcome to your Lovable project
+# Smokzy HQ Hub
 
-## Project info
+Head-office operations app for Smokzy, a chain of hookah lounges/clubs — attendance, sales,
+stock, rostering, inspections, and management dashboards. Installable PWA, mobile-first for
+staff.
 
-**URL**: https://lovable.dev/projects/aff5535c-c904-4d53-b16d-72fda08092bd
+See [CLAUDE.md](./CLAUDE.md) for the full architecture map, roles/access model, and working
+agreements.
 
-## How can I edit this code?
+## Stack
 
-There are several ways of editing your application.
+- **Frontend**: Vite + React 18 + TypeScript, shadcn-ui (Radix) + Tailwind, React Router, TanStack Query
+- **Backend**: Supabase (Postgres + Auth + Storage + Edge Functions)
+- **Hosting**: Vercel
 
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/aff5535c-c904-4d53-b16d-72fda08092bd) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+## Local development
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
+git clone https://github.com/harshjain111/smokzy-hq-hub.git
+cd smokzy-hq-hub
 npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+cp .env.example .env   # fill in your Supabase project's URL/anon key/project ID
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+```sh
+npm run build     # production build
+npm run lint       # eslint
+```
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Backend (Supabase)
 
-**Use GitHub Codespaces**
+```sh
+npx supabase login
+npx supabase link --project-ref <your-project-ref>
+npx supabase db push                                                 # apply migrations
+npx supabase functions deploy                                        # deploy edge functions
+npx supabase gen types typescript --linked > src/integrations/supabase/types.ts
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Deployment
 
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/aff5535c-c904-4d53-b16d-72fda08092bd) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Hosted on Vercel (`harshjain111s-projects/club`), connected to this repo — pushes to `main`
+deploy automatically. `vercel.json` handles the SPA rewrite so client-side routes work on a
+direct hit/refresh.
