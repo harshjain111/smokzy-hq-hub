@@ -67,7 +67,7 @@ const ProfileMenu = ({ user, role }: ProfileMenuProps) => {
         <Button variant="ghost" className="relative h-10 w-10 rounded-full">
           <Avatar className="h-10 w-10">
             {profileName && (
-              <AvatarImage src={`https://fqtfmhlevdhaitkyoyzr.supabase.co/storage/v1/object/public/avatars/${user.id}/avatar.jpg`} alt={profileName} />
+              <AvatarImage src={supabase.storage.from("avatars").getPublicUrl(`${user.id}/avatar.jpg`).data.publicUrl} alt={profileName} />
             )}
             <AvatarFallback className="bg-primary text-primary-foreground">
               {getInitials()}
