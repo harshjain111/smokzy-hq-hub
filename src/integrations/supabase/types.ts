@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       admin_notifications: {
@@ -474,6 +499,53 @@ export type Database = {
             columns: ["venue_id"]
             isOneToOne: false
             referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inspection_items: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          inspection_id: string
+          item_key: string
+          item_label: string
+          notes: string | null
+          photo_urls: string[]
+          reason: string | null
+          status: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          id?: string
+          inspection_id: string
+          item_key: string
+          item_label: string
+          notes?: string | null
+          photo_urls?: string[]
+          reason?: string | null
+          status: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          inspection_id?: string
+          item_key?: string
+          item_label?: string
+          notes?: string | null
+          photo_urls?: string[]
+          reason?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inspection_items_inspection_id_fkey"
+            columns: ["inspection_id"]
+            isOneToOne: false
+            referencedRelation: "inspections"
             referencedColumns: ["id"]
           },
         ]
@@ -1519,6 +1591,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       app_role: ["admin", "employee", "club_management", "club_incharge"],

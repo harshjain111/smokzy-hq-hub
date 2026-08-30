@@ -4,31 +4,51 @@ import PageLayout from "@/components/PageLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, Trash2, GripVertical, Save, Loader2 } from "lucide-react";
+import { Plus, Trash2, Save, Loader2 } from "lucide-react";
 
-interface CheckItem {
+export type InspectionCategory = 'service_experience' | 'operations' | 'safety_asset' | 'other';
+
+export interface CheckItem {
   key: string;
   label: string;
   icon: string;
+  category: InspectionCategory;
 }
 
-const DEFAULT_CHECKS: CheckItem[] = [
-  { key: "staff_grooming", label: "Staff Grooming", icon: "👔" },
-  { key: "venue_cleanliness", label: "Venue Cleanliness", icon: "🧹" },
-  { key: "hookah_quality", label: "Hookah Quality", icon: "💨" },
-  { key: "music_ambience", label: "Music & Ambience", icon: "🎵" },
-  { key: "inventory_check", label: "Inventory Check", icon: "📦" },
-  { key: "safety_compliance", label: "Safety Compliance", icon: "🛡️" },
-  { key: "customer_feedback", label: "Customer Feedback", icon: "⭐" },
-  { key: "staff_behavior", label: "Staff Behavior", icon: "🤝" },
-  { key: "billing_accuracy", label: "Billing Accuracy", icon: "💳" },
-  { key: "opening_procedure", label: "Opening Procedure", icon: "🔓" },
-  { key: "closing_procedure", label: "Closing Procedure", icon: "🔒" },
-  { key: "equipment_condition", label: "Equipment Condition", icon: "🔧" },
+export const CATEGORY_LABELS: Record<InspectionCategory, string> = {
+  service_experience: "Service & Experience",
+  operations: "Operations",
+  safety_asset: "Safety & Asset Control",
+  other: "Other",
+};
+
+export const DEFAULT_CHECKS: CheckItem[] = [
+  { key: "staff_grooming", label: "Staff Grooming", icon: "👔", category: "service_experience" },
+  { key: "hookah_quality", label: "Hookah Quality", icon: "💨", category: "service_experience" },
+  { key: "customer_feedback", label: "Customer Feedback", icon: "⭐", category: "service_experience" },
+  { key: "staff_behavior", label: "Staff Behavior", icon: "🤝", category: "service_experience" },
+  { key: "music_ambience", label: "Music & Ambience", icon: "🎵", category: "service_experience" },
+  { key: "venue_cleanliness", label: "Venue Cleanliness", icon: "🧹", category: "operations" },
+  { key: "inventory_check", label: "Inventory Check", icon: "📦", category: "operations" },
+  { key: "billing_accuracy", label: "Billing Accuracy", icon: "💳", category: "operations" },
+  { key: "opening_procedure", label: "Opening Procedure", icon: "🔓", category: "operations" },
+  { key: "closing_procedure", label: "Closing Procedure", icon: "🔒", category: "operations" },
+  { key: "safety_compliance", label: "Safety Compliance", icon: "🛡️", category: "safety_asset" },
+  { key: "equipment_condition", label: "Equipment Condition", icon: "🔧", category: "safety_asset" },
 ];
 
 const EMOJI_OPTIONS = ["👔", "🧹", "💨", "🎵", "📦", "🛡️", "⭐", "🤝", "💳", "🔓", "🔒", "🔧", "🍽️", "🚿", "📋", "🎯", "🔥", "💡", "🧊", "🪑"];
+
+// Back-compat: older saved checklists (or brand-new custom items) may not have a category yet.
+export const withCategoryFallback = (items: Partial<CheckItem>[]): CheckItem[] =>
+  items.map((item) => ({
+    key: item.key || `custom_${Date.now()}`,
+    label: item.label || "",
+    icon: item.icon || "📋",
+    category: (item.category as InspectionCategory) || "other",
+  }));
 
 const InspectionSettings = () => {
   const [items, setItems] = useState<CheckItem[]>([]);
@@ -49,7 +69,7 @@ const InspectionSettings = () => {
 
     if (data?.value) {
       try {
-        setItems(JSON.parse(data.value));
+        setItems(withCategoryFallback(JSON.parse(data.value)));
       } catch {
         setItems(DEFAULT_CHECKS);
       }
@@ -62,7 +82,6 @@ const InspectionSettings = () => {
   const handleSave = async () => {
     setSaving(true);
     try {
-      // Upsert into global_settings
       const { data: existing } = await supabase
         .from("global_settings")
         .select("id")
@@ -81,8 +100,8 @@ const InspectionSettings = () => {
       }
 
       toast.success("Inspection checklist saved");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to save");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save");
     } finally {
       setSaving(false);
     }
@@ -90,7 +109,7 @@ const InspectionSettings = () => {
 
   const addItem = () => {
     const key = `custom_${Date.now()}`;
-    setItems([...items, { key, label: "", icon: "📋" }]);
+    setItems([...items, { key, label: "", icon: "📋", category: "other" }]);
   };
 
   const removeItem = (index: number) => {
@@ -121,7 +140,7 @@ const InspectionSettings = () => {
 
   return (
     <PageLayout title="Inspection Checklist" subtitle="Add, remove, or reorder inspection check items">
-      <div className="space-y-4 max-w-2xl">
+      <div className="space-y-4 max-w-3xl">
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
@@ -166,6 +185,18 @@ const InspectionSettings = () => {
                   placeholder="Check item label..."
                   className="flex-1 h-9"
                 />
+
+                {/* Category */}
+                <Select value={item.category} onValueChange={(v) => updateItem(index, "category", v)}>
+                  <SelectTrigger className="h-9 w-[180px] shrink-0">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(Object.keys(CATEGORY_LABELS) as InspectionCategory[]).map((c) => (
+                      <SelectItem key={c} value={c}>{CATEGORY_LABELS[c]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
                 {/* Delete */}
                 <Button variant="ghost" size="icon" className="h-9 w-9 text-destructive hover:text-destructive shrink-0" onClick={() => removeItem(index)}>
