@@ -9,9 +9,11 @@ import { ClubSalesSection } from "@/components/admin/club/ClubSalesSection";
 import { ClubStockSection } from "@/components/admin/club/ClubStockSection";
 import { ClubAttendanceSection } from "@/components/admin/club/ClubAttendanceSection";
 import { ClubActivitySection } from "@/components/admin/club/ClubActivitySection";
-import { DateNavigationStrip } from "@/components/admin/club/DateNavigationStrip";
+import { DateNavigationStrip, RangeMode } from "@/components/admin/club/DateNavigationStrip";
 import { HistoricalDayView } from "@/components/admin/club/HistoricalDayView";
-import { format, subDays } from "date-fns";
+import { PeriodSummaryView } from "@/components/admin/club/PeriodSummaryView";
+import { SectionCard, KpiGrid, KpiTile } from "@/components/admin/club/DashboardPrimitives";
+import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 
 export interface ClubSession {
   id: string;
@@ -44,7 +46,9 @@ const ClubDetail = () => {
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
   const [viewMode, setViewMode] = useState<ViewMode>("live");
+  const [rangeMode, setRangeMode] = useState<RangeMode>("day");
   const [selectedHistoryDate, setSelectedHistoryDate] = useState<Date>(subDays(new Date(), 1));
+  const [customRange, setCustomRange] = useState<{ from: Date; to: Date } | undefined>();
 
   // Fed by the section components' own callbacks so the KPI strip reuses their existing calculations
   const [sessionHealth, setSessionHealth] = useState<SessionHealth | null>(null);
@@ -92,6 +96,21 @@ const ClubDetail = () => {
   };
 
   const refresh = () => setRefreshKey(k => k + 1);
+
+  const jumpToToday = () => {
+    setViewMode("live");
+    setRangeMode("day");
+  };
+
+  const periodRange = (): { from: Date; to: Date } => {
+    if (rangeMode === "week") {
+      return { from: startOfWeek(selectedHistoryDate, { weekStartsOn: 1 }), to: endOfWeek(selectedHistoryDate, { weekStartsOn: 1 }) };
+    }
+    if (rangeMode === "month") {
+      return { from: startOfMonth(selectedHistoryDate), to: endOfMonth(selectedHistoryDate) };
+    }
+    return customRange || { from: subDays(new Date(), 7), to: subDays(new Date(), 1) };
+  };
 
   const getSessionStatusBadge = () => {
     if (!currentSession) {
@@ -212,30 +231,33 @@ const ClubDetail = () => {
         ) : (
           <div className="space-y-3">
             <DateNavigationStrip
+              mode={rangeMode}
               selectedDate={selectedHistoryDate}
+              customRange={customRange}
+              onModeChange={setRangeMode}
               onDateChange={setSelectedHistoryDate}
+              onCustomRangeChange={setCustomRange}
+              onJumpToToday={jumpToToday}
             />
-            <HistoricalDayView
-              clubId={clubId!}
-              clubName={clubName}
-              selectedDate={selectedHistoryDate}
-            />
+            {rangeMode === "day" ? (
+              <HistoricalDayView
+                clubId={clubId!}
+                clubName={clubName}
+                selectedDate={selectedHistoryDate}
+              />
+            ) : (
+              <PeriodSummaryView
+                clubId={clubId!}
+                clubName={clubName}
+                dateRange={periodRange()}
+              />
+            )}
           </div>
         )}
       </div>
     </div>
   );
 };
-
-// Always-visible container replacing the old collapsible accordion sections
-const SectionCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
-  <div className="rounded-lg border bg-card overflow-hidden">
-    <div className="px-4 py-2.5 border-b bg-muted/30">
-      <span className="text-sm font-semibold">{title}</span>
-    </div>
-    <div className="p-4">{children}</div>
-  </div>
-);
 
 const KpiStrip = ({
   sessionHealth,
@@ -262,7 +284,7 @@ const KpiStrip = ({
     : null;
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+    <KpiGrid>
       <KpiTile
         icon={<Activity className="h-4 w-4" />}
         label="Session Health"
@@ -297,33 +319,8 @@ const KpiStrip = ({
         sub={attendance ? `${attendance.onBreak} break · ${attendance.notCheckedIn} missing` : "No data yet"}
         tone={!attendance ? 'muted' : attendance.notCheckedIn > 0 ? 'warning' : 'success'}
       />
-    </div>
+    </KpiGrid>
   );
 };
-
-type KpiTone = 'success' | 'warning' | 'destructive' | 'primary' | 'muted';
-
-const toneClasses: Record<KpiTone, string> = {
-  success: 'border-success/20 bg-success/5 text-success',
-  warning: 'border-warning/20 bg-warning/5 text-warning',
-  destructive: 'border-destructive/20 bg-destructive/5 text-destructive',
-  primary: 'border-primary/20 bg-primary/5 text-primary',
-  muted: 'border-border bg-muted/30 text-muted-foreground',
-};
-
-const KpiTile = ({
-  icon, label, value, sub, tone,
-}: {
-  icon: React.ReactNode; label: string; value: string; sub: string; tone: KpiTone;
-}) => (
-  <div className={`p-3 rounded-lg border ${toneClasses[tone]}`}>
-    <div className="flex items-center gap-1.5 mb-1.5">
-      {icon}
-      <span className="text-[11px] font-medium opacity-90">{label}</span>
-    </div>
-    <div className="text-xl font-bold text-foreground">{value}</div>
-    <p className="text-[10px] mt-0.5 opacity-80">{sub}</p>
-  </div>
-);
 
 export default ClubDetail;

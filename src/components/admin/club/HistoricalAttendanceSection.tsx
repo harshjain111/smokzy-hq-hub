@@ -4,8 +4,8 @@ import { format, differenceInMinutes } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Download, Clock, AlertTriangle, Coffee, Users, Plus, Trash2 } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Download, AlertTriangle, Coffee, Users, Plus, Trash2 } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -42,6 +42,7 @@ interface HistoricalAttendanceSectionProps {
   session: HistoricalSession;
   clubId: string;
   clubName: string;
+  onSummaryChange?: (data: { count: number; missedCheckouts: number } | null) => void;
 }
 
 interface AttendanceRecord {
@@ -60,7 +61,7 @@ interface StaffOption {
   full_name: string;
 }
 
-export const HistoricalAttendanceSection = ({ session, clubId, clubName }: HistoricalAttendanceSectionProps) => {
+export const HistoricalAttendanceSection = ({ session, clubId, clubName, onSummaryChange }: HistoricalAttendanceSectionProps) => {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -74,7 +75,16 @@ export const HistoricalAttendanceSection = ({ session, clubId, clubName }: Histo
 
   useEffect(() => {
     fetchAttendanceData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session.id]);
+
+  const missedCheckouts = records.filter(r => !r.check_out_time).length;
+  const longBreaks = records.filter(r => r.break_minutes > 30).length;
+
+  useEffect(() => {
+    onSummaryChange?.(loading ? null : { count: records.length, missedCheckouts });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [records, loading]);
 
   const fetchAttendanceData = async () => {
     setLoading(true);
@@ -187,8 +197,9 @@ export const HistoricalAttendanceSection = ({ session, clubId, clubName }: Histo
       toast({ title: "Punch-in added successfully" });
       setAddDialogOpen(false);
       fetchAttendanceData();
-    } catch (error: any) {
-      toast({ title: "Error adding punch-in", description: error.message, variant: "destructive" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      toast({ title: "Error adding punch-in", description: message, variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -208,8 +219,9 @@ export const HistoricalAttendanceSection = ({ session, clubId, clubName }: Histo
       setDeleteDialogOpen(false);
       setRecordToDelete(null);
       fetchAttendanceData();
-    } catch (error: any) {
-      toast({ title: "Error deleting", description: error.message, variant: "destructive" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      toast({ title: "Error deleting", description: message, variant: "destructive" });
     }
   };
 
@@ -226,9 +238,6 @@ export const HistoricalAttendanceSection = ({ session, clubId, clubName }: Histo
     await exportToXlsx(exportData, `${clubName}_Attendance_${session.session_date}.xlsx`, "Attendance");
   };
 
-  const missedCheckouts = records.filter(r => !r.check_out_time).length;
-  const longBreaks = records.filter(r => r.break_minutes > 30).length;
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-6">
@@ -239,6 +248,17 @@ export const HistoricalAttendanceSection = ({ session, clubId, clubName }: Histo
 
   return (
     <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-2">
+        <Button variant="outline" size="sm" className="gap-2" onClick={handleOpenAddDialog}>
+          <Plus className="h-4 w-4" />
+          Add Punch-In
+        </Button>
+        <Button variant="outline" size="sm" className="gap-2" onClick={downloadExcel}>
+          <Download className="h-4 w-4" />
+          Export
+        </Button>
+      </div>
+
       {/* Summary Stats */}
       <div className="grid grid-cols-4 gap-2">
         <div className="bg-muted/50 rounded-lg p-2 text-center">
@@ -247,7 +267,6 @@ export const HistoricalAttendanceSection = ({ session, clubId, clubName }: Histo
           <div className="text-[10px] text-muted-foreground">Staff</div>
         </div>
         <div className="bg-muted/50 rounded-lg p-2 text-center">
-          <Clock className="h-3.5 w-3.5 mx-auto mb-1 text-muted-foreground" />
           <div className="text-lg font-bold">
             {Math.round(records.reduce((sum, r) => sum + r.total_hours, 0))}h
           </div>
@@ -265,73 +284,64 @@ export const HistoricalAttendanceSection = ({ session, clubId, clubName }: Histo
         </div>
       </div>
 
-      {/* Add Punch-In Button */}
-      <Button variant="outline" size="sm" className="w-full gap-2" onClick={handleOpenAddDialog}>
-        <Plus className="h-4 w-4" />
-        Add Punch-In
-      </Button>
-
-      {/* Attendance List */}
-      {records.length === 0 ? (
-        <div className="text-center py-6 text-muted-foreground text-sm">
-          No attendance records for this session
-        </div>
-      ) : (
-        <ScrollArea className="h-[250px]">
-          <div className="space-y-2">
+      {/* Attendance table */}
+      <div className="border rounded-lg max-h-[300px] overflow-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="text-xs sticky left-0 top-0 bg-background z-10">Staff</TableHead>
+              <TableHead className="text-xs sticky top-0 bg-background z-10">Check-in</TableHead>
+              <TableHead className="text-xs sticky top-0 bg-background z-10">Check-out</TableHead>
+              <TableHead className="text-xs text-center sticky top-0 bg-background z-10">Hours</TableHead>
+              <TableHead className="text-xs sticky top-0 bg-background z-10">Flags</TableHead>
+              <TableHead className="text-xs sticky top-0 bg-background z-10 w-8"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {records.map((record) => (
-              <div
-                key={record.id}
-                className={`p-2 rounded-lg border ${
-                  record.flags.length > 0 ? "border-warning/50 bg-warning/5" : "border-border bg-muted/30"
-                }`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium">{record.staff_name}</div>
-                    <div className="text-[10px] text-muted-foreground">
-                      {format(new Date(record.check_in_time), "HH:mm")} -{" "}
-                      {record.check_out_time ? format(new Date(record.check_out_time), "HH:mm") : "?"}
-                      {record.break_minutes > 0 && ` • ${record.break_minutes}m break`}
-                    </div>
-                    {record.flags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {record.flags.map((flag, idx) => (
-                          <Badge key={idx} variant="outline" className="text-[10px] px-1.5 py-0">
-                            {flag}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
+              <TableRow key={record.id} className={record.flags.length > 0 ? "bg-warning/5" : ""}>
+                <TableCell className="text-xs font-medium sticky left-0 bg-background">{record.staff_name}</TableCell>
+                <TableCell className="text-xs">{format(new Date(record.check_in_time), "HH:mm")}</TableCell>
+                <TableCell className="text-xs">
+                  {record.check_out_time ? format(new Date(record.check_out_time), "HH:mm") : "—"}
+                </TableCell>
+                <TableCell className="text-xs text-center font-medium">{record.total_hours}h</TableCell>
+                <TableCell>
+                  <div className="flex flex-wrap gap-1">
+                    {record.flags.map((flag, idx) => (
+                      <Badge key={idx} variant="outline" className="text-[9px] px-1 py-0 text-warning border-warning/30">
+                        {flag}
+                      </Badge>
+                    ))}
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <div className="text-sm font-medium">{record.total_hours}h</div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-destructive/70 hover:text-destructive hover:bg-destructive/10"
-                      onClick={() => {
-                        setRecordToDelete(record);
-                        setDeleteDialogOpen(true);
-                      }}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
+                </TableCell>
+                <TableCell>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-destructive/70 hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => {
+                      setRecordToDelete(record);
+                      setDeleteDialogOpen(true);
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </TableCell>
+              </TableRow>
             ))}
-          </div>
-        </ScrollArea>
-      )}
+            {records.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center text-muted-foreground py-6 text-xs">
+                  No attendance records for this session
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
 
-      {/* Download Button */}
-      <Button variant="outline" size="sm" className="w-full gap-2" onClick={downloadExcel}>
-        <Download className="h-4 w-4" />
-        Download Attendance Report (Excel)
-      </Button>
-
-      {/* Add Punch-In Dialog */}
+      {/* Add Punch-In Dialog — legitimate admin editing, not data-hiding */}
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
         <DialogContent className="max-w-[90vw] sm:max-w-md">
           <DialogHeader>

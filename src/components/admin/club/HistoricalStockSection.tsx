@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { format, parseISO, subDays } from "date-fns";
+import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Download, AlertTriangle, Package } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Download, Info } from "lucide-react";
 import { exportToXlsx } from "@/lib/exportXlsx";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface HistoricalSession {
   id: string;
@@ -16,6 +16,7 @@ interface HistoricalStockSectionProps {
   session: HistoricalSession;
   clubId: string;
   clubName: string;
+  onSummaryChange?: (data: { itemCount: number; mismatchCount: number } | null) => void;
 }
 
 interface StockItem {
@@ -29,22 +30,26 @@ interface StockItem {
 
 const AVG_GRAMS_PER_CHILLUM = 25;
 
-export const HistoricalStockSection = ({ session, clubId, clubName }: HistoricalStockSectionProps) => {
+export const HistoricalStockSection = ({ session, clubId, clubName, onSummaryChange }: HistoricalStockSectionProps) => {
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [totalSales, setTotalSales] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchStockData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session.id, clubId]);
+
+  const mismatchCount = stockItems.filter(i => i.status === "mismatch").length;
+
+  useEffect(() => {
+    onSummaryChange?.(loading ? null : { itemCount: stockItems.length, mismatchCount });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stockItems, loading]);
 
   const fetchStockData = async () => {
     setLoading(true);
     try {
-      const sessionDate = parseISO(session.session_date);
-      const previousDate = format(subDays(sessionDate, 1), "yyyy-MM-dd");
-
-      // Fetch sales for expected usage calculation
       const { data: salesData } = await supabase
         .from("sales_reports")
         .select("quantity_sold")
@@ -54,41 +59,30 @@ export const HistoricalStockSection = ({ session, clubId, clubName }: Historical
       const sales = salesData?.reduce((sum, s) => sum + s.quantity_sold, 0) || 0;
       setTotalSales(sales);
 
-      // Fetch stock items
+      // No per-day stock snapshot table exists — this estimates a past day's usage by
+      // working backward from TODAY's live stock. Not an exact historical record.
       const { data: currentStock } = await supabase
         .from("stock")
         .select("item_name, quantity")
         .eq("venue_id", clubId)
         .eq("category", "flavour");
 
-      // Note: This is a simplified calculation
-      // In a real scenario, you'd have historical stock snapshots
       const items: StockItem[] = (currentStock || []).map(item => {
-        // Calculate expected usage based on sales and avg grams per chillum
         const expectedUsage = Math.round((sales * AVG_GRAMS_PER_CHILLUM) / (currentStock?.length || 1));
-        
-        // Since we don't have historical snapshots, show current state
         const closing = item.quantity;
-        const opening = closing + expectedUsage; // Estimate
+        const opening = closing + expectedUsage;
         const difference = opening - closing;
-        
-        const tolerance = expectedUsage * 0.15; // 15% tolerance
+
+        const tolerance = expectedUsage * 0.15;
         let status: "match" | "mismatch" | "unknown" = "unknown";
-        
+
         if (Math.abs(difference - expectedUsage) <= tolerance) {
           status = "match";
         } else if (difference > expectedUsage + tolerance) {
           status = "mismatch";
         }
 
-        return {
-          item_name: item.item_name,
-          opening,
-          closing,
-          difference,
-          expectedUsage,
-          status,
-        };
+        return { item_name: item.item_name, opening, closing, difference, expectedUsage, status };
       });
 
       setStockItems(items);
@@ -102,17 +96,15 @@ export const HistoricalStockSection = ({ session, clubId, clubName }: Historical
   const downloadExcel = async () => {
     const exportData = stockItems.map(item => ({
       Item: item.item_name,
-      "Opening (g)": item.opening,
+      "Opening (g, estimated)": item.opening,
       "Closing (g)": item.closing,
-      "Actual Usage (g)": item.difference,
+      "Actual Usage (g, estimated)": item.difference,
       "Expected Usage (g)": item.expectedUsage,
       Status: item.status === "match" ? "OK" : item.status === "mismatch" ? "Mismatch" : "Unknown",
     }));
 
     await exportToXlsx(exportData, `${clubName}_Stock_${session.session_date}.xlsx`, "Stock");
   };
-
-  const mismatchCount = stockItems.filter(i => i.status === "mismatch").length;
 
   if (loading) {
     return (
@@ -124,70 +116,68 @@ export const HistoricalStockSection = ({ session, clubId, clubName }: Historical
 
   return (
     <div className="space-y-4">
-      {/* Summary Stats */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-muted/50 rounded-lg p-3 text-center">
-          <div className="flex items-center justify-center gap-1.5 mb-1">
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </div>
-          <div className="text-lg font-bold">{stockItems.length}</div>
-          <div className="text-[10px] text-muted-foreground">Stock Items</div>
-        </div>
-        <div className="bg-muted/50 rounded-lg p-3 text-center">
-          <div className="flex items-center justify-center gap-1.5 mb-1">
-            <AlertTriangle className={`h-4 w-4 ${mismatchCount > 0 ? "text-destructive" : "text-success"}`} />
-          </div>
-          <div className={`text-lg font-bold ${mismatchCount > 0 ? "text-destructive" : "text-success"}`}>
-            {mismatchCount}
-          </div>
-          <div className="text-[10px] text-muted-foreground">Mismatches</div>
-        </div>
-      </div>
-
-      {/* Expected Usage Info */}
-      <div className="bg-muted/50 rounded-lg p-3">
-        <div className="text-xs text-muted-foreground">
-          Expected usage calculated based on {totalSales} hookahs sold @ {AVG_GRAMS_PER_CHILLUM}g per chillum
-        </div>
-      </div>
-
-      {/* Stock Table */}
-      <ScrollArea className="h-[200px]">
-        <div className="space-y-2">
-          {stockItems.map((item, idx) => (
-            <div 
-              key={idx} 
-              className={`flex items-center justify-between p-2 rounded-lg border ${
-                item.status === "mismatch" ? "border-destructive/50 bg-destructive/5" : "border-border bg-muted/30"
-              }`}
-            >
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium truncate">{item.item_name}</div>
-                <div className="text-[10px] text-muted-foreground">
-                  {item.opening}g → {item.closing}g (used: {item.difference}g)
-                </div>
-              </div>
-              <div className="text-right shrink-0 ml-2">
-                <Badge 
-                  variant={item.status === "match" ? "default" : item.status === "mismatch" ? "destructive" : "outline"}
-                  className="text-[10px]"
-                >
-                  {item.status === "match" ? "OK" : item.status === "mismatch" ? "Mismatch" : "—"}
-                </Badge>
-                <div className="text-[10px] text-muted-foreground mt-0.5">
-                  exp: {item.expectedUsage}g
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </ScrollArea>
-
-      {/* Download Button */}
       <Button variant="outline" size="sm" className="w-full gap-2" onClick={downloadExcel}>
         <Download className="h-4 w-4" />
-        Download Stock Report (Excel)
+        Export Stock Report
       </Button>
+
+      <div className="flex items-start gap-2 p-2.5 rounded-lg bg-muted/50 text-xs text-muted-foreground">
+        <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+        <span>
+          Estimated — not an exact historical snapshot. Worked backward from today's live stock using{" "}
+          {totalSales} hookahs sold on this day @ {AVG_GRAMS_PER_CHILLUM}g/chillum.
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <div className="p-2.5 rounded-lg bg-muted/30 text-center">
+          <div className="text-lg font-bold">{stockItems.length}</div>
+          <p className="text-[9px] text-muted-foreground">Stock Items</p>
+        </div>
+        <div className={`p-2.5 rounded-lg text-center ${mismatchCount > 0 ? 'bg-warning/10' : 'bg-muted/30'}`}>
+          <div className={`text-lg font-bold ${mismatchCount > 0 ? 'text-warning' : ''}`}>{mismatchCount}</div>
+          <p className="text-[9px] text-muted-foreground">Mismatches</p>
+        </div>
+      </div>
+
+      <div className="border rounded-lg max-h-[280px] overflow-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="text-xs sticky left-0 top-0 bg-background z-10">Item</TableHead>
+              <TableHead className="text-xs text-center sticky top-0 bg-background z-10">Est. Opening → Closing</TableHead>
+              <TableHead className="text-xs text-center sticky top-0 bg-background z-10">Expected</TableHead>
+              <TableHead className="text-xs text-center sticky top-0 bg-background z-10">Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {stockItems.map((item, idx) => (
+              <TableRow key={idx} className={item.status === "mismatch" ? "bg-warning/5" : ""}>
+                <TableCell className="text-xs font-medium sticky left-0 bg-background">{item.item_name}</TableCell>
+                <TableCell className="text-xs text-center text-muted-foreground">
+                  {item.opening}g → {item.closing}g
+                </TableCell>
+                <TableCell className="text-xs text-center text-muted-foreground">{item.expectedUsage}g</TableCell>
+                <TableCell className="text-center">
+                  <Badge
+                    variant={item.status === "mismatch" ? "outline" : item.status === "match" ? "secondary" : "outline"}
+                    className={`text-[9px] ${item.status === "mismatch" ? "text-warning border-warning" : ""}`}
+                  >
+                    {item.status === "match" ? "OK" : item.status === "mismatch" ? "Mismatch" : "—"}
+                  </Badge>
+                </TableCell>
+              </TableRow>
+            ))}
+            {stockItems.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={4} className="text-center text-muted-foreground py-6 text-xs">
+                  No flavour stock recorded
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 };
