@@ -11,3 +11,12 @@ verify_jwt = true
 
 [functions.auto-close-sessions]
 verify_jwt = false
+
+[functions.inventory-club-stock]
+verify_jwt = false
+
+[functions.inventory-club-stock-summary]
+verify_jwt = false
+
+[functions.inventory-health]
+verify_jwt = false
