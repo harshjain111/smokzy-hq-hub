@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AlertDrawer } from "./AlertDrawer";
-import { ChevronRight } from "lucide-react";
+import { Bell, ChevronRight, CheckCircle2 } from "lucide-react";
 
 export type AlertSeverity = "critical" | "warning" | "pending";
 
@@ -91,41 +91,61 @@ export const AlertBar = () => {
 
   if (total === 0) {
     return (
-      <div className="flex items-center justify-center h-[52px] rounded-lg border border-success/30 bg-success/5 text-sm text-muted-foreground">
-        ✅ No active alerts
+      <div className="flex items-center gap-3 p-3.5 rounded-xl border bg-card">
+        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-success/15">
+          <CheckCircle2 className="h-5 w-5 text-success" />
+        </div>
+        <div>
+          <div className="text-sm font-medium">All clear</div>
+          <div className="text-[11px] text-muted-foreground">No active alerts</div>
+        </div>
       </div>
     );
   }
 
   return (
     <>
-      <div className="flex items-center justify-between h-[52px] px-4 rounded-lg border bg-muted/50">
-        <div className="flex items-center gap-4 text-sm font-medium">
-          {counts.critical > 0 && (
-            <button onClick={() => openWith("critical")} className="flex items-center gap-1.5 hover:opacity-80 transition-opacity">
-              <span className="inline-block w-2.5 h-2.5 rounded-full bg-destructive" />
-              <span>{counts.critical} Critical</span>
-            </button>
-          )}
-          {counts.warning > 0 && (
-            <button onClick={() => openWith("warning")} className="flex items-center gap-1.5 hover:opacity-80 transition-opacity">
-              <span className="inline-block w-2.5 h-2.5 rounded-full bg-warning" />
-              <span>{counts.warning} Warnings</span>
-            </button>
-          )}
-          {counts.pending > 0 && (
-            <button onClick={() => openWith("pending")} className="flex items-center gap-1.5 hover:opacity-80 transition-opacity">
-              <span className="inline-block w-2.5 h-2.5 rounded-full bg-yellow-400" />
-              <span>{counts.pending} Pending</span>
-            </button>
-          )}
+      <div
+        className="flex items-center justify-between p-3.5 rounded-xl border bg-card cursor-pointer hover:border-primary/20 transition-colors"
+        onClick={() => openWith("all")}
+      >
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-warning/15">
+            <Bell className="h-5 w-5 text-warning" />
+          </div>
+          <div className="flex items-center gap-3">
+            {counts.critical > 0 && (
+              <button
+                onClick={(e) => { e.stopPropagation(); openWith("critical"); }}
+                className="flex items-center gap-1.5 text-xs font-medium hover:opacity-80 transition-opacity"
+              >
+                <span className="w-2 h-2 rounded-full bg-destructive" />
+                {counts.critical} Critical
+              </button>
+            )}
+            {counts.warning > 0 && (
+              <button
+                onClick={(e) => { e.stopPropagation(); openWith("warning"); }}
+                className="flex items-center gap-1.5 text-xs font-medium hover:opacity-80 transition-opacity"
+              >
+                <span className="w-2 h-2 rounded-full bg-warning" />
+                {counts.warning} Warnings
+              </button>
+            )}
+            {counts.pending > 0 && (
+              <button
+                onClick={(e) => { e.stopPropagation(); openWith("pending"); }}
+                className="flex items-center gap-1.5 text-xs font-medium hover:opacity-80 transition-opacity"
+              >
+                <span className="w-2 h-2 rounded-full bg-yellow-400" />
+                {counts.pending} Pending
+              </button>
+            )}
+          </div>
         </div>
-        <button
-          onClick={() => openWith("all")}
-          className="flex items-center gap-1 text-sm font-medium text-primary hover:underline"
-        >
-          View All <ChevronRight className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-1 text-xs font-medium text-primary">
+          View <ChevronRight className="h-3.5 w-3.5" />
+        </div>
       </div>
 
       <AlertDrawer

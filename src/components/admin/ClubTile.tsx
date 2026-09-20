@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, Package, TrendingUp, Camera, AlertCircle, Clock, CheckCircle2 } from "lucide-react";
+import { Users, Package, TrendingUp, Camera, Clock, CheckCircle2, ChevronRight } from "lucide-react";
 import { ClubTileData } from "@/hooks/useAdminStats";
 import { format, formatDistanceToNow } from "date-fns";
 
@@ -14,93 +14,96 @@ export const ClubTile = ({ club }: ClubTileProps) => {
 
   const getSessionBadge = () => {
     switch (club.sessionStatus) {
-      case 'active':
-        return <Badge className="bg-success/20 text-success border-success/30 text-[10px] h-5 px-1.5">Active</Badge>;
-      case 'closed':
-        return <Badge className="bg-muted text-muted-foreground border-muted text-[10px] h-5 px-1.5">Closed</Badge>;
-      case 'force_closed':
-        return <Badge className="bg-destructive/20 text-destructive border-destructive/30 text-[10px] h-5 px-1.5">Force Closed</Badge>;
+      case "active":
+        return (
+          <Badge className="bg-success/15 text-success border-0 text-[10px] h-5 px-2 font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-success mr-1 animate-pulse" />
+            Live
+          </Badge>
+        );
+      case "closed":
+        return <Badge variant="secondary" className="text-[10px] h-5 px-2 font-medium border-0">Closed</Badge>;
+      case "force_closed":
+        return <Badge className="bg-destructive/15 text-destructive border-0 text-[10px] h-5 px-2 font-medium">Force Closed</Badge>;
       default:
-        return <Badge variant="outline" className="text-[10px] h-5 px-1.5">No Session</Badge>;
+        return <Badge variant="outline" className="text-[10px] h-5 px-2 font-medium text-muted-foreground">No Session</Badge>;
     }
   };
 
-  const getStatusIcon = (status: 'ok' | 'pending' | 'submitted' | 'uploaded' | 'overdue') => {
-    if (status === 'ok' || status === 'submitted' || status === 'uploaded') {
-      return <CheckCircle2 className="h-3 w-3 text-success" />;
-    }
-    return <Clock className="h-3 w-3 text-warning" />;
-  };
+  const TaskDot = ({ done }: { done: boolean }) => (
+    <div className={`w-5 h-5 rounded-full flex items-center justify-center ${
+      done ? "bg-success/15" : "bg-warning/15"
+    }`}>
+      {done
+        ? <CheckCircle2 className="h-3 w-3 text-success" />
+        : <Clock className="h-3 w-3 text-warning" />
+      }
+    </div>
+  );
 
-  const getBorderColor = () => {
-    if (club.issueCount > 0) return 'border-l-4 border-l-warning border-warning/30';
-    if (club.sessionStatus === 'force_closed') return 'border-l-4 border-l-destructive border-destructive/30';
-    if (club.sessionStatus === 'active') return 'border-l-4 border-l-success border-success/30';
-    return 'border-l-4 border-l-muted-foreground/30';
-  };
+  const accentBorder =
+    club.issueCount > 0 ? "border-l-warning"
+    : club.sessionStatus === "force_closed" ? "border-l-destructive"
+    : club.sessionStatus === "active" ? "border-l-success"
+    : "border-l-muted-foreground/20";
 
   return (
-    <Card 
-      className={`cursor-pointer transition-all hover:shadow-md active:scale-[0.98] ${getBorderColor()}`}
+    <Card
+      className={`group cursor-pointer transition-all hover:shadow-md hover:border-primary/20 active:scale-[0.98] border-l-[3px] ${accentBorder}`}
       onClick={() => navigate(`/club/${club.id}`)}
     >
-      <CardContent className="p-3 space-y-2">
-        {/* Header Row */}
-        <div className="flex items-center justify-between gap-2">
+      <CardContent className="p-3.5">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-2 mb-2.5">
           <div className="min-w-0 flex-1">
-            <h3 className="font-semibold text-sm truncate">{club.name}</h3>
-          </div>
-          <div className="flex items-center gap-1.5 flex-shrink-0">
-            {getSessionBadge()}
-            {club.issueCount > 0 && (
-              <div className="flex items-center gap-0.5 bg-warning/20 text-warning px-1.5 py-0.5 rounded text-[10px] font-medium">
-                <AlertCircle className="h-3 w-3" />
-                {club.issueCount}
-              </div>
+            <h3 className="font-semibold text-sm leading-tight truncate">{club.name}</h3>
+            {club.location && (
+              <span className="text-[10px] text-muted-foreground">{club.location}</span>
             )}
           </div>
+          {getSessionBadge()}
         </div>
 
-        {/* Stats Row - Compact */}
-        <div className="flex items-center gap-3 text-xs">
-          {/* Staff */}
-          <div className="flex items-center gap-1">
-            <Users className="h-3.5 w-3.5 text-primary" />
-            <span className="font-medium">{club.staffOnDuty}</span>
-            <span className="text-muted-foreground text-[10px]">staff</span>
+        {/* Stats Row */}
+        <div className="flex items-center gap-4 text-xs mb-2.5">
+          <div className="flex items-center gap-1.5">
+            <Users className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="font-semibold">{club.staffOnDuty}</span>
+            <span className="text-muted-foreground">on duty</span>
           </div>
-
-          {/* Session Time */}
           {club.sessionStartTime && (
             <div className="flex items-center gap-1 text-muted-foreground">
               <Clock className="h-3 w-3" />
-              <span className="text-[10px]">
-                {format(new Date(club.sessionStartTime), "hh:mm a")}
-              </span>
+              <span>{format(new Date(club.sessionStartTime), "h:mm a")}</span>
             </div>
           )}
         </div>
 
-        {/* Task Status Row - Only for active sessions */}
-        {club.sessionStatus === 'active' && (
-          <div className="flex items-center gap-4 pt-1 border-t border-border/50">
-            <div className="flex items-center gap-1">
-              <Package className="h-3 w-3 text-muted-foreground" />
-              {getStatusIcon(club.stockStatus)}
+        {/* Task Progress — active sessions only */}
+        {club.sessionStatus === "active" && (
+          <div className="flex items-center justify-between pt-2.5 border-t border-border/50">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5" title="Stock">
+                <Package className="h-3 w-3 text-muted-foreground" />
+                <TaskDot done={club.stockStatus === "ok"} />
+              </div>
+              <div className="flex items-center gap-1.5" title="Sales">
+                <TrendingUp className="h-3 w-3 text-muted-foreground" />
+                <TaskDot done={club.salesStatus === "submitted"} />
+              </div>
+              <div className="flex items-center gap-1.5" title="Photos">
+                <Camera className="h-3 w-3 text-muted-foreground" />
+                <TaskDot done={club.photoStatus === "uploaded"} />
+              </div>
             </div>
-            <div className="flex items-center gap-1">
-              <TrendingUp className="h-3 w-3 text-muted-foreground" />
-              {getStatusIcon(club.salesStatus)}
-            </div>
-            <div className="flex items-center gap-1">
-              <Camera className="h-3 w-3 text-muted-foreground" />
-              {getStatusIcon(club.photoStatus)}
-            </div>
-            {club.stockLastUpdate && (
-              <span className="text-[9px] text-muted-foreground ml-auto">
-                {formatDistanceToNow(new Date(club.stockLastUpdate), { addSuffix: true })}
-              </span>
-            )}
+            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+          </div>
+        )}
+
+        {/* Inactive session — show chevron */}
+        {club.sessionStatus !== "active" && (
+          <div className="flex justify-end pt-2 border-t border-border/30">
+            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
         )}
       </CardContent>
