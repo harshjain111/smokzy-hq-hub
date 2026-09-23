@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download, MapPin, Image as ImageIcon } from "lucide-react";
+import LocationDisplay from "@/components/admin/LocationDisplay";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
@@ -689,10 +690,11 @@ export default function AttendanceReport() {
                               }}
                             />
                           )}
-                          <div className="flex items-center gap-1 text-[10px] md:text-xs text-muted-foreground">
-                            <MapPin className="h-2.5 w-2.5 md:h-3 md:w-3 flex-shrink-0" />
-                            <span className="truncate">{record.check_in_lat.toFixed(4)}, {record.check_in_lng.toFixed(4)}</span>
-                          </div>
+                          <LocationDisplay
+                            lat={record.check_in_lat}
+                            lng={record.check_in_lng}
+                            label={`${record.profiles?.full_name || "Staff"} check-in`}
+                          />
                           <p className="text-[10px] md:text-xs">{format(new Date(record.check_in_time), "hh:mm a")}</p>
                         </div>
 
@@ -710,10 +712,11 @@ export default function AttendanceReport() {
                                 }}
                               />
                               {record.check_out_lat && record.check_out_lng && (
-                                <div className="flex items-center gap-1 text-[10px] md:text-xs text-muted-foreground">
-                                  <MapPin className="h-2.5 w-2.5 md:h-3 md:w-3 flex-shrink-0" />
-                                  <span className="truncate">{record.check_out_lat.toFixed(4)}, {record.check_out_lng.toFixed(4)}</span>
-                                </div>
+                                <LocationDisplay
+                                  lat={record.check_out_lat}
+                                  lng={record.check_out_lng}
+                                  label={`${record.profiles?.full_name || "Staff"} check-out`}
+                                />
                               )}
                               {record.check_out_time && (
                                 <p className="text-[10px] md:text-xs">{format(new Date(record.check_out_time), "hh:mm a")}</p>

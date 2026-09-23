@@ -7,6 +7,7 @@ import { Camera, Check, Loader2, RotateCcw, Image } from "lucide-react";
 import { ClubSession } from "@/hooks/useClubSession";
 import { compressImage } from "@/lib/imageCompression";
 import { haptic } from "@/lib/haptics";
+import PermissionBlockedBanner from "@/components/PermissionBlockedBanner";
 
 interface PhotoModuleProps {
   user: User;
@@ -23,6 +24,7 @@ const PhotoModule = ({ user, venueId, session, updateSessionTask }: PhotoModuleP
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [submitterName, setSubmitterName] = useState<string | null>(null);
   const [submittedAt, setSubmittedAt] = useState<string | null>(null);
+  const [cameraBlocked, setCameraBlocked] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -64,9 +66,13 @@ const PhotoModule = ({ user, venueId, session, updateSessionTask }: PhotoModuleP
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Camera error:", error);
-      toast.error("Failed to access camera");
+      if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
+        setCameraBlocked(true);
+      } else {
+        toast.error("Failed to access camera. Please try again.");
+      }
       setFlowState('idle');
     }
   }, []);
@@ -239,6 +245,12 @@ const PhotoModule = ({ user, venueId, session, updateSessionTask }: PhotoModuleP
             This photo confirms the counter is clean and ready for the next day
           </p>
         </div>
+
+        {cameraBlocked && (
+          <div className="w-full max-w-xs">
+            <PermissionBlockedBanner type="camera" />
+          </div>
+        )}
 
         <Button
           size="lg"
