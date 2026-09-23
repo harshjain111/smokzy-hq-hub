@@ -138,7 +138,7 @@ const AttendanceWidget = ({ user, venueId }: AttendanceWidgetProps) => {
     
     const { data } = await supabase
       .from("attendance")
-      .select("*")
+      .select("id, check_in_time, check_out_time")
       .eq("user_id", user.id)
       .gte("check_in_time", twentyFourHoursAgo)
       .order("check_in_time", { ascending: false });

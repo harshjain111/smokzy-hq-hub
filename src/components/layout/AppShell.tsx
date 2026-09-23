@@ -25,7 +25,7 @@ const routeTitles: Record<string, string> = {
   "/roster/weekly": "Weekly Roster",
   "/roster/daily": "Daily Roster",
   "/packet-dispatch": "Packet Dispatch",
-  "/packet-dispatch/history": "Dispatch History",
+  "/dispatch-settings": "Dispatch Settings",
   "/daily-report": "Daily Club Report",
   "/inspections/new": "New Inspection",
   "/inspections": "Inspection History",

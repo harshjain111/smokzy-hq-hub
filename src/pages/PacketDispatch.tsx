@@ -1,12 +1,30 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import PageLayout from "@/components/PageLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Save, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Loader2, Download, Camera, ImageIcon, Package } from "lucide-react";
+import { format } from "date-fns";
+import { compressImage } from "@/lib/imageCompression";
+
+type DispatchMode = "packet" | "weight";
 
 interface Venue {
   id: string;
@@ -16,276 +34,436 @@ interface Venue {
 interface Flavour {
   id: string;
   name: string;
-  is_active: boolean;
+  packet_weight_grams: number;
 }
 
-interface Employee {
-  user_id: string;
-  full_name: string;
+interface RawDispatchRow {
+  id: string;
+  venue_id: string;
+  date: string;
+  flavour_id: string;
+  quantity_sent: number;
+  unit: string;
+  received_by_name: string | null;
+  photo_url: string | null;
+  dispatched_by: string;
+  created_at: string;
 }
 
-// Map key = "venueId_flavourId"
-type DispatchGrid = Map<string, { quantity: number; id?: string; received_by?: string }>;
+interface DispatchRecord {
+  id: string;
+  venue_id: string;
+  venue_name: string;
+  date: string;
+  flavour_name: string;
+  quantity_sent: number;
+  unit: string;
+  received_by_name: string | null;
+  dispatched_by_name: string;
+  photo_url: string | null;
+  created_at: string;
+}
 
 const formatDate = (d: Date): string => d.toISOString().split("T")[0];
 
 const PacketDispatch = () => {
-  const [selectedDate, setSelectedDate] = useState(() => new Date());
+  const [dispatchMode, setDispatchMode] = useState<DispatchMode>("packet");
   const [venues, setVenues] = useState<Venue[]>([]);
   const [flavours, setFlavours] = useState<Flavour[]>([]);
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [grid, setGrid] = useState<DispatchGrid>(new Map());
-  const [saving, setSaving] = useState(false);
-  const [dirty, setDirty] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const dateStr = formatDate(selectedDate);
-  const isToday = dateStr === formatDate(new Date());
-  const isPast = selectedDate < new Date(new Date().setHours(0, 0, 0, 0));
-  const canEdit = isToday; // Only today's dispatches are editable
+  // Form dialog state
+  const [formOpen, setFormOpen] = useState(false);
+  const [formVenueId, setFormVenueId] = useState("");
+  const [formRecipient, setFormRecipient] = useState("");
+  const [formFlavourId, setFormFlavourId] = useState("");
+  const [formQuantity, setFormQuantity] = useState("");
+  const [formWeightUnit, setFormWeightUnit] = useState<"g" | "kg">("g");
+  const [formPhoto, setFormPhoto] = useState<File | null>(null);
+  const [formPhotoPreview, setFormPhotoPreview] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  // History state
+  const [records, setRecords] = useState<DispatchRecord[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [filterVenue, setFilterVenue] = useState("all");
+  const [filterFlavour, setFilterFlavour] = useState("all");
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    return formatDate(d);
+  });
+  const [endDate, setEndDate] = useState(() => formatDate(new Date()));
 
   useEffect(() => {
     fetchBaseData();
   }, []);
 
-  useEffect(() => {
-    fetchDispatches();
-  }, [selectedDate, venues, flavours]);
-
   const fetchBaseData = async () => {
-    const [{ data: v }, { data: f }, { data: roles }] = await Promise.all([
+    setLoading(true);
+    const [{ data: v }, { data: f }, { data: setting }] = await Promise.all([
       supabase.from("venues").select("id, name").order("name"),
-      supabase.from("flavours").select("id, name, is_active").eq("is_active", true).order("name"),
-      supabase.from("user_roles").select("user_id").eq("role", "employee"),
+      supabase.from("flavours").select("id, name, packet_weight_grams").eq("is_active", true).order("name"),
+      supabase.from("global_settings").select("value").eq("key", "dispatch_mode").maybeSingle(),
     ]);
-
     setVenues(v || []);
     setFlavours((f as Flavour[]) || []);
-
-    if (roles && roles.length > 0) {
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, full_name")
-        .in("id", roles.map((r) => r.user_id));
-      setEmployees((profiles || []).map((p) => ({ user_id: p.id, full_name: p.full_name })));
-    }
-  };
-
-  const fetchDispatches = async () => {
-    if (venues.length === 0 || flavours.length === 0) return;
-    setLoading(true);
-
-    const { data } = await supabase
-      .from("packet_dispatches")
-      .select("*")
-      .eq("date", dateStr);
-
-    const newGrid: DispatchGrid = new Map();
-    (data || []).forEach((d: any) => {
-      newGrid.set(`${d.venue_id}_${d.flavour_id}`, {
-        quantity: d.quantity_sent,
-        id: d.id,
-        received_by: d.received_by_staff_id,
-      });
-    });
-    setGrid(newGrid);
-    setDirty(false);
+    setDispatchMode((setting?.value as DispatchMode) || "packet");
     setLoading(false);
   };
 
-  const gridKey = (venueId: string, flavourId: string) => `${venueId}_${flavourId}`;
+  const fetchHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    let query = supabase
+      .from("packet_dispatches")
+      .select("*")
+      .gte("date", startDate)
+      .lte("date", endDate)
+      .order("created_at", { ascending: false });
 
-  const setCell = (venueId: string, flavourId: string, qty: number) => {
-    const key = gridKey(venueId, flavourId);
-    const newGrid = new Map(grid);
-    const existing = newGrid.get(key);
-    newGrid.set(key, { ...existing, quantity: qty });
-    setGrid(newGrid);
-    setDirty(true);
+    if (filterVenue !== "all") query = query.eq("venue_id", filterVenue);
+    if (filterFlavour !== "all") query = query.eq("flavour_id", filterFlavour);
+
+    const { data } = await query;
+
+    if (data && data.length > 0) {
+      const rows = data as unknown as RawDispatchRow[];
+      const venueMap = new Map(venues.map((v) => [v.id, v.name]));
+      const flavourMap = new Map(flavours.map((f) => [f.id, f.name]));
+
+      const userIds = [...new Set(rows.map((d) => d.dispatched_by))];
+      const { data: profiles } = userIds.length > 0
+        ? await supabase.from("profiles").select("id, full_name").in("id", userIds)
+        : { data: [] };
+      const profileMap = new Map((profiles || []).map((p) => [p.id, p.full_name]));
+
+      setRecords(
+        rows.map((d) => ({
+          id: d.id,
+          venue_id: d.venue_id,
+          venue_name: venueMap.get(d.venue_id) || "Unknown",
+          date: d.date,
+          flavour_name: flavourMap.get(d.flavour_id) || "Unknown",
+          quantity_sent: d.quantity_sent,
+          unit: d.unit || "packets",
+          received_by_name: d.received_by_name,
+          dispatched_by_name: profileMap.get(d.dispatched_by) || "—",
+          photo_url: d.photo_url,
+          created_at: d.created_at,
+        }))
+      );
+    } else {
+      setRecords([]);
+    }
+    setHistoryLoading(false);
+  }, [startDate, endDate, filterVenue, filterFlavour, venues, flavours]);
+
+  useEffect(() => {
+    if (venues.length > 0 && flavours.length > 0) {
+      fetchHistory();
+    }
+  }, [fetchHistory, venues.length, flavours.length]);
+
+  const resetForm = () => {
+    setFormVenueId("");
+    setFormRecipient("");
+    setFormFlavourId("");
+    setFormQuantity("");
+    setFormWeightUnit("g");
+    setFormPhoto(null);
+    setFormPhotoPreview(null);
   };
 
-  const getCell = (venueId: string, flavourId: string) => {
-    return grid.get(gridKey(venueId, flavourId));
+  const handleFormOpenChange = (open: boolean) => {
+    if (!open) resetForm();
+    setFormOpen(open);
   };
 
-  const getVenueTotal = (venueId: string): number => {
-    let total = 0;
-    flavours.forEach((f) => {
-      const cell = getCell(venueId, f.id);
-      if (cell) total += cell.quantity;
-    });
-    return total;
+  const handlePhotoSelect = (file: File | null) => {
+    setFormPhoto(file);
+    setFormPhotoPreview(file ? URL.createObjectURL(file) : null);
   };
-
-  const getFlavourTotal = (flavourId: string): number => {
-    let total = 0;
-    venues.forEach((v) => {
-      const cell = getCell(v.id, flavourId);
-      if (cell) total += cell.quantity;
-    });
-    return total;
-  };
-
-  const grandTotal = useMemo(() => {
-    let total = 0;
-    grid.forEach((cell) => (total += cell.quantity));
-    return total;
-  }, [grid]);
 
   const handleSave = async () => {
+    if (!formVenueId || !formFlavourId || !formQuantity || Number(formQuantity) <= 0) {
+      toast.error("Venue, flavour, and a positive quantity are required");
+      return;
+    }
+
     setSaving(true);
     try {
       const user = (await supabase.auth.getUser()).data.user;
+      if (!user) throw new Error("Not signed in");
 
-      // Delete existing dispatches for this date
-      await supabase.from("packet_dispatches").delete().eq("date", dateStr);
+      const quantity = dispatchMode === "weight"
+        ? Number(formQuantity) * (formWeightUnit === "kg" ? 1000 : 1)
+        : Number(formQuantity);
+      const unit = dispatchMode === "weight" ? "grams" : "packets";
 
-      // Insert all non-zero entries
-      const rows: any[] = [];
-      grid.forEach((cell, key) => {
-        if (cell.quantity > 0) {
-          const [venueId, flavourId] = key.split("_");
-          rows.push({
-            venue_id: venueId,
-            flavour_id: flavourId,
-            date: dateStr,
-            quantity_sent: cell.quantity,
-            received_by_staff_id: cell.received_by || null,
-            dispatched_by: user?.id || "",
-          });
-        }
-      });
+      let photoUrl: string | null = null;
+      if (formPhoto) {
+        const compressed = await compressImage(formPhoto, {
+          maxWidth: 1280,
+          maxHeight: 1280,
+          quality: 0.7,
+          maxSizeMB: 0.5,
+        });
+        const filename = `${user.id}/${formVenueId}_${Date.now()}.jpg`;
+        const { error: uploadError } = await supabase.storage
+          .from("dispatch-photos")
+          .upload(filename, compressed, { contentType: "image/jpeg" });
+        if (uploadError) throw uploadError;
 
-      if (rows.length > 0) {
-        const { error } = await supabase.from("packet_dispatches").insert(rows);
-        if (error) throw error;
+        const { data: urlData, error: urlError } = await supabase.storage
+          .from("dispatch-photos")
+          .createSignedUrl(filename, 60 * 60 * 24 * 365);
+        if (urlError || !urlData?.signedUrl) throw urlError || new Error("Failed to get photo URL");
+        photoUrl = urlData.signedUrl;
       }
 
-      toast.success(`Saved ${rows.length} dispatch entries`);
-      setDirty(false);
-      fetchDispatches();
-    } catch (err: any) {
-      toast.error(err.message || "Failed to save dispatches");
+      const { error } = await supabase.from("packet_dispatches").insert({
+        venue_id: formVenueId,
+        flavour_id: formFlavourId,
+        date: formatDate(new Date()),
+        quantity_sent: Math.round(quantity),
+        unit,
+        received_by_name: formRecipient.trim() || null,
+        dispatched_by: user.id,
+      });
+      if (error) throw error;
+
+      toast.success("Dispatch recorded");
+      handleFormOpenChange(false);
+      fetchHistory();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to record dispatch");
     } finally {
       setSaving(false);
     }
   };
 
-  const navigateDay = (dir: number) => {
-    const next = new Date(selectedDate);
-    next.setDate(next.getDate() + dir);
-    setSelectedDate(next);
+  const handleExportCSV = () => {
+    const header = "Date,Club,Flavour,Quantity,Unit,Received By,Dispatched By\n";
+    const rows = records
+      .map((r) =>
+        `${r.date},${r.venue_name},${r.flavour_name},${r.quantity_sent},${r.unit},${r.received_by_name || "—"},${r.dispatched_by_name}`
+      )
+      .join("\n");
+    const blob = new Blob([header + rows], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `dispatch-history-${startDate}-to-${endDate}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
+  const pageTitle = dispatchMode === "weight" ? "Flavour Dispatch" : "Packet Dispatch";
+  const totalQuantity = records.reduce((sum, r) => sum + r.quantity_sent, 0);
+
+  if (loading) {
+    return (
+      <PageLayout title={pageTitle} subtitle="Loading...">
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      </PageLayout>
+    );
+  }
+
   return (
-    <PageLayout
-      title="Packet Dispatch"
-      subtitle={selectedDate.toLocaleDateString("en-IN", {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      })}
-    >
+    <PageLayout title={pageTitle} subtitle="Record and review flavour sent to venues">
       <div className="space-y-4">
-        {/* Controls */}
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" onClick={() => navigateDay(-1)}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setSelectedDate(new Date())}>
-              Today
-            </Button>
-            <Button variant="outline" size="icon" onClick={() => navigateDay(1)}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-medium">
-              Grand Total: <span className="text-primary">{grandTotal} packets</span>
-            </span>
-            {canEdit && (
-              <Button onClick={handleSave} disabled={!dirty || saving}>
-                {saving ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        <Dialog open={formOpen} onOpenChange={handleFormOpenChange}>
+          <Button onClick={() => setFormOpen(true)} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Dispatch
+          </Button>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>{pageTitle}</DialogTitle>
+              <DialogDescription>Record flavour handed over to a venue.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              <div className="space-y-2">
+                <Label>Club</Label>
+                <Select value={formVenueId} onValueChange={setFormVenueId} disabled={saving}>
+                  <SelectTrigger className="h-11">
+                    <SelectValue placeholder="Select club" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover z-50">
+                    {venues.map((v) => (
+                      <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Handed over to</Label>
+                <Input
+                  placeholder="Name of person receiving"
+                  value={formRecipient}
+                  onChange={(e) => setFormRecipient(e.target.value)}
+                  className="h-11"
+                  disabled={saving}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Flavour</Label>
+                <Select value={formFlavourId} onValueChange={setFormFlavourId} disabled={saving}>
+                  <SelectTrigger className="h-11">
+                    <SelectValue placeholder="Select flavour" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover z-50">
+                    {flavours.map((f) => (
+                      <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>{dispatchMode === "weight" ? "Quantity" : "Packets"}</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    min={0}
+                    step={dispatchMode === "weight" ? "0.1" : "1"}
+                    value={formQuantity}
+                    onChange={(e) => setFormQuantity(e.target.value)}
+                    placeholder={dispatchMode === "weight" ? "e.g. 500" : "e.g. 10"}
+                    className="h-11"
+                    disabled={saving}
+                  />
+                  {dispatchMode === "weight" && (
+                    <Select value={formWeightUnit} onValueChange={(v) => setFormWeightUnit(v as "g" | "kg")} disabled={saving}>
+                      <SelectTrigger className="h-11 w-20">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-popover z-50">
+                        <SelectItem value="g">g</SelectItem>
+                        <SelectItem value="kg">kg</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Photo (optional)</Label>
+                {formPhotoPreview ? (
+                  <div className="relative w-full h-32 rounded-xl overflow-hidden border border-border">
+                    <img src={formPhotoPreview} alt="Dispatch proof" className="w-full h-full object-cover" />
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="absolute bottom-2 right-2 h-8"
+                      onClick={() => handlePhotoSelect(null)}
+                      disabled={saving}
+                    >
+                      Remove
+                    </Button>
+                  </div>
                 ) : (
-                  <Save className="mr-2 h-4 w-4" />
+                  <label className="flex items-center justify-center gap-2 h-11 rounded-xl border border-dashed border-border cursor-pointer text-sm text-muted-foreground hover:bg-muted/50">
+                    <Camera className="h-4 w-4" />
+                    Add a photo
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      className="hidden"
+                      onChange={(e) => handlePhotoSelect(e.target.files?.[0] || null)}
+                      disabled={saving}
+                    />
+                  </label>
                 )}
+              </div>
+
+              <Button onClick={handleSave} disabled={saving} className="w-full h-12">
+                {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Package className="h-4 w-4 mr-2" />}
                 Save Dispatch
               </Button>
-            )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* History */}
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="space-y-1">
+            <Label className="text-xs">From</Label>
+            <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-9 w-[140px]" />
           </div>
+          <div className="space-y-1">
+            <Label className="text-xs">To</Label>
+            <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-9 w-[140px]" />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Club</Label>
+            <Select value={filterVenue} onValueChange={setFilterVenue}>
+              <SelectTrigger className="h-9 w-[160px]"><SelectValue /></SelectTrigger>
+              <SelectContent className="bg-background z-50">
+                <SelectItem value="all">All Clubs</SelectItem>
+                {venues.map((v) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Flavour</Label>
+            <Select value={filterFlavour} onValueChange={setFilterFlavour}>
+              <SelectTrigger className="h-9 w-[160px]"><SelectValue /></SelectTrigger>
+              <SelectContent className="bg-background z-50">
+                <SelectItem value="all">All Flavours</SelectItem>
+                {flavours.map((f) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={records.length === 0}>
+            <Download className="mr-2 h-4 w-4" />
+            Export CSV
+          </Button>
         </div>
 
-        {!canEdit && isPast && (
-          <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
-            Past dispatches are locked and cannot be edited.
-          </div>
-        )}
+        <div className="text-sm text-muted-foreground">
+          {records.length} dispatches · {totalQuantity} total {records[0]?.unit === "grams" ? "grams" : "units"}
+        </div>
 
-        {/* Dispatch Grid */}
         <Card>
           <CardContent className="p-0">
-            {loading ? (
-              <div className="text-center py-12 text-muted-foreground">Loading dispatch data...</div>
+            {historyLoading ? (
+              <div className="text-center py-12 text-muted-foreground">Loading...</div>
+            ) : records.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                No dispatches recorded for the selected period
+              </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="sticky left-0 bg-muted/50 z-10 p-3 text-left font-medium min-w-[160px]">
-                        Club
-                      </th>
-                      {flavours.map((f) => (
-                        <th key={f.id} className="p-3 text-center font-medium min-w-[90px]">
-                          <div className="text-xs leading-tight">{f.name}</div>
-                        </th>
-                      ))}
-                      <th className="p-3 text-center font-medium min-w-[70px] bg-muted/80">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {venues.map((venue) => (
-                      <tr key={venue.id} className="border-b hover:bg-muted/30">
-                        <td className="sticky left-0 bg-background z-10 p-3 font-medium">
-                          {venue.name}
-                        </td>
-                        {flavours.map((f) => {
-                          const cell = getCell(venue.id, f.id);
-                          return (
-                            <td key={f.id} className="p-1.5 text-center">
-                              <Input
-                                type="number"
-                                min={0}
-                                value={cell?.quantity || ""}
-                                onChange={(e) =>
-                                  setCell(venue.id, f.id, parseInt(e.target.value) || 0)
-                                }
-                                className="h-8 w-full text-center text-xs"
-                                disabled={!canEdit}
-                                placeholder="0"
-                              />
-                            </td>
-                          );
-                        })}
-                        <td className="p-3 text-center font-semibold bg-muted/30">
-                          {getVenueTotal(venue.id) || "—"}
-                        </td>
-                      </tr>
-                    ))}
-                    {/* Totals row */}
-                    <tr className="border-t-2 bg-muted/50 font-semibold">
-                      <td className="sticky left-0 bg-muted/50 z-10 p-3">Total</td>
-                      {flavours.map((f) => (
-                        <td key={f.id} className="p-3 text-center">
-                          {getFlavourTotal(f.id) || "—"}
-                        </td>
-                      ))}
-                      <td className="p-3 text-center text-primary">{grandTotal || "—"}</td>
-                    </tr>
-                  </tbody>
-                </table>
+              <div className="divide-y">
+                {records.map((r) => (
+                  <div key={r.id} className="flex items-center gap-3 p-3">
+                    {r.photo_url ? (
+                      <img src={r.photo_url} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0 border border-border" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                        <ImageIcon className="h-5 w-5 text-muted-foreground/50" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-sm">{r.venue_name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(r.date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                        </span>
+                      </div>
+                      <p className="text-sm text-muted-foreground truncate">
+                        {r.flavour_name} · {r.quantity_sent} {r.unit === "grams" ? "g" : "packets"}
+                        {r.received_by_name ? ` · to ${r.received_by_name}` : ""}
+                      </p>
+                    </div>
+                    <span className="text-xs text-muted-foreground shrink-0">{r.dispatched_by_name}</span>
+                  </div>
+                ))}
               </div>
             )}
           </CardContent>

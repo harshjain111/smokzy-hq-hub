@@ -60,7 +60,7 @@ const TopBar = ({ user, pageTitle, onMobileMenuClick, showSidebarToggle }: TopBa
   };
 
   return (
-    <header className="sticky top-0 z-40 h-14 border-b bg-card flex items-center px-4 gap-3 shadow-sm">
+    <header className="sticky top-0 z-40 min-h-[3.5rem] border-b bg-card flex items-center px-4 gap-3 shadow-sm pt-[env(safe-area-inset-top,0px)]">
       {/* Mobile: hamburger */}
       {showSidebarToggle && (
         <Button variant="ghost" size="icon" className="md:hidden touch-target" onClick={onMobileMenuClick}>

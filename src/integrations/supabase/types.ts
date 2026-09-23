@@ -10,7 +10,32 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "13.0.5"
+    PostgrestVersion: "14.5"
+  }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -478,6 +503,53 @@ export type Database = {
           },
         ]
       }
+      inspection_items: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          inspection_id: string
+          item_key: string
+          item_label: string
+          notes: string | null
+          photo_urls: string[]
+          reason: string | null
+          status: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          id?: string
+          inspection_id: string
+          item_key: string
+          item_label: string
+          notes?: string | null
+          photo_urls?: string[]
+          reason?: string | null
+          status: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          inspection_id?: string
+          item_key?: string
+          item_label?: string
+          notes?: string | null
+          photo_urls?: string[]
+          reason?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inspection_items_inspection_id_fkey"
+            columns: ["inspection_id"]
+            isOneToOne: false
+            referencedRelation: "inspections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inspection_stock_checks: {
         Row: {
           created_at: string
@@ -664,8 +736,11 @@ export type Database = {
           dispatched_by: string
           flavour_id: string
           id: string
+          photo_url: string | null
           quantity_sent: number
+          received_by_name: string | null
           received_by_staff_id: string | null
+          unit: string
           venue_id: string
         }
         Insert: {
@@ -674,8 +749,11 @@ export type Database = {
           dispatched_by: string
           flavour_id: string
           id?: string
+          photo_url?: string | null
           quantity_sent?: number
+          received_by_name?: string | null
           received_by_staff_id?: string | null
+          unit?: string
           venue_id: string
         }
         Update: {
@@ -684,8 +762,11 @@ export type Database = {
           dispatched_by?: string
           flavour_id?: string
           id?: string
+          photo_url?: string | null
           quantity_sent?: number
+          received_by_name?: string | null
           received_by_staff_id?: string | null
+          unit?: string
           venue_id?: string
         }
         Relationships: [
@@ -1510,6 +1591,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       app_role: ["admin", "employee", "club_management", "club_incharge"],

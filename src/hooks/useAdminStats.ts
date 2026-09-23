@@ -45,7 +45,7 @@ export const useAdminStats = () => {
       // Fetch all venues
       const { data: venues } = await supabase
         .from("venues")
-        .select("*")
+        .select("id, name, location")
         .order("name");
 
       if (!venues) {
@@ -56,7 +56,7 @@ export const useAdminStats = () => {
       // Fetch all sessions for today
       const { data: sessions } = await supabase
         .from("club_sessions")
-        .select("*")
+        .select("id, venue_id, status, force_close_reason, stock_submitted, sales_submitted, photo_uploaded, started_at, stock_submitted_at")
         .eq("session_date", today);
 
       // Get today's session IDs
@@ -66,7 +66,7 @@ export const useAdminStats = () => {
       const { data: activeBlocks } = todaySessionIds.length > 0
         ? await supabase
             .from("staff_attendance_blocks")
-            .select("*")
+            .select("id, venue_id")
             .in("session_id", todaySessionIds)
             .is("check_out_time", null)
         : { data: [] };
@@ -144,8 +144,8 @@ export const useAdminStats = () => {
   useEffect(() => {
     fetchData();
     
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchData, 30000);
+    // Refresh every 60 seconds (admin-only, doesn't need sub-minute liveness)
+    const interval = setInterval(fetchData, 60000);
     return () => clearInterval(interval);
   }, []);
 

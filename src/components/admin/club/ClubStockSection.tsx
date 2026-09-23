@@ -2,26 +2,20 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { format, subDays } from "date-fns";
-import { 
-  Download, AlertTriangle, Package, Info, ChevronRight, TrendingDown, 
-  TrendingUp, BarChart3, AlertCircle, CheckCircle2, RefreshCw
+import { format } from "date-fns";
+import {
+  Download, AlertTriangle, Package, Info,
+  AlertCircle, CheckCircle2
 } from "lucide-react";
 import { toast } from "sonner";
 import { ClubSession } from "@/pages/ClubDetail";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface ClubStockSectionProps {
   clubId: string;
   clubName: string;
   session: ClubSession | null;
+  onSummaryChange?: (data: { score: number; lowCount: number; outCount: number } | null) => void;
 }
 
 interface StockItem {
@@ -47,10 +41,9 @@ interface CategorySummary {
   healthScore: number;
 }
 
-export const ClubStockSection = ({ clubId, clubName, session }: ClubStockSectionProps) => {
+export const ClubStockSection = ({ clubId, clubName, session, onSummaryChange }: ClubStockSectionProps) => {
   const [stockData, setStockData] = useState<StockItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showDetailDialog, setShowDetailDialog] = useState(false);
   const [insights, setInsights] = useState<StockInsight[]>([]);
   const [categorySummary, setCategorySummary] = useState<CategorySummary[]>([]);
   const [lastStockUpdate, setLastStockUpdate] = useState<string | null>(null);
@@ -71,8 +64,7 @@ export const ClubStockSection = ({ clubId, clubName, session }: ClubStockSection
     if (data) {
       setStockData(data);
       analyzeStock(data);
-      
-      // Get latest update time
+
       const latestUpdate = data.reduce((latest, item) => {
         return new Date(item.updated_at) > new Date(latest) ? item.updated_at : latest;
       }, data[0]?.updated_at || '');
@@ -83,12 +75,10 @@ export const ClubStockSection = ({ clubId, clubName, session }: ClubStockSection
 
   const analyzeStock = (items: StockItem[]) => {
     const newInsights: StockInsight[] = [];
-    
-    // Critical stock (at or below threshold)
+
     const criticalItems = items.filter(item => item.quantity <= item.low_stock_threshold);
     const outOfStock = items.filter(item => item.quantity === 0);
-    
-    // Category analysis
+
     const categoryMap = new Map<string, { total: number; low: number }>();
     items.forEach(item => {
       const cat = categoryMap.get(item.category) || { total: 0, low: 0 };
@@ -97,7 +87,6 @@ export const ClubStockSection = ({ clubId, clubName, session }: ClubStockSection
       categoryMap.set(item.category, cat);
     });
 
-    // Generate insights
     if (outOfStock.length > 0) {
       newInsights.push({
         type: 'critical',
@@ -115,10 +104,9 @@ export const ClubStockSection = ({ clubId, clubName, session }: ClubStockSection
       });
     }
 
-    // Category health
     const categorySum: CategorySummary[] = [];
     categoryMap.forEach((stats, name) => {
-      const healthScore = stats.total > 0 
+      const healthScore = stats.total > 0
         ? Math.round(((stats.total - stats.low) / stats.total) * 100)
         : 100;
       categorySum.push({
@@ -136,11 +124,9 @@ export const ClubStockSection = ({ clubId, clubName, session }: ClubStockSection
       }
     });
 
-    // Sort by health score (worst first)
     categorySum.sort((a, b) => a.healthScore - b.healthScore);
     setCategorySummary(categorySum);
 
-    // Positive insights
     if (criticalItems.length === 0) {
       newInsights.push({
         type: 'positive',
@@ -148,7 +134,6 @@ export const ClubStockSection = ({ clubId, clubName, session }: ClubStockSection
       });
     }
 
-    // Stock freshness
     if (session?.stock_submitted && session.stock_submitted_at) {
       newInsights.push({
         type: 'info',
@@ -162,9 +147,18 @@ export const ClubStockSection = ({ clubId, clubName, session }: ClubStockSection
   const lowStockItems = stockData.filter(item => item.quantity <= item.low_stock_threshold);
   const outOfStockItems = stockData.filter(item => item.quantity === 0);
   const totalItems = stockData.length;
-  const stockHealthScore = totalItems > 0 
+  const stockHealthScore = totalItems > 0
     ? Math.round(((totalItems - lowStockItems.length) / totalItems) * 100)
     : 100;
+
+  useEffect(() => {
+    onSummaryChange?.(
+      totalItems > 0
+        ? { score: stockHealthScore, lowCount: lowStockItems.length, outCount: outOfStockItems.length }
+        : null
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stockHealthScore, lowStockItems.length, outOfStockItems.length, totalItems]);
 
   const exportStock = () => {
     const headers = ["Item Name", "Category", "Unit", "Current Qty", "Threshold", "Status", "Last Updated"];
@@ -212,15 +206,14 @@ export const ClubStockSection = ({ clubId, clubName, session }: ClubStockSection
     }
   };
 
-  // No session state
   if (!session) {
     return (
-      <div className="flex flex-col items-center justify-center py-8 text-center">
-        <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-3">
-          <Info className="h-6 w-6 text-muted-foreground" />
+      <div className="flex flex-col items-center justify-center py-6 text-center">
+        <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mb-2">
+          <Info className="h-5 w-5 text-muted-foreground" />
         </div>
         <p className="text-sm font-medium text-muted-foreground">No Active Session</p>
-        <p className="text-xs text-muted-foreground/70 mt-1 max-w-[200px]">
+        <p className="text-xs text-muted-foreground/70 mt-1 max-w-[220px]">
           Stock data will appear once the session is active.
         </p>
       </div>
@@ -237,6 +230,12 @@ export const ClubStockSection = ({ clubId, clubName, session }: ClubStockSection
     );
   }
 
+  // Prioritize exceptions: out-of-stock > low stock > healthy
+  const sortedInventory = [...stockData].sort((a, b) => {
+    const rank = (item: StockItem) => (item.quantity === 0 ? 0 : item.quantity <= item.low_stock_threshold ? 1 : 2);
+    return rank(a) - rank(b);
+  });
+
   return (
     <div className="space-y-4">
       {/* Stock Health Score */}
@@ -249,7 +248,7 @@ export const ClubStockSection = ({ clubId, clubName, session }: ClubStockSection
           <div className="text-2xl font-bold">{stockHealthScore}%</div>
         </div>
         <div className="h-2 bg-current/20 rounded-full overflow-hidden">
-          <div 
+          <div
             className="h-full bg-current rounded-full transition-all"
             style={{ width: `${stockHealthScore}%` }}
           />
@@ -260,32 +259,17 @@ export const ClubStockSection = ({ clubId, clubName, session }: ClubStockSection
         </div>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-3 gap-2">
-        <div className="p-2.5 rounded-lg bg-muted/30 text-center">
-          <div className="text-lg font-bold">{totalItems}</div>
-          <p className="text-[9px] text-muted-foreground">Total Items</p>
-        </div>
-        <div className={`p-2.5 rounded-lg text-center ${outOfStockItems.length > 0 ? 'bg-destructive/10' : 'bg-muted/30'}`}>
-          <div className={`text-lg font-bold ${outOfStockItems.length > 0 ? 'text-destructive' : ''}`}>
-            {outOfStockItems.length}
-          </div>
-          <p className="text-[9px] text-muted-foreground">Out of Stock</p>
-        </div>
-        <div className={`p-2.5 rounded-lg text-center ${lowStockItems.length > outOfStockItems.length ? 'bg-warning/10' : 'bg-muted/30'}`}>
-          <div className={`text-lg font-bold ${lowStockItems.length > outOfStockItems.length ? 'text-warning' : ''}`}>
-            {lowStockItems.length - outOfStockItems.length}
-          </div>
-          <p className="text-[9px] text-muted-foreground">Running Low</p>
-        </div>
-      </div>
+      <Button variant="outline" size="sm" onClick={exportStock} className="w-full">
+        <Download className="h-4 w-4 mr-2" />
+        Export Stock Report
+      </Button>
 
       {/* Smart Insights */}
       {insights.length > 0 && (
         <div className="space-y-1.5">
           {insights.slice(0, 4).map((insight, i) => (
-            <div 
-              key={i} 
+            <div
+              key={i}
               className={`flex items-start gap-2 p-2.5 rounded-lg border text-xs ${getInsightStyle(insight.type)}`}
             >
               {getInsightIcon(insight.type)}
@@ -300,120 +284,60 @@ export const ClubStockSection = ({ clubId, clubName, session }: ClubStockSection
         </div>
       )}
 
-      {/* Category Health Summary */}
-      {categorySummary.length > 0 && (
-        <div className="space-y-2">
-          <span className="text-sm font-medium">Category Health</span>
-          <div className="space-y-1.5">
-            {categorySummary.map(cat => (
-              <div key={cat.name} className="flex items-center justify-between p-2 bg-muted/30 rounded">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium capitalize">{cat.name}</span>
-                  <span className="text-[10px] text-muted-foreground">({cat.totalItems} items)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {cat.lowStockItems > 0 && (
-                    <Badge variant="outline" className="text-[9px] text-warning border-warning/30">
-                      {cat.lowStockItems} low
-                    </Badge>
-                  )}
-                  <span className={`text-xs font-bold ${
-                    cat.healthScore >= 80 ? 'text-success' :
-                    cat.healthScore >= 50 ? 'text-warning' : 'text-destructive'
-                  }`}>
-                    {cat.healthScore}%
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Critical Items Alert */}
-      {outOfStockItems.length > 0 && (
-        <div className="space-y-2">
-          <span className="text-sm font-medium text-destructive">⚠️ Out of Stock - Immediate Action</span>
-          <div className="space-y-1.5">
-            {outOfStockItems.map(item => (
-              <div key={item.id} className="flex items-center justify-between p-2.5 bg-destructive/5 border border-destructive/20 rounded">
-                <div>
-                  <span className="text-xs font-medium">{item.item_name}</span>
-                  <p className="text-[10px] text-muted-foreground capitalize">{item.category.replace('_', ' ')}</p>
-                </div>
-                <Badge variant="destructive" className="text-[10px]">
-                  OUT
-                </Badge>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Low Stock Items */}
-      {lowStockItems.length > outOfStockItems.length && (
-        <div className="space-y-2">
-          <span className="text-sm font-medium text-warning">Running Low - Plan Reorder</span>
-          <div className="space-y-1.5">
-            {lowStockItems.filter(i => i.quantity > 0).slice(0, 5).map(item => (
-              <div key={item.id} className="flex items-center justify-between p-2 bg-warning/5 border border-warning/20 rounded">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="h-3 w-3 text-warning shrink-0" />
-                  <div>
-                    <span className="text-xs font-medium">{item.item_name}</span>
-                    <p className="text-[10px] text-muted-foreground capitalize">{item.category.replace('_', ' ')}</p>
+      {/* Category health + full inventory side-by-side on desktop */}
+      <div className="grid md:grid-cols-2 gap-3">
+        {/* Category Health Summary */}
+        {categorySummary.length > 0 && (
+          <div className="space-y-2">
+            <span className="text-sm font-medium">Category Health</span>
+            <div className="space-y-1.5">
+              {categorySummary.map(cat => (
+                <div key={cat.name} className="flex items-center justify-between p-2 bg-muted/30 rounded">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium capitalize">{cat.name}</span>
+                    <span className="text-[10px] text-muted-foreground">({cat.totalItems} items)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {cat.lowStockItems > 0 && (
+                      <Badge variant="outline" className="text-[9px] text-warning border-warning/30">
+                        {cat.lowStockItems} low
+                      </Badge>
+                    )}
+                    <span className={`text-xs font-bold ${
+                      cat.healthScore >= 80 ? 'text-success' :
+                      cat.healthScore >= 50 ? 'text-warning' : 'text-destructive'
+                    }`}>
+                      {cat.healthScore}%
+                    </span>
                   </div>
                 </div>
-                <Badge variant="outline" className="text-[10px] text-warning border-warning/30">
-                  {item.quantity} {item.unit}
-                </Badge>
-              </div>
-            ))}
-            {lowStockItems.filter(i => i.quantity > 0).length > 5 && (
-              <p className="text-[10px] text-muted-foreground text-center">
-                +{lowStockItems.filter(i => i.quantity > 0).length - 5} more items
-              </p>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Full inventory — inline, sorted by severity */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">Full Inventory</span>
+            {lastStockUpdate && (
+              <span className="text-[10px] text-muted-foreground">
+                Updated {format(new Date(lastStockUpdate), "MMM dd, hh:mm a")}
+              </span>
             )}
           </div>
-        </div>
-      )}
-
-      {/* View Full Inventory Button */}
-      <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
-        <DialogTrigger asChild>
-          <Button variant="outline" size="sm" className="w-full">
-            View Full Inventory
-            <ChevronRight className="h-4 w-4 ml-2" />
-          </Button>
-        </DialogTrigger>
-        <DialogContent className="max-w-2xl max-h-[80vh]">
-          <DialogHeader className="pb-2">
-            <DialogTitle className="text-base">Full Inventory - {clubName}</DialogTitle>
-          </DialogHeader>
-          
-          <div className="flex items-center justify-between pb-3 border-b">
-            <div className="text-xs text-muted-foreground">
-              {lastStockUpdate && `Last updated: ${format(new Date(lastStockUpdate), "MMM dd, hh:mm a")}`}
-            </div>
-            <Button variant="outline" size="sm" onClick={exportStock} className="h-8 text-xs">
-              <Download className="h-3.5 w-3.5 mr-1.5" />
-              Export
-            </Button>
-          </div>
-
-          <div className="flex-1 overflow-auto">
+          <div className="border rounded-lg max-h-[320px] overflow-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-xs sticky left-0 bg-background">Item</TableHead>
-                  <TableHead className="text-xs">Category</TableHead>
-                  <TableHead className="text-xs text-center">Quantity</TableHead>
-                  <TableHead className="text-xs text-center">Threshold</TableHead>
-                  <TableHead className="text-xs text-center">Status</TableHead>
+                  <TableHead className="text-xs sticky left-0 top-0 bg-background z-10">Item</TableHead>
+                  <TableHead className="text-xs sticky top-0 bg-background z-10">Category</TableHead>
+                  <TableHead className="text-xs text-center sticky top-0 bg-background z-10">Qty</TableHead>
+                  <TableHead className="text-xs text-center sticky top-0 bg-background z-10">Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {stockData.map(item => {
+                {sortedInventory.map(item => {
                   const isOut = item.quantity === 0;
                   const isLow = item.quantity <= item.low_stock_threshold && item.quantity > 0;
                   return (
@@ -429,12 +353,9 @@ export const ClubStockSection = ({ clubId, clubName, session }: ClubStockSection
                       }`}>
                         {item.quantity} {item.unit}
                       </TableCell>
-                      <TableCell className="text-xs text-center text-muted-foreground">
-                        {item.low_stock_threshold}
-                      </TableCell>
                       <TableCell className="text-center">
-                        <Badge 
-                          variant={isOut ? "destructive" : isLow ? "outline" : "secondary"} 
+                        <Badge
+                          variant={isOut ? "destructive" : isLow ? "outline" : "secondary"}
                           className={`text-[9px] ${isLow && !isOut ? 'text-warning border-warning' : ''}`}
                         >
                           {isOut ? "OUT" : isLow ? "LOW" : "OK"}
@@ -443,17 +364,18 @@ export const ClubStockSection = ({ clubId, clubName, session }: ClubStockSection
                     </TableRow>
                   );
                 })}
+                {sortedInventory.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center text-muted-foreground py-6 text-xs">
+                      No stock items recorded
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Download Button */}
-      <Button variant="ghost" size="sm" onClick={exportStock} className="w-full text-muted-foreground">
-        <Download className="h-4 w-4 mr-2" />
-        Export Stock Report
-      </Button>
+        </div>
+      </div>
     </div>
   );
 };

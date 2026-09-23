@@ -47,8 +47,24 @@ const DailyClubReport = () => {
   const [reports, setReports] = useState<VenueReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedVenues, setExpandedVenues] = useState<Set<string>>(new Set());
+  const [dispatchMode, setDispatchMode] = useState<"packet" | "weight">("packet");
 
   const dateStr = formatDate(selectedDate);
+  const isWeightMode = dispatchMode === "weight";
+  const unitLabel = isWeightMode ? "g" : "packets";
+  const dispatchedLabel = isWeightMode ? "Dispatched (g)" : "Dispatched";
+  const usedLabel = isWeightMode ? "Flavour Used (g)" : "Packets Used";
+
+  useEffect(() => {
+    supabase
+      .from("global_settings")
+      .select("value")
+      .eq("key", "dispatch_mode")
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.value === "weight") setDispatchMode("weight");
+      });
+  }, []);
 
   useEffect(() => {
     fetchReport();
@@ -205,7 +221,7 @@ const DailyClubReport = () => {
 
     // Summary
     doc.setFontSize(10);
-    doc.text(`Total Dispatched: ${summary.totalDispatched} | Packets Used: ${summary.totalUsed} | Shisha Sold: ${summary.totalSold} | Net Mismatch: ${summary.totalMismatch}`, 14, 36);
+    doc.text(`Total Dispatched: ${summary.totalDispatched}${unitLabel} | ${usedLabel}: ${summary.totalUsed} | Shisha Sold: ${summary.totalSold} | Net Mismatch: ${summary.totalMismatch}`, 14, 36);
     doc.text(`Flagged Clubs: ${summary.flaggedClubs} / ${reports.length}`, 14, 42);
 
     // Main table
@@ -220,7 +236,7 @@ const DailyClubReport = () => {
 
     autoTable(doc, {
       startY: 48,
-      head: [["Club", "Dispatched", "Packets Used", "Shisha Sold", "Mismatch", "Status"]],
+      head: [["Club", dispatchedLabel, usedLabel, "Shisha Sold", "Mismatch", "Status"]],
       body: tableData,
       styles: { fontSize: 8 },
       headStyles: { fillColor: [99, 65, 214] },
@@ -258,7 +274,7 @@ const DailyClubReport = () => {
 
         autoTable(doc, {
           startY: currentY,
-          head: [["Flavour", "Dispatched"]],
+          head: [["Flavour", dispatchedLabel]],
           body: r.flavour_breakdown.map((fb) => [fb.flavour_name, fb.packets_dispatched.toString()]),
           styles: { fontSize: 7 },
           headStyles: { fillColor: [120, 120, 120] },
@@ -325,8 +341,8 @@ const DailyClubReport = () => {
 
         {/* KPI Summary Strip */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          <SummaryCard label="Dispatched" value={summary.totalDispatched} unit="packets" />
-          <SummaryCard label="Packets Used" value={summary.totalUsed} unit="packets" />
+          <SummaryCard label="Dispatched" value={summary.totalDispatched} unit={unitLabel} />
+          <SummaryCard label={usedLabel} value={summary.totalUsed} unit={unitLabel} />
           <SummaryCard label="Shisha Sold" value={summary.totalSold} unit="orders" />
           <SummaryCard
             label="Net Mismatch"
@@ -357,8 +373,8 @@ const DailyClubReport = () => {
                     <tr className="border-b bg-muted/50">
                       <th className="p-3 text-left font-medium w-8"></th>
                       <th className="p-3 text-left font-medium">Club</th>
-                      <th className="p-3 text-center font-medium">Dispatched</th>
-                      <th className="p-3 text-center font-medium">Packets Used</th>
+                      <th className="p-3 text-center font-medium">{dispatchedLabel}</th>
+                      <th className="p-3 text-center font-medium">{usedLabel}</th>
                       <th className="p-3 text-center font-medium">Shisha Sold</th>
                       <th className="p-3 text-center font-medium">Mismatch</th>
                       <th className="p-3 text-center font-medium">Status</th>
@@ -416,7 +432,7 @@ const DailyClubReport = () => {
                                     <thead>
                                       <tr className="bg-muted/40">
                                         <th className="p-2 text-left font-medium pl-4">Flavour</th>
-                                        <th className="p-2 text-center font-medium">Dispatched</th>
+                                        <th className="p-2 text-center font-medium">{dispatchedLabel}</th>
                                       </tr>
                                     </thead>
                                     <tbody>
@@ -465,7 +481,7 @@ const DailyClubReport = () => {
         <div className="flex flex-wrap gap-4 text-xs text-muted-foreground px-1">
           <span className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-full bg-destructive/80" />
-            Positive mismatch = Leakage (packets used but not sold)
+            Positive mismatch = Leakage ({unitLabel} used but not sold)
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-full bg-orange-400" />

@@ -172,6 +172,11 @@
     padding-bottom: max(env(safe-area-inset-bottom, 0px), 0px);
   }
 
+  /* Safe area top padding for standalone PWA */
+  .safe-top {
+    padding-top: max(env(safe-area-inset-top, 0px), 0px);
+  }
+
   /* Sticky first column for tables */
   .sticky-first-col th:first-child,
   .sticky-first-col td:first-child {
