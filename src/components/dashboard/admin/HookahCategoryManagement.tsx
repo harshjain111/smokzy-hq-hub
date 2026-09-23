@@ -7,8 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, Trash2, Package } from "lucide-react";
+import { Plus, Trash2, Package, X } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 
 interface Venue {
   id: string;
@@ -23,12 +24,21 @@ interface HookahCategory {
   venue_name?: string;
 }
 
+const PRESET_CATEGORIES = [
+  "Normal Pot Normal Flavour",
+  "Normal Pot Premium Flavour",
+  "Premium Pot Normal Flavour",
+  "Premium Pot Premium Flavour",
+];
+
 const HookahCategoryManagement = () => {
   const [venues, setVenues] = useState<Venue[]>([]);
   const [categories, setCategories] = useState<HookahCategory[]>([]);
   const [open, setOpen] = useState(false);
   const [selectedVenueId, setSelectedVenueId] = useState("");
-  const [categoryName, setCategoryName] = useState("");
+  const [categoryNames, setCategoryNames] = useState<string[]>([]);
+  const [customInput, setCustomInput] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     fetchVenues();
@@ -64,7 +74,28 @@ const HookahCategoryManagement = () => {
     }
   };
 
-  const handleAddCategory = async (e: React.FormEvent) => {
+  const togglePreset = (name: string) => {
+    setCategoryNames((prev) =>
+      prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]
+    );
+  };
+
+  const addCustomCategory = () => {
+    const trimmed = customInput.trim();
+    if (!trimmed) return;
+    if (categoryNames.includes(trimmed)) {
+      toast.error("Already added");
+      return;
+    }
+    setCategoryNames((prev) => [...prev, trimmed]);
+    setCustomInput("");
+  };
+
+  const removeCategory = (name: string) => {
+    setCategoryNames((prev) => prev.filter((n) => n !== name));
+  };
+
+  const handleAddCategories = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!selectedVenueId) {
@@ -72,19 +103,30 @@ const HookahCategoryManagement = () => {
       return;
     }
 
+    if (categoryNames.length === 0) {
+      toast.error("Please select or add at least one category");
+      return;
+    }
+
+    setSubmitting(true);
+    const rows = categoryNames.map((name) => ({
+      venue_id: selectedVenueId,
+      category_name: name,
+    }));
+
     const { error } = await supabase
       .from("venue_hookah_categories")
-      .insert({
-        venue_id: selectedVenueId,
-        category_name: categoryName
-      });
+      .upsert(rows, { onConflict: "venue_id,category_name", ignoreDuplicates: true });
+
+    setSubmitting(false);
 
     if (error) {
-      toast.error("Failed to add category");
+      toast.error("Failed to add categories");
       console.error(error);
     } else {
-      toast.success("Category added successfully");
-      setCategoryName("");
+      toast.success(`${categoryNames.length} categor${categoryNames.length === 1 ? "y" : "ies"} added`);
+      setCategoryNames([]);
+      setCustomInput("");
       setSelectedVenueId("");
       setOpen(false);
       fetchCategories();
@@ -123,7 +165,6 @@ const HookahCategoryManagement = () => {
     }
   };
 
-  // Group categories by venue
   const groupedCategories = categories.reduce((acc, cat) => {
     if (!acc[cat.venue_id]) {
       acc[cat.venue_id] = [];
@@ -131,6 +172,10 @@ const HookahCategoryManagement = () => {
     acc[cat.venue_id].push(cat);
     return acc;
   }, {} as Record<string, HookahCategory[]>);
+
+  const existingForVenue = selectedVenueId
+    ? (groupedCategories[selectedVenueId] || []).map((c) => c.category_name)
+    : [];
 
   return (
     <div className="space-y-4">
@@ -143,12 +188,12 @@ const HookahCategoryManagement = () => {
               Add Category
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Add Hookah Category</DialogTitle>
-              <DialogDescription>Add a new hookah category for a venue</DialogDescription>
+              <DialogTitle>Add Hookah Categories</DialogTitle>
+              <DialogDescription>Select multiple categories or add custom ones</DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleAddCategory} className="space-y-4">
+            <form onSubmit={handleAddCategories} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="venue">Venue</Label>
                 <Select value={selectedVenueId} onValueChange={setSelectedVenueId}>
@@ -164,17 +209,84 @@ const HookahCategoryManagement = () => {
                   </SelectContent>
                 </Select>
               </div>
+
               <div className="space-y-2">
-                <Label htmlFor="categoryName">Category Name</Label>
-                <Input
-                  id="categoryName"
-                  value={categoryName}
-                  onChange={(e) => setCategoryName(e.target.value)}
-                  placeholder="e.g., Premium, Standard, Budget"
-                  required
-                />
+                <Label>Quick-add presets</Label>
+                <div className="flex flex-wrap gap-2">
+                  {PRESET_CATEGORIES.map((preset) => {
+                    const selected = categoryNames.includes(preset);
+                    const alreadyExists = existingForVenue.includes(preset);
+                    return (
+                      <button
+                        key={preset}
+                        type="button"
+                        disabled={alreadyExists}
+                        onClick={() => togglePreset(preset)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                          alreadyExists
+                            ? "border-muted bg-muted text-muted-foreground cursor-not-allowed line-through"
+                            : selected
+                              ? "border-primary bg-primary/15 text-primary"
+                              : "border-border bg-card text-foreground hover:border-primary/40"
+                        }`}
+                      >
+                        {preset}
+                        {alreadyExists && " (exists)"}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-              <Button type="submit" className="w-full">Add Category</Button>
+
+              <div className="space-y-2">
+                <Label>Custom category</Label>
+                <div className="flex gap-2">
+                  <Input
+                    value={customInput}
+                    onChange={(e) => setCustomInput(e.target.value)}
+                    placeholder="Type a custom name"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addCustomCategory();
+                      }
+                    }}
+                  />
+                  <Button type="button" variant="outline" size="sm" onClick={addCustomCategory} className="shrink-0">
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              {categoryNames.length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">
+                    {categoryNames.length} selected
+                  </Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {categoryNames.map((name) => (
+                      <Badge key={name} variant="secondary" className="gap-1 pr-1">
+                        {name}
+                        <button
+                          type="button"
+                          onClick={() => removeCategory(name)}
+                          className="ml-0.5 rounded-full hover:bg-destructive/20 p-0.5"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={submitting || categoryNames.length === 0}
+              >
+                {submitting ? "Adding..." : `Add ${categoryNames.length} Categor${categoryNames.length === 1 ? "y" : "ies"}`}
+              </Button>
             </form>
           </DialogContent>
         </Dialog>
@@ -183,7 +295,7 @@ const HookahCategoryManagement = () => {
       <div className="space-y-6">
         {venues.map((venue) => {
           const venueCategories = groupedCategories[venue.id] || [];
-          
+
           return (
             <Card key={venue.id}>
               <CardHeader>
@@ -232,7 +344,7 @@ const HookahCategoryManagement = () => {
             </Card>
           );
         })}
-        
+
         {venues.length === 0 && (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-10">
