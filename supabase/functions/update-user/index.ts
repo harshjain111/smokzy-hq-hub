@@ -1,5 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import {
+  assertCallerIsAdmin,
+  assertValidRole,
+  AuthzError,
+  countAdmins,
+  errorResponse,
+  getCurrentRole,
+  logAdminAudit,
+} from "../_shared/authz.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,15 +20,48 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+  let callerId: string | null = null;
+  let callerIp: string | null = null;
+  let targetUserId: string | null = null;
+  let oldRole: string | null = null;
+
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    // 1. AuthZ: caller must be an admin.
+    ({ callerId, ip: callerIp } = await assertCallerIsAdmin(req, supabaseAdmin));
 
-    const { userId, fullName, phone, password, role, venueId } = await req.json();
+    const body = await req.json();
+    const { userId, fullName, phone, password, role, venueId } = body ?? {};
 
-    console.log('Updating user:', { userId, fullName, phone, role, venueId });
+    if (!userId || typeof userId !== 'string') {
+      throw new AuthzError(400, 'Invalid request', 'missing userId');
+    }
+    targetUserId = userId;
+
+    // 2. Validate role against hardcoded allowlist.
+    assertValidRole(role);
+
+    // 3. Last-admin-demotion guard. Look up the target's current role; if
+    //    they're being demoted from admin and there is only one admin
+    //    left in the system, refuse. This prevents the "locked out at
+    //    2 AM" failure mode whether the caller is demoting themselves
+    //    or another admin.
+    oldRole = await getCurrentRole(supabaseAdmin, userId);
+    if (oldRole === 'admin' && role !== 'admin') {
+      const adminCount = await countAdmins(supabaseAdmin);
+      if (adminCount <= 1) {
+        throw new AuthzError(
+          409,
+          'Cannot demote the last admin — promote another user first',
+          `caller ${callerId} tried to demote last admin ${userId}`,
+        );
+      }
+    }
+
+    console.log('Updating user:', { userId, fullName, phone, role, venueId, callerId });
 
     // Update password if provided
     if (password) {
@@ -88,18 +130,31 @@ serve(async (req) => {
 
     console.log('User role updated to:', role);
 
+    logAdminAudit({
+      action: 'update_user',
+      caller_id: callerId,
+      target_user_id: targetUserId,
+      old_role: oldRole,
+      new_role: role,
+      ip: callerIp,
+      success: true,
+    });
+
     return new Response(
       JSON.stringify({ success: true }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating user:', error);
-    return new Response(
-      JSON.stringify({ error: error.message || 'Failed to update user' }),
-      { 
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
-    );
+    logAdminAudit({
+      action: 'update_user',
+      caller_id: callerId ?? 'unknown',
+      target_user_id: targetUserId,
+      old_role: oldRole,
+      ip: callerIp,
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return errorResponse(error, corsHeaders);
   }
 });

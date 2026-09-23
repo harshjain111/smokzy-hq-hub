@@ -9,6 +9,8 @@ import { ClubSession, AttendanceBlock, StaffBreak, StaffStatus } from "@/hooks/u
 import { compressImage } from "@/lib/imageCompression";
 import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
+import { reverseGeocode } from "@/lib/geocoding";
+import PermissionBlockedBanner from "@/components/PermissionBlockedBanner";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -73,7 +75,10 @@ const AttendanceModule = ({
   const [earlyExitLoading, setEarlyExitLoading] = useState(false);
   const [breakLoading, setBreakLoading] = useState(false);
   const [breakDuration, setBreakDuration] = useState(0);
-  
+  const [cameraBlocked, setCameraBlocked] = useState(false);
+  const [locationBlocked, setLocationBlocked] = useState(false);
+  const [locationAddress, setLocationAddress] = useState<string | null>(null);
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
@@ -139,7 +144,7 @@ const AttendanceModule = ({
         const permission = await navigator.permissions.query({ name: 'geolocation' });
         
         if (permission.state === 'denied') {
-          toast.error("Location access is blocked. Please enable it in your browser settings and refresh.");
+          setLocationBlocked(true);
           return false;
         }
         
@@ -185,11 +190,16 @@ const AttendanceModule = ({
           maximumAge: 0, // Don't use cached position
         });
       });
-      setLocation({
+      const coords = {
         lat: position.coords.latitude,
         lng: position.coords.longitude,
-      });
+      };
+      setLocation(coords);
+      setLocationBlocked(false);
       haptic('success');
+      reverseGeocode(coords.lat, coords.lng).then((addr) => {
+        if (addr) setLocationAddress(addr);
+      });
     } catch (error) {
       const geoError = error as GeolocationPositionError;
       console.error("Location error:", geoError.code, geoError.message);
@@ -198,7 +208,7 @@ const AttendanceModule = ({
       switch (geoError.code) {
         case 1: // PERMISSION_DENIED
           haptic('error');
-          toast.error("Location permission denied. Please enable location in your browser settings and refresh the page.");
+          setLocationBlocked(true);
           break;
         case 2: // POSITION_UNAVAILABLE
           if (retryCount < 2) {
@@ -249,9 +259,13 @@ const AttendanceModule = ({
           });
         }
       }, 100);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Camera error:", error);
-      toast.error("Failed to access camera. Please allow camera access.");
+      if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
+        setCameraBlocked(true);
+      } else {
+        toast.error("Failed to access camera. Please try again.");
+      }
       setFlowState('idle');
     }
   };
@@ -464,6 +478,7 @@ const AttendanceModule = ({
     setPhotoBlob(null);
     setPhotoPreview(null);
     setLocation(null);
+    setLocationAddress(null);
     setFlowState('idle');
     setIsCheckingOut(false);
     setIsEarlyExit(false);
@@ -646,6 +661,13 @@ const AttendanceModule = ({
               </p>
             </div>
 
+            {(cameraBlocked || locationBlocked) && (
+              <div className="w-full max-w-xs space-y-2">
+                {cameraBlocked && <PermissionBlockedBanner type="camera" />}
+                {locationBlocked && <PermissionBlockedBanner type="location" />}
+              </div>
+            )}
+
             <Button
               size="lg"
               onClick={handleCheckInStart}
@@ -727,8 +749,8 @@ const AttendanceModule = ({
               ) : location ? (
                 <>
                   <MapPin className="w-4 h-4 text-success" />
-                  <span className="text-white text-sm">
-                    Location: {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
+                  <span className="text-white text-sm truncate">
+                    {locationAddress || `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`}
                   </span>
                 </>
               ) : (

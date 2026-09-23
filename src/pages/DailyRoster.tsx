@@ -274,29 +274,59 @@ const DailyRoster = () => {
       .eq("date", date)
       .eq("status", "assigned");
 
-    if (!weekly || weekly.length === 0) return [];
+    if (weekly && weekly.length > 0) {
+      const missing = weekly.map(w => w.staff_id).filter(id => !profileMap.has(id));
+      if (missing.length > 0) {
+        const { data: profiles } = await supabase.from("profiles").select("id, full_name").in("id", missing);
+        (profiles || []).forEach(p => profileMap.set(p.id, p.full_name));
+      }
 
-    const missing = weekly.map(w => w.staff_id).filter(id => !profileMap.has(id));
+      return weekly.map(w => ({
+        staff_id: w.staff_id,
+        staff_name: profileMap.get(w.staff_id) || "Unknown",
+        role: "Staff",
+        shift_start: w.shift_start,
+        shift_end: w.shift_end,
+        source: "weekly" as const,
+        note: "",
+        is_removed: false,
+        _original: {
+          staff_id: w.staff_id,
+          role: "Staff",
+          shift_start: w.shift_start,
+          shift_end: w.shift_end,
+        },
+      }));
+    }
+
+    // No weekly assignments — auto-populate from venue's assigned staff
+    return await prefillFromVenueStaff(venueId, profileMap);
+  };
+
+  const prefillFromVenueStaff = async (venueId: string, profileMap: Map<string, string>): Promise<RosterRow[]> => {
+    const { data: venueStaff } = await supabase
+      .from("user_roles")
+      .select("user_id")
+      .eq("venue_id", venueId)
+      .eq("role", "employee");
+
+    if (!venueStaff || venueStaff.length === 0) return [];
+
+    const missing = venueStaff.map(s => s.user_id).filter(id => !profileMap.has(id));
     if (missing.length > 0) {
       const { data: profiles } = await supabase.from("profiles").select("id, full_name").in("id", missing);
       (profiles || []).forEach(p => profileMap.set(p.id, p.full_name));
     }
 
-    return weekly.map(w => ({
-      staff_id: w.staff_id,
-      staff_name: profileMap.get(w.staff_id) || "Unknown",
+    return venueStaff.map(s => ({
+      staff_id: s.user_id,
+      staff_name: profileMap.get(s.user_id) || "Unknown",
       role: "Staff",
-      shift_start: w.shift_start,
-      shift_end: w.shift_end,
+      shift_start: null,
+      shift_end: null,
       source: "weekly" as const,
       note: "",
       is_removed: false,
-      _original: {
-        staff_id: w.staff_id,
-        role: "Staff",
-        shift_start: w.shift_start,
-        shift_end: w.shift_end,
-      },
     }));
   };
 

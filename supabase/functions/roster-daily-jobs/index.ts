@@ -43,18 +43,40 @@ Deno.serve(async (req) => {
             .eq("date", targetDate)
             .eq("status", "assigned");
 
-          if (!weekly || weekly.length === 0) continue;
+          let rows: any[];
 
-          const rows = weekly.map((w: any) => ({
-            venue_id: venue.id,
-            date: targetDate,
-            staff_id: w.staff_id,
-            role: "Staff",
-            shift_start: w.shift_start,
-            shift_end: w.shift_end,
-            status: "draft",
-            source: "weekly",
-          }));
+          if (weekly && weekly.length > 0) {
+            rows = weekly.map((w: any) => ({
+              venue_id: venue.id,
+              date: targetDate,
+              staff_id: w.staff_id,
+              role: "Staff",
+              shift_start: w.shift_start,
+              shift_end: w.shift_end,
+              status: "draft",
+              source: "weekly",
+            }));
+          } else {
+            // Fallback: auto-populate from venue's assigned staff
+            const { data: venueStaff } = await supabase
+              .from("user_roles")
+              .select("user_id")
+              .eq("venue_id", venue.id)
+              .eq("role", "employee");
+
+            if (!venueStaff || venueStaff.length === 0) continue;
+
+            rows = venueStaff.map((s: any) => ({
+              venue_id: venue.id,
+              date: targetDate,
+              staff_id: s.user_id,
+              role: "Staff",
+              shift_start: null,
+              shift_end: null,
+              status: "draft",
+              source: "weekly",
+            }));
+          }
 
           await supabase.from("daily_roster").insert(rows);
 
