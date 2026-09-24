@@ -36,8 +36,9 @@ serve(async (req) => {
 
     console.log('Creating user:', { fullName, phone, role, venueId, callerId });
 
-    // Create auth user
-    const email = `${phone}@smokzy.com`;
+    // Create auth user — strip non-digit chars so the synthetic email is always valid
+    const sanitizedPhone = phone.replace(/\D/g, '');
+    const email = `${sanitizedPhone}@smokzy.com`;
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
