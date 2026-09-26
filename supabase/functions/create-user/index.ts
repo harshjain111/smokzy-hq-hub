@@ -36,8 +36,11 @@ serve(async (req) => {
 
     console.log('Creating user:', { fullName, phone, role, venueId, callerId });
 
-    // Create auth user — strip non-digit chars so the synthetic email is always valid
-    const sanitizedPhone = phone.replace(/\D/g, '');
+    // Normalize phone to 10-digit Indian number: strip non-digits, then strip leading 91 country code
+    let sanitizedPhone = phone.replace(/\D/g, '');
+    if (sanitizedPhone.length === 12 && sanitizedPhone.startsWith('91')) {
+      sanitizedPhone = sanitizedPhone.slice(2);
+    }
     const email = `${sanitizedPhone}@smokzy.com`;
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,

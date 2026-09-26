@@ -12,7 +12,7 @@ import loginBackground from "@/assets/login-background.jpg";
 import smokzyLogo from "@/assets/smokzy-logo.png";
 
 const phoneAuthSchema = z.object({
-  phone: z.string().regex(/^\d{10}$/, "Phone number must be 10 digits"),
+  phone: z.string().refine((val) => val.replace(/\D/g, '').length >= 10, "Enter a valid phone number"),
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
@@ -28,7 +28,12 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
 
   const isEmail = (input: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input);
-  const isPhone = (input: string) => /^\d{10}$/.test(input);
+  const normalizePhone = (input: string) => {
+    const digits = input.replace(/\D/g, '');
+    if (digits.length === 12 && digits.startsWith('91')) return digits.slice(2);
+    return digits;
+  };
+  const isPhone = (input: string) => normalizePhone(input).length === 10;
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -62,10 +67,10 @@ const Auth = () => {
         }
         emailToUse = loginIdentifier;
       } else if (isPhone(loginIdentifier)) {
-        // Convert phone to synthetic email
-        emailToUse = `${loginIdentifier}@smokzy.com`;
+        const digits = normalizePhone(loginIdentifier);
+        emailToUse = `${digits}@smokzy.com`;
       } else {
-        toast.error("Please enter a valid email or 10-digit mobile number");
+        toast.error("Please enter a valid email or mobile number");
         setLoading(false);
         return;
       }
