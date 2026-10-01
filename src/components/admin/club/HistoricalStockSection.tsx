@@ -94,7 +94,9 @@ export const HistoricalStockSection = ({ session, clubId, clubName, onSummaryCha
   };
 
   const hasData = prevDayTotal !== null && todayTotal !== null;
-  const actualConsumption = hasData ? (prevDayTotal + receivedToday - todayTotal) : null;
+  const rawConsumption = hasData ? (prevDayTotal + receivedToday - todayTotal) : null;
+  const actualConsumption = rawConsumption !== null ? Math.max(0, rawConsumption) : null;
+  const stockAdded = rawConsumption !== null && rawConsumption < 0 ? Math.abs(rawConsumption) : 0;
   const predictedConsumption = totalSales * gramsPerChillum;
 
   const downloadExcel = async () => {
@@ -134,15 +136,15 @@ export const HistoricalStockSection = ({ session, clubId, clubName, onSummaryCha
             </div>
           </div>
 
-          {receivedToday > 0 && (
+          {stockAdded > 0 && (
             <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/30 text-center">
-              <span className="text-xs text-blue-600 dark:text-blue-400">+{receivedToday}g received today</span>
+              <span className="text-xs text-blue-600 dark:text-blue-400">+{stockAdded}g stock added today</span>
             </div>
           )}
 
           <div className="grid grid-cols-2 gap-2">
             <div className="p-3 rounded-lg bg-muted/30 text-center">
-              <div className={`text-lg font-bold ${actualConsumption! < 0 ? 'text-orange-500' : ''}`}>
+              <div className="text-lg font-bold">
                 {actualConsumption}g
               </div>
               <p className="text-[10px] text-muted-foreground">Actual Consumption</p>
