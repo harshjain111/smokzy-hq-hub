@@ -197,7 +197,7 @@ const VenueReports = () => {
       <div className="space-y-4 md:space-y-6">
         <Button
           variant="outline"
-          onClick={() => navigate(`/club/${venueId}`)}
+          onClick={() => navigate(-1)}
           className="w-full md:w-auto"
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
