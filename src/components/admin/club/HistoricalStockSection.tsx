@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Download } from "lucide-react";
 import { exportToXlsx } from "@/lib/exportXlsx";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -25,12 +24,9 @@ interface StockItem {
 
 export const HistoricalStockSection = ({ session, clubId, clubName, onSummaryChange }: HistoricalStockSectionProps) => {
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
-  const [dailySnapshot, setDailySnapshot] = useState<{
-    opening_stock: number | null;
-    closing_stock: number | null;
-    packets_received: number;
-    packets_used: number;
-  } | null>(null);
+  const [prevDayTotal, setPrevDayTotal] = useState<number | null>(null);
+  const [todayTotal, setTodayTotal] = useState<number | null>(null);
+  const [receivedToday, setReceivedToday] = useState(0);
   const [totalSales, setTotalSales] = useState(0);
   const [gramsPerChillum, setGramsPerChillum] = useState(25);
   const [loading, setLoading] = useState(true);
@@ -48,7 +44,11 @@ export const HistoricalStockSection = ({ session, clubId, clubName, onSummaryCha
   const fetchStockData = async () => {
     setLoading(true);
     try {
-      const [salesRes, snapshotRes, stockRes, settingsRes] = await Promise.all([
+      const prevDate = new Date(session.session_date + "T00:00:00");
+      prevDate.setDate(prevDate.getDate() - 1);
+      const prevDateStr = prevDate.toISOString().split("T")[0];
+
+      const [salesRes, todaySnapshotRes, prevSnapshotRes, stockRes, settingsRes] = await Promise.all([
         supabase
           .from("sales_reports")
           .select("quantity_sold")
@@ -56,9 +56,15 @@ export const HistoricalStockSection = ({ session, clubId, clubName, onSummaryCha
           .eq("report_date", session.session_date),
         supabase
           .from("venue_stock_daily")
-          .select("opening_stock, closing_stock, packets_received, packets_used")
+          .select("closing_stock, packets_received")
           .eq("venue_id", clubId)
           .eq("date", session.session_date)
+          .maybeSingle(),
+        supabase
+          .from("venue_stock_daily")
+          .select("closing_stock")
+          .eq("venue_id", clubId)
+          .eq("date", prevDateStr)
           .maybeSingle(),
         supabase
           .from("stock")
@@ -75,7 +81,9 @@ export const HistoricalStockSection = ({ session, clubId, clubName, onSummaryCha
 
       const sales = salesRes.data?.reduce((sum, s) => sum + s.quantity_sold, 0) || 0;
       setTotalSales(sales);
-      setDailySnapshot(snapshotRes.data || null);
+      setTodayTotal(todaySnapshotRes.data?.closing_stock ?? null);
+      setPrevDayTotal(prevSnapshotRes.data?.closing_stock ?? null);
+      setReceivedToday(todaySnapshotRes.data?.packets_received || 0);
       setStockItems(stockRes.data || []);
       if (settingsRes.data?.value) setGramsPerChillum(Number(settingsRes.data.value) || 25);
     } catch (error) {
@@ -85,23 +93,15 @@ export const HistoricalStockSection = ({ session, clubId, clubName, onSummaryCha
     }
   };
 
-  const predictedConsumption = Math.round(totalSales * gramsPerChillum);
-  const actualConsumption = dailySnapshot?.packets_used || 0;
-  const variance = actualConsumption - predictedConsumption;
+  const hasData = prevDayTotal !== null && todayTotal !== null;
+  const actualConsumption = hasData ? (prevDayTotal + receivedToday - todayTotal) : null;
+  const predictedConsumption = totalSales * gramsPerChillum;
 
   const downloadExcel = async () => {
     const rows = stockItems.map(item => ({
       Item: item.item_name,
-      "Current Quantity (g)": item.quantity,
+      "Quantity (g)": item.quantity,
     }));
-
-    if (dailySnapshot) {
-      rows.push({
-        Item: "--- Daily Summary ---",
-        "Current Quantity (g)": 0,
-      });
-    }
-
     await exportToXlsx(rows, `${clubName}_Stock_${session.session_date}.xlsx`, "Stock");
   };
 
@@ -120,53 +120,46 @@ export const HistoricalStockSection = ({ session, clubId, clubName, onSummaryCha
         Export Stock Report
       </Button>
 
-      {/* Daily Consumption Summary */}
-      {dailySnapshot ? (
-        <div className="grid grid-cols-2 gap-2">
-          <div className="p-2.5 rounded-lg bg-muted/30 text-center">
-            <div className="text-lg font-bold">{dailySnapshot.opening_stock ?? "—"}<span className="text-xs font-normal text-muted-foreground">g</span></div>
-            <p className="text-[9px] text-muted-foreground">Opening Stock</p>
+      {/* Simple consumption summary */}
+      {hasData ? (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="p-3 rounded-lg bg-muted/30 text-center">
+              <div className="text-lg font-bold">{prevDayTotal}g</div>
+              <p className="text-[10px] text-muted-foreground">Previous Day Stock</p>
+            </div>
+            <div className="p-3 rounded-lg bg-muted/30 text-center">
+              <div className="text-lg font-bold">{todayTotal}g</div>
+              <p className="text-[10px] text-muted-foreground">Today's Stock</p>
+            </div>
           </div>
-          <div className="p-2.5 rounded-lg bg-muted/30 text-center">
-            <div className="text-lg font-bold">{dailySnapshot.closing_stock ?? "—"}<span className="text-xs font-normal text-muted-foreground">g</span></div>
-            <p className="text-[9px] text-muted-foreground">Closing Stock</p>
-          </div>
-          <div className="p-2.5 rounded-lg bg-muted/30 text-center">
-            <div className="text-lg font-bold">{dailySnapshot.packets_received}<span className="text-xs font-normal text-muted-foreground">g</span></div>
-            <p className="text-[9px] text-muted-foreground">Received</p>
-          </div>
-          <div className="p-2.5 rounded-lg bg-muted/30 text-center">
-            <div className="text-lg font-bold">{actualConsumption}<span className="text-xs font-normal text-muted-foreground">g</span></div>
-            <p className="text-[9px] text-muted-foreground">Used (Actual)</p>
+
+          {receivedToday > 0 && (
+            <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/30 text-center">
+              <span className="text-xs text-blue-600 dark:text-blue-400">+{receivedToday}g received today</span>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-2">
+            <div className="p-3 rounded-lg bg-muted/30 text-center">
+              <div className={`text-lg font-bold ${actualConsumption! < 0 ? 'text-orange-500' : ''}`}>
+                {actualConsumption}g
+              </div>
+              <p className="text-[10px] text-muted-foreground">Actual Consumption</p>
+            </div>
+            <div className="p-3 rounded-lg bg-muted/30 text-center">
+              <div className="text-lg font-bold">{predictedConsumption}g</div>
+              <p className="text-[10px] text-muted-foreground">
+                Predicted ({totalSales} × {gramsPerChillum}g)
+              </p>
+            </div>
           </div>
         </div>
       ) : (
-        <div className="p-2.5 rounded-lg bg-muted/50 text-xs text-muted-foreground text-center">
+        <div className="p-3 rounded-lg bg-muted/50 text-xs text-muted-foreground text-center">
           No daily stock snapshot recorded for this date.
         </div>
       )}
-
-      {/* Consumption comparison */}
-      <div className="grid grid-cols-3 gap-2">
-        <div className="p-2.5 rounded-lg bg-muted/30 text-center">
-          <div className="text-lg font-bold">{actualConsumption}<span className="text-xs font-normal text-muted-foreground">g</span></div>
-          <p className="text-[9px] text-muted-foreground">Actual</p>
-        </div>
-        <div className="p-2.5 rounded-lg bg-muted/30 text-center">
-          <div className="text-lg font-bold">{predictedConsumption}<span className="text-xs font-normal text-muted-foreground">g</span></div>
-          <p className="text-[9px] text-muted-foreground">Predicted ({totalSales} × {gramsPerChillum}g)</p>
-        </div>
-        <div className={`p-2.5 rounded-lg text-center ${
-          variance > 0 ? 'bg-destructive/10' : variance < 0 ? 'bg-orange-50 dark:bg-orange-950/30' : 'bg-success/10'
-        }`}>
-          <div className={`text-lg font-bold ${
-            variance > 0 ? 'text-destructive' : variance < 0 ? 'text-orange-500' : 'text-success'
-          }`}>
-            {variance > 0 ? "+" : ""}{variance}<span className="text-xs font-normal">g</span>
-          </div>
-          <p className="text-[9px] text-muted-foreground">Variance</p>
-        </div>
-      </div>
 
       {/* Per-item stock table */}
       <div className="border rounded-lg max-h-[280px] overflow-auto">

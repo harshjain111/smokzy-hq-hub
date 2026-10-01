@@ -83,8 +83,9 @@ const VenueReports = () => {
           .order("report_date", { ascending: false }),
         supabase
           .from("staff_attendance_blocks")
-          .select("*, profiles:user_id(full_name)")
+          .select("*")
           .eq("venue_id", venueId)
+          .eq("is_break", false)
           .gte("check_in_time", `${fromDate}T00:00:00`)
           .lte("check_in_time", `${toDate}T23:59:59`)
           .order("check_in_time", { ascending: false }),
@@ -104,9 +105,25 @@ const VenueReports = () => {
 
       setStockDailyData(stockDailyRes.data || []);
       setSalesData(salesRes.data || []);
-      setAttendanceData(attendanceRes.data || []);
       setBreakageData(breakageRes.data || []);
       if (settingsRes.data?.value) setGramsPerChillum(Number(settingsRes.data.value) || 25);
+
+      // Fetch profile names for attendance user_ids (no FK exists)
+      const rawAttendance = attendanceRes.data || [];
+      if (rawAttendance.length > 0) {
+        const userIds = [...new Set(rawAttendance.map((a: any) => a.user_id))];
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, full_name")
+          .in("id", userIds);
+        const profileMap = new Map((profiles || []).map((p: any) => [p.id, p.full_name]));
+        setAttendanceData(rawAttendance.map((a: any) => ({
+          ...a,
+          profiles: { full_name: profileMap.get(a.user_id) || "Unknown" },
+        })));
+      } else {
+        setAttendanceData([]);
+      }
     } catch (error) {
       console.error("Error fetching reports:", error);
       toast.error("Failed to load reports");
@@ -116,12 +133,9 @@ const VenueReports = () => {
   };
 
   const exportStockCSV = () => {
-    const headers = ["Date", "Opening Stock (g)", "Received (g)", "Used (g)", "Closing Stock (g)"];
+    const headers = ["Date", "Closing Stock (g)"];
     const rows = stockDailyData.map(d => [
       d.date,
-      d.opening_stock ?? "",
-      d.packets_received,
-      d.packets_used,
       d.closing_stock ?? "",
     ]);
     downloadCSV(headers, rows, `${venueName}-stock-daily`);
@@ -293,11 +307,8 @@ const VenueReports = () => {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="text-xs font-semibold min-w-[90px]">Date</TableHead>
-                          <TableHead className="text-xs text-center font-semibold min-w-[90px]">Opening (g)</TableHead>
-                          <TableHead className="text-xs text-center font-semibold min-w-[90px]">Received (g)</TableHead>
-                          <TableHead className="text-xs text-center font-semibold min-w-[90px]">Used (g)</TableHead>
-                          <TableHead className="text-xs text-center font-semibold min-w-[90px]">Closing (g)</TableHead>
+                          <TableHead className="text-xs font-semibold min-w-[120px]">Date</TableHead>
+                          <TableHead className="text-xs text-center font-semibold min-w-[120px]">Closing Stock (g)</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -306,24 +317,9 @@ const VenueReports = () => {
                             <TableCell className="text-xs font-medium">
                               {format(new Date(d.date + "T00:00:00"), "dd MMM, EEE")}
                             </TableCell>
-                            <TableCell className="text-xs text-center">{d.opening_stock ?? "—"}</TableCell>
-                            <TableCell className="text-xs text-center">{d.packets_received}</TableCell>
-                            <TableCell className="text-xs text-center font-medium">{d.packets_used}</TableCell>
-                            <TableCell className="text-xs text-center">{d.closing_stock ?? "—"}</TableCell>
+                            <TableCell className="text-xs text-center font-medium">{d.closing_stock ?? "—"}</TableCell>
                           </TableRow>
                         ))}
-                        {/* Totals row */}
-                        <TableRow className="border-t-2 bg-muted/50 font-semibold">
-                          <TableCell className="text-xs">TOTAL</TableCell>
-                          <TableCell className="text-xs text-center">—</TableCell>
-                          <TableCell className="text-xs text-center">
-                            {stockDailyData.reduce((s, d) => s + (d.packets_received || 0), 0)}
-                          </TableCell>
-                          <TableCell className="text-xs text-center font-bold">
-                            {stockDailyData.reduce((s, d) => s + (d.packets_used || 0), 0)}
-                          </TableCell>
-                          <TableCell className="text-xs text-center">—</TableCell>
-                        </TableRow>
                       </TableBody>
                     </Table>
                   )}
