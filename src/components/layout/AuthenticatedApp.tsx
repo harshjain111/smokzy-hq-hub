@@ -113,6 +113,7 @@ const AuthenticatedApp = () => {
           <Route path="/club/:clubId" element={<ClubDetail />} />
           <Route path="/venue/:venueId" element={<VenueDetail />} />
           <Route path="/venue/:venueId/reports" element={<VenueReports />} />
+          <Route path="/club/:venueId/reports" element={<VenueReports />} />
 
           <Route path="/manage-employees" element={guard([...ADMIN_ONLY], <ManageEmployees />)} />
 

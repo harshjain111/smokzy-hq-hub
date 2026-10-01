@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, RefreshCw, Users, Activity, TrendingUp, TrendingDown, Package } from "lucide-react";
+import { ArrowLeft, RefreshCw, Users, Activity, TrendingUp, TrendingDown, Package, FileBarChart } from "lucide-react";
 import { ClubOverviewSection, SessionHealth } from "@/components/admin/club/ClubOverviewSection";
 import { ClubSalesSection } from "@/components/admin/club/ClubSalesSection";
 import { ClubStockSection } from "@/components/admin/club/ClubStockSection";
@@ -145,9 +145,14 @@ const ClubDetail = () => {
             </div>
           </div>
 
-          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={refresh}>
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => navigate(`/club/${clubId}/reports`)}>
+              <FileBarChart className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={refresh}>
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
         </div>
 
         {/* Live/History Toggle */}
