@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { format, startOfMonth, endOfMonth, subMonths, eachDayOfInterval } from "date-fns";
+import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { CalendarIcon, Download, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import PageLayout from "@/components/PageLayout";
@@ -19,24 +19,17 @@ interface DateRange {
   to: Date;
 }
 
-interface StockRecord {
-  item_name: string;
-  category: string;
-  date: string;
-  quantity: number;
-  updated_at: string;
-}
-
 const VenueReports = () => {
   const { venueId } = useParams();
   const navigate = useNavigate();
   const [venueName, setVenueName] = useState("");
   const [dateRangeType, setDateRangeType] = useState<"current" | "last" | "custom">("current");
   const [customRange, setCustomRange] = useState<DateRange | null>(null);
-  const [stockData, setStockData] = useState<any[]>([]);
+  const [stockDailyData, setStockDailyData] = useState<any[]>([]);
   const [salesData, setSalesData] = useState<any[]>([]);
   const [attendanceData, setAttendanceData] = useState<any[]>([]);
   const [breakageData, setBreakageData] = useState<any[]>([]);
+  const [gramsPerChillum, setGramsPerChillum] = useState(25);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -52,10 +45,7 @@ const VenueReports = () => {
       .select("name")
       .eq("id", venueId)
       .maybeSingle();
-
-    if (data) {
-      setVenueName(data.name);
-    }
+    if (data) setVenueName(data.name);
   };
 
   const getDateRange = (): DateRange => {
@@ -76,26 +66,47 @@ const VenueReports = () => {
       const fromDate = format(range.from, "yyyy-MM-dd");
       const toDate = format(range.to, "yyyy-MM-dd");
 
-      const [stockRes, salesRes, attendanceRes, breakageRes] = await Promise.all([
-        supabase.from("stock").select("*").eq("venue_id", venueId),
-        supabase.from("sales_reports").select("*, venue_hookah_categories(category_name)")
+      const [stockDailyRes, salesRes, attendanceRes, breakageRes, settingsRes] = await Promise.all([
+        supabase
+          .from("venue_stock_daily")
+          .select("*")
+          .eq("venue_id", venueId)
+          .gte("date", fromDate)
+          .lte("date", toDate)
+          .order("date", { ascending: false }),
+        supabase
+          .from("sales_reports")
+          .select("*, venue_hookah_categories(category_name)")
           .eq("venue_id", venueId)
           .gte("report_date", fromDate)
-          .lte("report_date", toDate),
-        supabase.from("attendance").select("*, profiles(full_name)")
+          .lte("report_date", toDate)
+          .order("report_date", { ascending: false }),
+        supabase
+          .from("staff_attendance_blocks")
+          .select("*, profiles:user_id(full_name)")
           .eq("venue_id", venueId)
           .gte("check_in_time", `${fromDate}T00:00:00`)
-          .lte("check_in_time", `${toDate}T23:59:59`),
-        supabase.from("breakage_reports").select("*")
+          .lte("check_in_time", `${toDate}T23:59:59`)
+          .order("check_in_time", { ascending: false }),
+        supabase
+          .from("breakage_reports")
+          .select("*")
           .eq("venue_id", venueId)
           .gte("created_at", `${fromDate}T00:00:00`)
-          .lte("created_at", `${toDate}T23:59:59`),
+          .lte("created_at", `${toDate}T23:59:59`)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("global_settings")
+          .select("value")
+          .eq("key", "grams_per_chillum")
+          .maybeSingle(),
       ]);
 
-      setStockData(stockRes.data || []);
+      setStockDailyData(stockDailyRes.data || []);
       setSalesData(salesRes.data || []);
       setAttendanceData(attendanceRes.data || []);
       setBreakageData(breakageRes.data || []);
+      if (settingsRes.data?.value) setGramsPerChillum(Number(settingsRes.data.value) || 25);
     } catch (error) {
       console.error("Error fetching reports:", error);
       toast.error("Failed to load reports");
@@ -104,56 +115,89 @@ const VenueReports = () => {
     }
   };
 
-  const getStockMatrix = () => {
-    const range = getDateRange();
-    const dates = eachDayOfInterval({ start: range.from, end: range.to });
-    
-    const itemsMap = new Map();
-    stockData.forEach(item => {
-      if (!itemsMap.has(item.item_name)) {
-        itemsMap.set(item.item_name, {
-          name: item.item_name,
-          category: item.category,
-          unit: item.unit,
-          quantities: new Map(),
-        });
-      }
-    });
-
-    return {
-      dates,
-      items: Array.from(itemsMap.values()),
-    };
+  const exportStockCSV = () => {
+    const headers = ["Date", "Opening Stock (g)", "Received (g)", "Used (g)", "Closing Stock (g)"];
+    const rows = stockDailyData.map(d => [
+      d.date,
+      d.opening_stock ?? "",
+      d.packets_received,
+      d.packets_used,
+      d.closing_stock ?? "",
+    ]);
+    downloadCSV(headers, rows, `${venueName}-stock-daily`);
   };
 
-  const exportStockReport = () => {
-    const { dates, items } = getStockMatrix();
-    const headers = ["Item Name", "Category", "Unit", ...dates.map(d => format(d, "dd-MM-yyyy"))];
-    const rows = items.map(item => [
-      item.name,
-      item.category,
-      item.unit,
-      ...dates.map(date => {
-        const dateKey = format(date, "yyyy-MM-dd");
-        return item.quantities.get(dateKey) || "-";
-      }),
-    ]);
+  const exportSalesCSV = () => {
+    const salesByDate = new Map<string, { total: number; categories: Record<string, number> }>();
+    salesData.forEach((s: any) => {
+      const dateKey = s.report_date;
+      if (!salesByDate.has(dateKey)) salesByDate.set(dateKey, { total: 0, categories: {} });
+      const entry = salesByDate.get(dateKey)!;
+      const catName = s.venue_hookah_categories?.category_name || "Other";
+      entry.categories[catName] = (entry.categories[catName] || 0) + s.quantity_sold;
+      entry.total += s.quantity_sold;
+    });
 
-    const csv = [headers, ...rows].map(row => row.join(",")).join("\n");
+    const allCategories = [...new Set(salesData.map((s: any) => s.venue_hookah_categories?.category_name || "Other"))];
+    const headers = ["Date", ...allCategories, "Total"];
+    const rows = [...salesByDate.entries()]
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(([date, data]) => [
+        date,
+        ...allCategories.map(c => data.categories[c] || 0),
+        data.total,
+      ]);
+    downloadCSV(headers, rows, `${venueName}-sales`);
+  };
+
+  const exportAttendanceCSV = () => {
+    const headers = ["Date", "Employee", "Check In", "Check Out", "Hours"];
+    const rows = attendanceData.map((r: any) => {
+      const checkIn = new Date(r.check_in_time);
+      const checkOut = r.check_out_time ? new Date(r.check_out_time) : null;
+      const hours = checkOut ? ((checkOut.getTime() - checkIn.getTime()) / 3600000).toFixed(1) : "—";
+      return [
+        format(checkIn, "yyyy-MM-dd"),
+        r.profiles?.full_name || "Unknown",
+        format(checkIn, "hh:mm a"),
+        checkOut ? format(checkOut, "hh:mm a") : "—",
+        hours,
+      ];
+    });
+    downloadCSV(headers, rows, `${venueName}-attendance`);
+  };
+
+  const downloadCSV = (headers: string[], rows: any[][], prefix: string) => {
+    const csv = [headers, ...rows].map(row => row.map(v => `"${v}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${venueName}-stock-report-${format(new Date(), "yyyy-MM-dd")}.csv`;
+    a.download = `${prefix}-${format(new Date(), "yyyy-MM-dd")}.csv`;
     a.click();
+    window.URL.revokeObjectURL(url);
+    toast.success("CSV downloaded");
+  };
+
+  const getSalesByDate = () => {
+    const grouped = new Map<string, { total: number; categories: Record<string, number> }>();
+    salesData.forEach((s: any) => {
+      const dateKey = s.report_date;
+      if (!grouped.has(dateKey)) grouped.set(dateKey, { total: 0, categories: {} });
+      const entry = grouped.get(dateKey)!;
+      const catName = s.venue_hookah_categories?.category_name || "Other";
+      entry.categories[catName] = (entry.categories[catName] || 0) + s.quantity_sold;
+      entry.total += s.quantity_sold;
+    });
+    return [...grouped.entries()].sort(([a], [b]) => b.localeCompare(a));
   };
 
   return (
-    <PageLayout title={`${venueName} - Reports`} subtitle="Detailed analytics">
+    <PageLayout title={`${venueName} — Reports`} subtitle="Monthly stock, sales & attendance reports">
       <div className="space-y-4 md:space-y-6">
         <Button
           variant="outline"
-          onClick={() => navigate(`/venue/${venueId}`)}
+          onClick={() => navigate(`/club/${venueId}`)}
           className="w-full md:w-auto"
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
@@ -229,55 +273,57 @@ const VenueReports = () => {
             </TabsList>
           </div>
 
-          {/* Stock Report Matrix */}
+          {/* Stock Daily Report */}
           <TabsContent value="stock">
             <Card>
               <CardHeader className="flex flex-col md:flex-row md:items-center justify-between space-y-2 md:space-y-0 pb-3">
-                <CardTitle className="text-base md:text-xl">Stock Movement</CardTitle>
-                <Button onClick={exportStockReport} variant="outline" size="sm" className="w-full md:w-auto">
+                <CardTitle className="text-base md:text-xl">Daily Stock Report</CardTitle>
+                <Button onClick={exportStockCSV} variant="outline" size="sm" className="w-full md:w-auto">
                   <Download className="mr-2 h-4 w-4" />
-                  Export
+                  Export CSV
                 </Button>
               </CardHeader>
               <CardContent className="p-0 overflow-hidden">
                 <div className="overflow-x-auto">
                   {loading ? (
-                    <div className="p-8 text-center text-sm">Loading...</div>
+                    <div className="p-8 text-center text-sm text-muted-foreground">Loading...</div>
+                  ) : stockDailyData.length === 0 ? (
+                    <div className="p-8 text-center text-sm text-muted-foreground">No daily stock data for this period</div>
                   ) : (
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="sticky left-0 bg-background z-20 border-r font-semibold min-w-[100px] md:min-w-[150px] text-xs">Item</TableHead>
-                          <TableHead className="sticky left-[100px] md:left-[150px] bg-background z-20 border-r font-semibold min-w-[70px] md:min-w-[100px] text-xs">Cat</TableHead>
-                          <TableHead className="sticky left-[170px] md:left-[250px] bg-background z-20 border-r font-semibold min-w-[50px] md:min-w-[80px] text-xs">Unit</TableHead>
-                          {getStockMatrix().dates.map((date) => (
-                            <TableHead key={date.toISOString()} className="text-center border-r min-w-[70px] md:min-w-[100px] font-semibold">
-                              <div className="text-xs">{format(date, "dd/MM")}</div>
-                              <div className="text-[9px] text-muted-foreground font-normal hidden md:block">{format(date, "EEE")}</div>
-                            </TableHead>
-                          ))}
-                          <TableHead className="sticky right-0 bg-background z-20 border-l font-semibold text-center min-w-[70px] md:min-w-[100px] text-xs">Now</TableHead>
+                          <TableHead className="text-xs font-semibold min-w-[90px]">Date</TableHead>
+                          <TableHead className="text-xs text-center font-semibold min-w-[90px]">Opening (g)</TableHead>
+                          <TableHead className="text-xs text-center font-semibold min-w-[90px]">Received (g)</TableHead>
+                          <TableHead className="text-xs text-center font-semibold min-w-[90px]">Used (g)</TableHead>
+                          <TableHead className="text-xs text-center font-semibold min-w-[90px]">Closing (g)</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {getStockMatrix().items.map((item, idx) => {
-                          const currentStock = stockData.find(s => s.item_name === item.name);
-                          return (
-                            <TableRow key={idx}>
-                              <TableCell className="sticky left-0 bg-background z-10 border-r font-medium text-xs">{item.name}</TableCell>
-                              <TableCell className="sticky left-[100px] md:left-[150px] bg-background z-10 border-r capitalize text-xs truncate">{item.category.replace('_', ' ')}</TableCell>
-                              <TableCell className="sticky left-[170px] md:left-[250px] bg-background z-10 border-r text-xs">{item.unit}</TableCell>
-                              {getStockMatrix().dates.map((date) => (
-                                <TableCell key={date.toISOString()} className="text-center border-r text-muted-foreground text-xs">
-                                  -
-                                </TableCell>
-                              ))}
-                              <TableCell className="sticky right-0 bg-background z-10 border-l text-center font-semibold text-xs">
-                                {currentStock?.quantity || 0}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
+                        {stockDailyData.map((d) => (
+                          <TableRow key={d.id}>
+                            <TableCell className="text-xs font-medium">
+                              {format(new Date(d.date + "T00:00:00"), "dd MMM, EEE")}
+                            </TableCell>
+                            <TableCell className="text-xs text-center">{d.opening_stock ?? "—"}</TableCell>
+                            <TableCell className="text-xs text-center">{d.packets_received}</TableCell>
+                            <TableCell className="text-xs text-center font-medium">{d.packets_used}</TableCell>
+                            <TableCell className="text-xs text-center">{d.closing_stock ?? "—"}</TableCell>
+                          </TableRow>
+                        ))}
+                        {/* Totals row */}
+                        <TableRow className="border-t-2 bg-muted/50 font-semibold">
+                          <TableCell className="text-xs">TOTAL</TableCell>
+                          <TableCell className="text-xs text-center">—</TableCell>
+                          <TableCell className="text-xs text-center">
+                            {stockDailyData.reduce((s, d) => s + (d.packets_received || 0), 0)}
+                          </TableCell>
+                          <TableCell className="text-xs text-center font-bold">
+                            {stockDailyData.reduce((s, d) => s + (d.packets_used || 0), 0)}
+                          </TableCell>
+                          <TableCell className="text-xs text-center">—</TableCell>
+                        </TableRow>
                       </TableBody>
                     </Table>
                   )}
@@ -289,33 +335,49 @@ const VenueReports = () => {
           {/* Sales Analysis */}
           <TabsContent value="sales">
             <Card>
-              <CardHeader>
-                <CardTitle className="text-base md:text-xl">Sales Summary</CardTitle>
+              <CardHeader className="flex flex-col md:flex-row md:items-center justify-between space-y-2 md:space-y-0 pb-3">
+                <CardTitle className="text-base md:text-xl">Daily Sales Report</CardTitle>
+                <Button onClick={exportSalesCSV} variant="outline" size="sm" className="w-full md:w-auto">
+                  <Download className="mr-2 h-4 w-4" />
+                  Export CSV
+                </Button>
               </CardHeader>
               <CardContent className="overflow-x-auto p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-xs min-w-[100px]">Date</TableHead>
-                      <TableHead className="text-xs min-w-[120px]">Category</TableHead>
-                      <TableHead className="text-right text-xs min-w-[80px]">Qty</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {salesData.map((sale) => (
-                      <TableRow key={sale.id}>
-                        <TableCell className="text-xs">{format(new Date(sale.report_date), "MMM dd")}</TableCell>
-                        <TableCell className="text-xs truncate max-w-[150px]">{(sale as any).venue_hookah_categories?.category_name || "N/A"}</TableCell>
-                        <TableCell className="text-right font-medium text-xs">{sale.quantity_sold}</TableCell>
-                      </TableRow>
-                    ))}
-                    {salesData.length === 0 && (
+                {loading ? (
+                  <div className="p-8 text-center text-sm text-muted-foreground">Loading...</div>
+                ) : getSalesByDate().length === 0 ? (
+                  <div className="p-8 text-center text-sm text-muted-foreground">No sales data for this period</div>
+                ) : (
+                  <Table>
+                    <TableHeader>
                       <TableRow>
-                        <TableCell colSpan={3} className="text-center text-muted-foreground text-xs py-8">No sales data</TableCell>
+                        <TableHead className="text-xs min-w-[90px] font-semibold">Date</TableHead>
+                        <TableHead className="text-xs min-w-[150px] font-semibold">Category Breakdown</TableHead>
+                        <TableHead className="text-right text-xs min-w-[70px] font-semibold">Total</TableHead>
                       </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {getSalesByDate().map(([date, data]) => (
+                        <TableRow key={date}>
+                          <TableCell className="text-xs font-medium">
+                            {format(new Date(date + "T00:00:00"), "dd MMM, EEE")}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {Object.entries(data.categories).map(([cat, qty]) => `${cat}: ${qty}`).join(" · ")}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold text-xs">{data.total}</TableCell>
+                        </TableRow>
+                      ))}
+                      <TableRow className="border-t-2 bg-muted/50 font-semibold">
+                        <TableCell className="text-xs">TOTAL</TableCell>
+                        <TableCell className="text-xs"></TableCell>
+                        <TableCell className="text-right text-xs font-bold">
+                          {getSalesByDate().reduce((s, [, d]) => s + d.total, 0)}
+                        </TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -323,35 +385,49 @@ const VenueReports = () => {
           {/* Attendance */}
           <TabsContent value="attendance">
             <Card>
-              <CardHeader>
-                <CardTitle className="text-base md:text-xl">Attendance</CardTitle>
+              <CardHeader className="flex flex-col md:flex-row md:items-center justify-between space-y-2 md:space-y-0 pb-3">
+                <CardTitle className="text-base md:text-xl">Punch In / Punch Out Report</CardTitle>
+                <Button onClick={exportAttendanceCSV} variant="outline" size="sm" className="w-full md:w-auto">
+                  <Download className="mr-2 h-4 w-4" />
+                  Export CSV
+                </Button>
               </CardHeader>
               <CardContent className="overflow-x-auto p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-xs min-w-[100px]">Employee</TableHead>
-                      <TableHead className="text-xs min-w-[110px]">Check In</TableHead>
-                      <TableHead className="text-xs min-w-[110px] hidden md:table-cell">Check Out</TableHead>
-                      <TableHead className="text-xs min-w-[60px] text-center">Done</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {attendanceData.map((record) => (
-                      <TableRow key={record.id}>
-                        <TableCell className="text-xs font-medium">{(record as any).profiles?.full_name || "N/A"}</TableCell>
-                        <TableCell className="text-xs whitespace-nowrap">{format(new Date(record.check_in_time), "MMM dd, hh:mm a")}</TableCell>
-                        <TableCell className="text-xs whitespace-nowrap hidden md:table-cell">{record.check_out_time ? format(new Date(record.check_out_time), "hh:mm a") : "-"}</TableCell>
-                        <TableCell className="text-xs text-center">{record.tasks_completed ? "✓" : "-"}</TableCell>
-                      </TableRow>
-                    ))}
-                    {attendanceData.length === 0 && (
+                {loading ? (
+                  <div className="p-8 text-center text-sm text-muted-foreground">Loading...</div>
+                ) : attendanceData.length === 0 ? (
+                  <div className="p-8 text-center text-sm text-muted-foreground">No attendance data for this period</div>
+                ) : (
+                  <Table>
+                    <TableHeader>
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center text-muted-foreground text-xs py-8">No attendance data</TableCell>
+                        <TableHead className="text-xs min-w-[90px] font-semibold">Date</TableHead>
+                        <TableHead className="text-xs min-w-[100px] font-semibold">Employee</TableHead>
+                        <TableHead className="text-xs min-w-[80px] font-semibold">Punch In</TableHead>
+                        <TableHead className="text-xs min-w-[80px] font-semibold">Punch Out</TableHead>
+                        <TableHead className="text-xs text-right min-w-[60px] font-semibold">Hours</TableHead>
                       </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {attendanceData.map((record: any) => {
+                        const checkIn = new Date(record.check_in_time);
+                        const checkOut = record.check_out_time ? new Date(record.check_out_time) : null;
+                        const hours = checkOut ? ((checkOut.getTime() - checkIn.getTime()) / 3600000).toFixed(1) : null;
+                        return (
+                          <TableRow key={record.id}>
+                            <TableCell className="text-xs font-medium">
+                              {format(checkIn, "dd MMM")}
+                            </TableCell>
+                            <TableCell className="text-xs">{record.profiles?.full_name || "Unknown"}</TableCell>
+                            <TableCell className="text-xs">{format(checkIn, "hh:mm a")}</TableCell>
+                            <TableCell className="text-xs">{checkOut ? format(checkOut, "hh:mm a") : "—"}</TableCell>
+                            <TableCell className="text-xs text-right font-medium">{hours ? `${hours}h` : "—"}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -363,31 +439,32 @@ const VenueReports = () => {
                 <CardTitle className="text-base md:text-xl">Breakage Reports</CardTitle>
               </CardHeader>
               <CardContent className="overflow-x-auto p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-xs min-w-[90px]">Date</TableHead>
-                      <TableHead className="text-xs min-w-[100px]">Item</TableHead>
-                      <TableHead className="text-right text-xs min-w-[50px]">Qty</TableHead>
-                      <TableHead className="text-xs min-w-[150px] hidden md:table-cell">Cause</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {breakageData.map((breakage) => (
-                      <TableRow key={breakage.id}>
-                        <TableCell className="text-xs whitespace-nowrap">{format(new Date(breakage.created_at), "MMM dd")}</TableCell>
-                        <TableCell className="text-xs">{breakage.item_type}</TableCell>
-                        <TableCell className="text-right font-medium text-xs">{breakage.quantity}</TableCell>
-                        <TableCell className="text-xs max-w-[200px] truncate hidden md:table-cell">{breakage.cause}</TableCell>
-                      </TableRow>
-                    ))}
-                    {breakageData.length === 0 && (
+                {loading ? (
+                  <div className="p-8 text-center text-sm text-muted-foreground">Loading...</div>
+                ) : breakageData.length === 0 ? (
+                  <div className="p-8 text-center text-sm text-muted-foreground">No breakage reports for this period</div>
+                ) : (
+                  <Table>
+                    <TableHeader>
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center text-muted-foreground text-xs py-8">No breakage reports</TableCell>
+                        <TableHead className="text-xs min-w-[90px] font-semibold">Date</TableHead>
+                        <TableHead className="text-xs min-w-[100px] font-semibold">Item</TableHead>
+                        <TableHead className="text-right text-xs min-w-[50px] font-semibold">Qty</TableHead>
+                        <TableHead className="text-xs min-w-[150px] hidden md:table-cell font-semibold">Cause</TableHead>
                       </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {breakageData.map((breakage) => (
+                        <TableRow key={breakage.id}>
+                          <TableCell className="text-xs whitespace-nowrap">{format(new Date(breakage.created_at), "dd MMM")}</TableCell>
+                          <TableCell className="text-xs">{breakage.item_type}</TableCell>
+                          <TableCell className="text-right font-medium text-xs">{breakage.quantity}</TableCell>
+                          <TableCell className="text-xs max-w-[200px] truncate hidden md:table-cell">{breakage.cause}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

@@ -38,6 +38,11 @@ interface VenueReport {
   total_sold: number;
   mismatch: number;
   flavour_breakdown: FlavourBreakdown[];
+  opening_stock: number | null;
+  closing_stock: number | null;
+  received_today: number;
+  actual_consumption: number;
+  predicted_consumption: number;
 }
 
 const formatDate = (d: Date): string => d.toISOString().split("T")[0];
@@ -55,15 +60,24 @@ const DailyClubReport = () => {
   const dispatchedLabel = isWeightMode ? "Dispatched (g)" : "Dispatched";
   const usedLabel = isWeightMode ? "Flavour Used (g)" : "Packets Used";
 
+  const [gramsPerChillum, setGramsPerChillum] = useState(25);
+
   useEffect(() => {
-    supabase
-      .from("global_settings")
-      .select("value")
-      .eq("key", "dispatch_mode")
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data?.value === "weight") setDispatchMode("weight");
-      });
+    Promise.all([
+      supabase
+        .from("global_settings")
+        .select("value")
+        .eq("key", "dispatch_mode")
+        .maybeSingle(),
+      supabase
+        .from("global_settings")
+        .select("value")
+        .eq("key", "grams_per_chillum")
+        .maybeSingle(),
+    ]).then(([modeRes, gramsRes]) => {
+      if (modeRes.data?.value === "weight") setDispatchMode("weight");
+      if (gramsRes.data?.value) setGramsPerChillum(Number(gramsRes.data.value) || 25);
+    });
   }, []);
 
   useEffect(() => {
@@ -133,6 +147,12 @@ const DailyClubReport = () => {
         // Sort by flavour name
         flavourBreakdowns.sort((a, b) => a.flavour_name.localeCompare(b.flavour_name));
 
+        const openingStock = venueStock?.opening_stock ?? null;
+        const closingStock = venueStock?.closing_stock ?? null;
+        const receivedToday = venueStock?.packets_received || 0;
+        const actualConsumption = packetsUsed;
+        const predictedConsumption = Math.round(totalSold * gramsPerChillum);
+
         return {
           venue_id: venue.id,
           venue_name: venue.name,
@@ -141,6 +161,11 @@ const DailyClubReport = () => {
           total_sold: totalSold,
           mismatch: packetsUsed - totalSold,
           flavour_breakdown: flavourBreakdowns,
+          opening_stock: openingStock,
+          closing_stock: closingStock,
+          received_today: receivedToday,
+          actual_consumption: actualConsumption,
+          predicted_consumption: predictedConsumption,
         };
       });
 
@@ -182,7 +207,10 @@ const DailyClubReport = () => {
     const totalSold = reports.reduce((s, r) => s + r.total_sold, 0);
     const totalMismatch = totalUsed - totalSold;
     const flaggedClubs = reports.filter((r) => r.mismatch !== 0).length;
-    return { totalDispatched, totalUsed, totalSold, totalMismatch, flaggedClubs };
+    const totalActualConsumption = reports.reduce((s, r) => s + r.actual_consumption, 0);
+    const totalPredictedConsumption = reports.reduce((s, r) => s + r.predicted_consumption, 0);
+    const consumptionVariance = totalActualConsumption - totalPredictedConsumption;
+    return { totalDispatched, totalUsed, totalSold, totalMismatch, flaggedClubs, totalActualConsumption, totalPredictedConsumption, consumptionVariance };
   }, [reports]);
 
   const getMismatchColor = (val: number) => {
@@ -256,8 +284,49 @@ const DailyClubReport = () => {
       },
     });
 
-    // Add flavour breakdowns for flagged clubs
+    // Consumption Analysis table
     let currentY = (doc as any).lastAutoTable?.finalY + 10 || 100;
+    if (currentY > 240) { doc.addPage(); currentY = 20; }
+    doc.setFontSize(12);
+    doc.text("Flavour Consumption Analysis", 14, currentY);
+    doc.setFontSize(9);
+    doc.text(`Predicted @ ${gramsPerChillum}g per hookah`, 14, currentY + 5);
+    currentY += 8;
+
+    const consumptionData = reports.map((r) => {
+      const variance = r.actual_consumption - r.predicted_consumption;
+      return [
+        r.venue_name,
+        r.opening_stock !== null ? `${r.opening_stock}g` : "—",
+        r.closing_stock !== null ? `${r.closing_stock}g` : "—",
+        `${r.actual_consumption}g`,
+        r.total_sold.toString(),
+        `${r.predicted_consumption}g`,
+        `${variance > 0 ? "+" : ""}${variance}g`,
+      ];
+    });
+
+    autoTable(doc, {
+      startY: currentY,
+      head: [["Club", "Opening", "Closing", "Actual Used", "Hookahs", "Predicted", "Variance"]],
+      body: consumptionData,
+      styles: { fontSize: 7 },
+      headStyles: { fillColor: [99, 65, 214] },
+      didParseCell: (data: any) => {
+        if (data.section === "body" && data.column.index === 6) {
+          const raw = String(data.cell.raw);
+          if (raw.startsWith("+")) {
+            data.cell.styles.textColor = [220, 38, 38];
+            data.cell.styles.fontStyle = "bold";
+          } else if (raw.startsWith("-")) {
+            data.cell.styles.textColor = [234, 138, 0];
+          }
+        }
+      },
+    });
+
+    // Add flavour breakdowns for flagged clubs
+    currentY = (doc as any).lastAutoTable?.finalY + 10 || 100;
     const flaggedReports = reports.filter((r) => r.mismatch !== 0 && r.flavour_breakdown.length > 0);
 
     if (flaggedReports.length > 0) {
@@ -490,6 +559,124 @@ const DailyClubReport = () => {
           <span className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-full bg-success/80" />
             Zero = All clear
+          </span>
+        </div>
+
+        {/* Consumption Analysis */}
+        <Card>
+          <CardContent className="p-0">
+            <div className="p-3 border-b bg-muted/30">
+              <h3 className="font-semibold text-sm">Flavour Consumption Analysis</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Actual consumption (stock used) vs predicted ({gramsPerChillum}g per hookah sold)
+              </p>
+            </div>
+
+            {/* Consumption KPI Strip */}
+            <div className="grid grid-cols-3 gap-3 p-3 border-b">
+              <div className="text-center">
+                <div className="text-xs text-muted-foreground mb-0.5">Actual Used</div>
+                <div className="text-lg font-bold">{summary.totalActualConsumption}g</div>
+              </div>
+              <div className="text-center">
+                <div className="text-xs text-muted-foreground mb-0.5">Predicted</div>
+                <div className="text-lg font-bold">{summary.totalPredictedConsumption}g</div>
+              </div>
+              <div className="text-center">
+                <div className="text-xs text-muted-foreground mb-0.5">Variance</div>
+                <div className={`text-lg font-bold ${
+                  summary.consumptionVariance > 0 ? "text-destructive" :
+                  summary.consumptionVariance < 0 ? "text-orange-500" : "text-success"
+                }`}>
+                  {summary.consumptionVariance > 0 ? "+" : ""}{summary.consumptionVariance}g
+                </div>
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="flex items-center justify-center py-8 text-muted-foreground gap-2">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Loading...
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="p-3 text-left font-medium">Club</th>
+                      <th className="p-3 text-center font-medium">Opening</th>
+                      <th className="p-3 text-center font-medium">Received</th>
+                      <th className="p-3 text-center font-medium">Closing</th>
+                      <th className="p-3 text-center font-medium">Actual Used</th>
+                      <th className="p-3 text-center font-medium">Hookahs</th>
+                      <th className="p-3 text-center font-medium">Predicted</th>
+                      <th className="p-3 text-center font-medium">Variance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reports.map((r) => {
+                      const variance = r.actual_consumption - r.predicted_consumption;
+                      const hasData = r.opening_stock !== null || r.closing_stock !== null;
+                      return (
+                        <tr key={r.venue_id} className="border-b hover:bg-muted/30">
+                          <td className="p-3 font-medium">{r.venue_name}</td>
+                          <td className="p-3 text-center text-muted-foreground">
+                            {r.opening_stock !== null ? `${r.opening_stock}g` : "—"}
+                          </td>
+                          <td className="p-3 text-center text-muted-foreground">
+                            {hasData ? `${r.received_today}g` : "—"}
+                          </td>
+                          <td className="p-3 text-center text-muted-foreground">
+                            {r.closing_stock !== null ? `${r.closing_stock}g` : "—"}
+                          </td>
+                          <td className="p-3 text-center font-medium">
+                            {hasData ? `${r.actual_consumption}g` : "—"}
+                          </td>
+                          <td className="p-3 text-center">{r.total_sold}</td>
+                          <td className="p-3 text-center text-muted-foreground">
+                            {r.predicted_consumption}g
+                          </td>
+                          <td className={`p-3 text-center font-bold ${
+                            !hasData ? "text-muted-foreground" :
+                            variance > 0 ? "text-destructive" :
+                            variance < 0 ? "text-orange-500" : "text-success"
+                          }`}>
+                            {!hasData ? "—" : `${variance > 0 ? "+" : ""}${variance}g`}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    <tr className="border-t-2 bg-muted/50 font-semibold">
+                      <td className="p-3">TOTAL</td>
+                      <td className="p-3 text-center">—</td>
+                      <td className="p-3 text-center">—</td>
+                      <td className="p-3 text-center">—</td>
+                      <td className="p-3 text-center">{summary.totalActualConsumption}g</td>
+                      <td className="p-3 text-center">{summary.totalSold}</td>
+                      <td className="p-3 text-center">{summary.totalPredictedConsumption}g</td>
+                      <td className={`p-3 text-center font-bold ${
+                        summary.consumptionVariance > 0 ? "text-destructive" :
+                        summary.consumptionVariance < 0 ? "text-orange-500" : "text-success"
+                      }`}>
+                        {summary.consumptionVariance > 0 ? "+" : ""}{summary.consumptionVariance}g
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Consumption Legend */}
+        <div className="flex flex-wrap gap-4 text-xs text-muted-foreground px-1">
+          <span className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded-full bg-destructive/80" />
+            Positive variance = more used than expected (wastage/leakage)
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded-full bg-orange-400" />
+            Negative variance = less used than expected
           </span>
         </div>
       </div>
