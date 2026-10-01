@@ -157,9 +157,10 @@ const DailyClubReport = () => {
         const prevDayStock = prevStock?.closing_stock ?? null;
         const todayStock = venueStock?.closing_stock ?? null;
         const receivedToday = venueStock?.packets_received || 0;
-        const actualConsumption = (prevDayStock !== null && todayStock !== null)
+        const rawConsumption = (prevDayStock !== null && todayStock !== null)
           ? (prevDayStock + receivedToday - todayStock)
           : 0;
+        const actualConsumption = Math.max(0, rawConsumption);
         const predictedConsumption = Math.round(totalSold * gramsPerChillum);
 
         return {
