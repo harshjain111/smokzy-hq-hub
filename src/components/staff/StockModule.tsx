@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Check, Package, Loader2, Plus, Search, ChevronDown, ChevronUp, Pencil, Trash2, MoreVertical, Grid3X3 } from "lucide-react";
+import { Check, Package, Loader2, Plus, Search, ChevronDown, ChevronUp, Pencil, Trash2, MoreVertical, Grid3X3, Eye } from "lucide-react";
 import { ClubSession } from "@/hooks/useClubSession";
 import { motion, AnimatePresence } from "framer-motion";
 import { haptic } from "@/lib/haptics";
@@ -41,6 +41,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import BulkAddStockDialog from "./BulkAddStockDialog";
+import StaffStockView from "./StaffStockView";
 
 interface StockModuleProps {
   user: User;
@@ -90,6 +91,7 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
 
   // Manage mode: hides per-item edit/delete + add-item controls during normal fast entry
   const [manageMode, setManageMode] = useState(false);
+  const [viewStockOpen, setViewStockOpen] = useState(false);
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   // Add item state
@@ -411,39 +413,42 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
   // Already submitted state (and not editing)
   if (session?.stock_submitted && !isEditing) {
     return (
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="flex flex-col items-center justify-center min-h-[60vh] px-8"
-      >
-        <motion.div 
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-          className="w-24 h-24 rounded-full bg-gradient-to-br from-gradient-start to-gradient-end flex items-center justify-center mb-6"
+      <div className="pb-24">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="flex flex-col items-center pt-6 px-8"
         >
-          <Check className="w-12 h-12 text-white" />
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+            className="w-16 h-16 rounded-full bg-gradient-to-br from-gradient-start to-gradient-end flex items-center justify-center mb-4"
+          >
+            <Check className="w-8 h-8 text-white" />
+          </motion.div>
+          <h2 className="text-xl font-bold text-foreground mb-1">Stock Submitted</h2>
+          {submitterName && submittedAt && (
+            <p className="text-sm text-muted-foreground mb-3">
+              By {submitterName} at {submittedAt}
+            </p>
+          )}
+          <Button
+            onClick={handleEnterEditMode}
+            variant="outline"
+            size="sm"
+            className="gap-2 mb-6"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+            Edit Stock
+          </Button>
         </motion.div>
-        <h2 className="text-2xl font-bold text-foreground mb-2">Stock Submitted</h2>
-        {submitterName && submittedAt && (
-          <p className="text-muted-foreground mb-6">
-            By {submitterName} at {submittedAt}
-          </p>
-        )}
-        <div className="bg-success/10 rounded-2xl px-6 py-4 text-center">
-          <p className="text-success font-medium">
-            Stock locked for today. Good control.
-          </p>
+
+        {/* Stock overview for staff to plan */}
+        <div className="px-5">
+          <StaffStockView venueId={venueId} />
         </div>
-        <Button
-          onClick={handleEnterEditMode}
-          variant="outline"
-          className="mt-6 gap-2"
-        >
-          <Pencil className="w-4 h-4" />
-          Edit Stock
-        </Button>
-      </motion.div>
+      </div>
     );
   }
 
@@ -630,6 +635,39 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
           </div>
         </div>
       </motion.div>
+
+      {/* View current stock toggle */}
+      <div className="px-5 pb-2">
+        <button
+          onClick={() => setViewStockOpen(v => !v)}
+          className="flex items-center gap-2 w-full py-2 px-3 rounded-xl bg-primary/5 border border-primary/10 transition-colors"
+        >
+          <Eye className="w-4 h-4 text-primary" />
+          <span className="text-sm font-medium text-primary flex-1 text-left">View Current Stock & History</span>
+          <motion.div
+            animate={{ rotate: viewStockOpen ? 180 : 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <ChevronDown className="w-4 h-4 text-primary" />
+          </motion.div>
+        </button>
+
+        <AnimatePresence>
+          {viewStockOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.25, ease: "easeInOut" }}
+              className="overflow-hidden"
+            >
+              <div className="pt-3">
+                <StaffStockView venueId={venueId} />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
       {/* Stock items by category */}
       <div className="flex-1 overflow-auto px-5 pb-4">
