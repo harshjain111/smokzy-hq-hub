@@ -346,32 +346,16 @@ export const useClubSession = (userId: string, venueId: string) => {
     // First, force-close any stale open sessions from previous business dates
     await forceCloseStaleSessionsClient();
 
-    // Check for existing OPEN session for this business date
-    const { data: existing } = await supabase
-      .from("club_sessions")
-      .select("*")
-      .eq("venue_id", venueId)
-      .eq("session_date", sessionDate)
-      .eq("status", "open")
-      .single();
-
-    if (existing) {
-      return existing as ClubSession;
-    }
-
-    // Create new session
-    const { data: newSession, error } = await supabase
-      .from("club_sessions")
-      .insert({
-        venue_id: venueId,
-        session_date: sessionDate,
-        status: "open",
-      })
-      .select()
-      .single();
+    // Atomic get-or-create via database RPC (prevents duplicate sessions from concurrent check-ins)
+    const { data, error } = await supabase
+      .rpc("get_or_create_open_session", {
+        p_venue_id: venueId,
+        p_session_date: sessionDate,
+      });
 
     if (error) throw error;
-    return newSession as ClubSession;
+    if (!data || data.length === 0) throw new Error("Failed to get or create session");
+    return data[0] as ClubSession;
   }, [venueId, settings.force_close_hour, forceCloseStaleSessionsClient]);
 
   // Check in to the current session
