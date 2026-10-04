@@ -37,13 +37,20 @@ export const ClubAttendanceTab = ({ clubId }: ClubAttendanceTabProps) => {
     const weekAgo = format(subDays(new Date(), 7), "yyyy-MM-dd");
 
     try {
-      // Fetch attendance blocks with profiles
+      // Fetch attendance blocks (no FK join — user_id has no FK to profiles)
       const { data: blocks } = await supabase
         .from("staff_attendance_blocks")
-        .select("*, profiles:user_id(full_name)")
+        .select("*")
         .eq("venue_id", clubId)
         .gte("check_in_time", `${weekAgo}T00:00:00`)
         .order("check_in_time", { ascending: false });
+
+      // Fetch profiles separately
+      const blockUserIds = [...new Set((blocks || []).map((b: any) => b.user_id))];
+      const { data: profiles } = blockUserIds.length > 0
+        ? await supabase.from("profiles").select("id, full_name").in("id", blockUserIds)
+        : { data: [] };
+      const profileMap = new Map((profiles || []).map((p: any) => [p.id, p.full_name]));
 
       // Fetch breaks
       const { data: breaks } = await supabase
@@ -76,7 +83,7 @@ export const ClubAttendanceTab = ({ clubId }: ClubAttendanceTabProps) => {
           return {
             id: block.id,
             user_id: block.user_id,
-            full_name: block.profiles?.full_name || "Unknown",
+            full_name: profileMap.get(block.user_id) || "Unknown",
             check_in_time: block.check_in_time,
             check_out_time: block.check_out_time,
             total_break_minutes: totalBreakMinutes,

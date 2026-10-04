@@ -46,7 +46,7 @@ export const HistoricalStockSection = ({ session, clubId, clubName, onSummaryCha
     try {
       const prevDate = new Date(session.session_date + "T00:00:00");
       prevDate.setDate(prevDate.getDate() - 1);
-      const prevDateStr = prevDate.toISOString().split("T")[0];
+      const prevDateStr = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}-${String(prevDate.getDate()).padStart(2, "0")}`;
 
       const [salesRes, todaySnapshotRes, prevSnapshotRes, stockRes, settingsRes] = await Promise.all([
         supabase

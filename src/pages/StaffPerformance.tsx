@@ -43,7 +43,7 @@ const StaffPerformance = () => {
   // Date range: last 30 days
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  const fromDate = thirtyDaysAgo.toISOString().split("T")[0];
+  const fromDate = `${thirtyDaysAgo.getFullYear()}-${String(thirtyDaysAgo.getMonth() + 1).padStart(2, "0")}-${String(thirtyDaysAgo.getDate()).padStart(2, "0")}`;
 
   useEffect(() => {
     fetchData();

@@ -66,35 +66,37 @@ export const ClubOverviewSection = ({ clubId, session, loading, onHealthChange }
       return;
     }
 
-    const { data: blocks } = await supabase
-      .from("staff_attendance_blocks")
-      .select("id, user_id, check_in_time, check_out_time, profiles:user_id(full_name)")
-      .eq("session_id", session.id)
-      .order("check_in_time", { ascending: true });
+    const [{ data: blocks }, { data: breaks }] = await Promise.all([
+      supabase
+        .from("staff_attendance_blocks")
+        .select("id, user_id, check_in_time, check_out_time")
+        .eq("session_id", session.id)
+        .order("check_in_time", { ascending: true }),
+      supabase
+        .from("staff_breaks")
+        .select("*")
+        .eq("session_id", session.id),
+    ]);
 
-    const { data: breaks } = await supabase
-      .from("staff_breaks")
-      .select("*")
-      .eq("session_id", session.id);
+    // Fetch profiles separately (no FK from staff_attendance_blocks to profiles)
+    const userIds = [...new Set((blocks || []).map((b: any) => b.user_id))];
+    const { data: profiles } = userIds.length > 0
+      ? await supabase.from("profiles").select("id, full_name").in("id", userIds)
+      : { data: [] };
+    const profileMap = new Map((profiles || []).map((p: any) => [p.id, p.full_name]));
 
     if (blocks) {
-      const mapped = blocks.map((d: {
-        id: string;
-        user_id: string;
-        check_in_time: string;
-        check_out_time: string | null;
-        profiles: { full_name: string } | null;
-      }) => {
+      const mapped = blocks.map((d: any) => {
         const staffBreaks = breaks?.filter(b => b.user_id === d.user_id) || [];
-        const totalBreakMinutes = staffBreaks.reduce((sum, b) => sum + (b.duration_minutes || 0), 0);
-        const isOnBreak = staffBreaks.some(b => !b.break_end_time);
+        const totalBreakMinutes = staffBreaks.reduce((sum: number, b: any) => sum + (b.duration_minutes || 0), 0);
+        const isOnBreak = staffBreaks.some((b: any) => !b.break_end_time);
 
         return {
           id: d.id,
           user_id: d.user_id,
           check_in_time: d.check_in_time,
           check_out_time: d.check_out_time,
-          full_name: d.profiles?.full_name || "Unknown",
+          full_name: profileMap.get(d.user_id) || "Unknown",
           total_break_minutes: totalBreakMinutes,
           is_on_break: isOnBreak,
         };

@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { format, formatDistanceToNow } from "date-fns";
+import { getBusinessDate } from "@/lib/businessDate";
 import { Clock, Users, Package, TrendingUp, Camera, CheckCircle2, AlertCircle } from "lucide-react";
 import { ClubSession } from "@/pages/ClubDetail";
 
@@ -39,22 +40,29 @@ export const ClubOverviewTab = ({ clubId, session, loading }: ClubOverviewTabPro
 
     const { data } = await supabase
       .from("staff_attendance_blocks")
-      .select("id, user_id, check_in_time, profiles:user_id(full_name)")
+      .select("id, user_id, check_in_time")
       .eq("session_id", session.id)
       .is("check_out_time", null);
+
+    // Fetch profiles separately (no FK from staff_attendance_blocks to profiles)
+    const userIds = [...new Set((data || []).map((b: any) => b.user_id))];
+    const { data: profiles } = userIds.length > 0
+      ? await supabase.from("profiles").select("id, full_name").in("id", userIds)
+      : { data: [] };
+    const profileMap = new Map((profiles || []).map((p: any) => [p.id, p.full_name]));
 
     if (data) {
       setStaffOnDuty(data.map((d: any) => ({
         id: d.id,
         user_id: d.user_id,
         check_in_time: d.check_in_time,
-        full_name: d.profiles?.full_name || "Unknown",
+        full_name: profileMap.get(d.user_id) || "Unknown",
       })));
     }
   };
 
   const fetchCounterPhoto = async () => {
-    const today = format(new Date(), "yyyy-MM-dd");
+    const today = getBusinessDate();
     const { data } = await supabase
       .from("closing_photos")
       .select("photo_url")

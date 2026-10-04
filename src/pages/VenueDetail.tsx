@@ -11,6 +11,7 @@ import AttendanceOverview from "@/components/dashboard/admin/AttendanceOverview"
 import EmployeeActivityReport from "@/components/dashboard/admin/EmployeeActivityReport";
 import PageLayout from "@/components/PageLayout";
 import { format } from "date-fns";
+import { getBusinessDate } from "@/lib/businessDate";
 
 interface VenueStats {
   totalEmployees: number;
@@ -52,7 +53,7 @@ const VenueDetail = () => {
   };
 
   const fetchCounterPhoto = async () => {
-    const today = format(new Date(), "yyyy-MM-dd");
+    const today = getBusinessDate();
     const { data } = await supabase
       .from("closing_photos")
       .select("photo_url")
@@ -78,7 +79,7 @@ const VenueDetail = () => {
   };
 
   const fetchVenueStats = async () => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getBusinessDate();
 
     const [employeesRes, stockRes, salesRes, attendanceRes] = await Promise.all([
       supabase
