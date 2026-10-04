@@ -14,6 +14,7 @@ import { HistoricalDayView } from "@/components/admin/club/HistoricalDayView";
 import { PeriodSummaryView } from "@/components/admin/club/PeriodSummaryView";
 import { SectionCard, KpiGrid, KpiTile } from "@/components/admin/club/DashboardPrimitives";
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
+import { getBusinessDate } from "@/lib/businessDate";
 
 export interface ClubSession {
   id: string;
@@ -65,7 +66,7 @@ const ClubDetail = () => {
   const fetchClubDetails = async () => {
     setLoading(true);
     try {
-      const today = format(new Date(), "yyyy-MM-dd");
+      const today = getBusinessDate();
 
       const [venueRes, sessionRes] = await Promise.all([
         supabase.from("venues").select("name").eq("id", clubId).single(),

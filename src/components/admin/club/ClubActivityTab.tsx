@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { getBusinessDate } from "@/lib/businessDate";
 import { Search, Clock, User, Package, TrendingUp, Camera, AlertTriangle } from "lucide-react";
 
 interface ClubActivityTabProps {
@@ -44,7 +45,7 @@ export const ClubActivityTab = ({ clubId }: ClubActivityTabProps) => {
 
   const fetchActivity = async () => {
     setLoading(true);
-    const today = format(new Date(), "yyyy-MM-dd");
+    const today = getBusinessDate();
     const allActivities: ActivityItem[] = [];
 
     try {

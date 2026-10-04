@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { format } from "date-fns";
+import { getBusinessDate } from "@/lib/businessDate";
 
 export interface ClubTileData {
   id: string;
@@ -40,7 +40,7 @@ export const useAdminStats = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const today = format(new Date(), "yyyy-MM-dd");
+      const today = getBusinessDate();
 
       // Fetch all venues
       const { data: venues } = await supabase

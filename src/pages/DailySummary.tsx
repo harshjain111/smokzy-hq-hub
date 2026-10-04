@@ -15,8 +15,8 @@ import {
   AlertCircle, Shield, ListChecks,
 } from "lucide-react";
 import RecentActivityFeed from "@/components/dashboard/RecentActivityFeed";
+import { getBusinessDate } from "@/lib/businessDate";
 
-const formatDate = (d: Date) => d.toISOString().split("T")[0];
 const getGreeting = () => {
   const h = new Date().getHours();
   if (h < 12) return "Good morning";
@@ -51,7 +51,7 @@ interface PriorityItem extends AlertItem {}
 // ============================================================
 const DailySummary = () => {
   const navigate = useNavigate();
-  const today = formatDate(new Date());
+  const today = getBusinessDate();
   const [userName, setUserName] = useState("");
   const [loading, setLoading] = useState(true);
 
