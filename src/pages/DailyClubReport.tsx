@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { format } from "date-fns";
 
 interface Venue {
   id: string;
@@ -45,7 +46,7 @@ interface VenueReport {
   predicted_consumption: number;
 }
 
-const formatDate = (d: Date): string => d.toISOString().split("T")[0];
+const formatDate = (d: Date): string => format(d, "yyyy-MM-dd");
 
 const DailyClubReport = () => {
   const [selectedDate, setSelectedDate] = useState(() => new Date());

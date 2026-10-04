@@ -20,6 +20,7 @@ import {
   
 } from "lucide-react";
 import { format, subDays, startOfMonth, startOfDay, endOfDay, differenceInMinutes } from "date-fns";
+import { getBusinessDate } from "@/lib/businessDate";
 import { toast } from "sonner";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -89,7 +90,7 @@ const ClubManagementDashboard = ({ user, venueIds }: ClubManagementDashboardProp
   const [alerts, setAlerts] = useState<any[]>([]);
   const [lastUpdated, setLastUpdated] = useState(new Date());
 
-  const today = format(new Date(), "yyyy-MM-dd");
+  const today = getBusinessDate();
   const now = new Date();
   const currentHour = now.getHours();
 

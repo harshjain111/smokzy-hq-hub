@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { format, formatDistanceToNow, differenceInHours, subDays } from "date-fns";
+import { getBusinessDate } from "@/lib/businessDate";
 import { Clock, CheckCircle2, AlertCircle, Camera, Info, AlertTriangle, Eye } from "lucide-react";
 import { ClubSession } from "@/pages/ClubDetail";
 import {
@@ -105,7 +106,7 @@ export const ClubOverviewSection = ({ clubId, session, loading, onHealthChange }
   };
 
   const fetchCounterPhoto = async () => {
-    const today = format(new Date(), "yyyy-MM-dd");
+    const today = getBusinessDate();
     const { data } = await supabase
       .from("closing_photos")
       .select("photo_url")

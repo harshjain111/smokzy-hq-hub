@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, TrendingDown, TrendingUp, Package, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, TrendingDown, TrendingUp, Package, ChevronDown } from "lucide-react";
+import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -33,7 +34,7 @@ const StaffStockView = ({ venueId }: StaffStockViewProps) => {
       const today = new Date();
       const sevenDaysAgo = new Date(today);
       sevenDaysAgo.setDate(today.getDate() - 7);
-      const fromDate = sevenDaysAgo.toISOString().split("T")[0];
+      const fromDate = format(sevenDaysAgo, "yyyy-MM-dd");
 
       const [stockRes, historyRes] = await Promise.all([
         supabase
