@@ -49,16 +49,33 @@ export const ClubActivityTab = ({ clubId }: ClubActivityTabProps) => {
     const allActivities: ActivityItem[] = [];
 
     try {
-      // Fetch attendance blocks
-      const { data: blocks } = await supabase
-        .from("staff_attendance_blocks")
-        .select("*, profiles:user_id(full_name)")
-        .eq("venue_id", clubId)
-        .gte("check_in_time", `${today}T00:00:00`)
-        .order("check_in_time", { ascending: false });
+      // Fetch attendance blocks and breaks (no FK join — user_id has no FK to profiles)
+      const [{ data: blocks }, { data: breaks }] = await Promise.all([
+        supabase
+          .from("staff_attendance_blocks")
+          .select("*")
+          .eq("venue_id", clubId)
+          .gte("check_in_time", `${today}T00:00:00`)
+          .order("check_in_time", { ascending: false }),
+        supabase
+          .from("staff_breaks")
+          .select("*")
+          .eq("venue_id", clubId)
+          .gte("break_start_time", `${today}T00:00:00`),
+      ]);
+
+      // Fetch profiles separately for all user_ids
+      const allUserIds = [...new Set([
+        ...(blocks || []).map((b: any) => b.user_id),
+        ...(breaks || []).map((b: any) => b.user_id),
+      ])];
+      const { data: profiles } = allUserIds.length > 0
+        ? await supabase.from("profiles").select("id, full_name").in("id", allUserIds)
+        : { data: [] };
+      const profileMap = new Map((profiles || []).map((p: any) => [p.id, p.full_name]));
 
       blocks?.forEach((block: any) => {
-        const name = block.profiles?.full_name || "Unknown";
+        const name = profileMap.get(block.user_id) || "Unknown";
         allActivities.push({
           id: `checkin-${block.id}`,
           timestamp: block.check_in_time,
@@ -77,15 +94,8 @@ export const ClubActivityTab = ({ clubId }: ClubActivityTabProps) => {
         }
       });
 
-      // Fetch breaks
-      const { data: breaks } = await supabase
-        .from("staff_breaks")
-        .select("*, profiles:user_id(full_name)")
-        .eq("venue_id", clubId)
-        .gte("break_start_time", `${today}T00:00:00`);
-
       breaks?.forEach((brk: any) => {
-        const name = brk.profiles?.full_name || "Unknown";
+        const name = profileMap.get(brk.user_id) || "Unknown";
         allActivities.push({
           id: `break-start-${brk.id}`,
           timestamp: brk.break_start_time,

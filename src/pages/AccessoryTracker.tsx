@@ -94,7 +94,7 @@ const AccessoryTracker = () => {
           remarks: row.remarks,
           replacement_needed: row.condition === "broken" || row.replacement_needed,
           checked_by: user?.id || null,
-          last_checked_date: new Date().toISOString().split("T")[0],
+          last_checked_date: (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })(),
         };
 
         if (row.id.startsWith("new_")) {

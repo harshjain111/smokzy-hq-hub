@@ -201,7 +201,7 @@ const InspectionForm = () => {
 
     const { data: dispatches } = await supabase
       .from("packet_dispatches").select("flavour_id").eq("venue_id", venueId)
-      .gte("date", twoWeeksAgo.toISOString().split("T")[0]);
+      .gte("date", `${twoWeeksAgo.getFullYear()}-${String(twoWeeksAgo.getMonth() + 1).padStart(2, "0")}-${String(twoWeeksAgo.getDate()).padStart(2, "0")}`);
 
     const uniqueFlavourIds = [...new Set((dispatches || []).map((d) => d.flavour_id))];
 
@@ -340,7 +340,7 @@ const InspectionForm = () => {
         .insert({
           venue_id: selectedVenue,
           inspector_id: user.id,
-          date: now.toISOString().split("T")[0],
+          date: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`,
           time: timeStr,
           remarks: remarks || null,
           photo_url: photoUrl,
@@ -407,7 +407,7 @@ const InspectionForm = () => {
               type: v.type,
               description: v.description || null,
               severity: v.severity,
-              date: now.toISOString().split("T")[0],
+              date: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`,
               reported_by: user.id,
             }))
           );
