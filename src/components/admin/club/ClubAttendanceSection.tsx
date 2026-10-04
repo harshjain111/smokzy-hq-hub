@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { format, differenceInMinutes, differenceInHours } from "date-fns";
+import { getBusinessDate } from "@/lib/businessDate";
 import {
   Users, AlertTriangle, Coffee, Download,
   Award, Timer, Info
@@ -198,7 +199,7 @@ export const ClubAttendanceSection = ({ clubId, currentSession, onSummaryChange 
   // Cross-references today's roster against actual attendance for the day.
   // No formal leave-approval workflow exists — 'leave'/'off' below is only a manually-typed roster_assignments flag.
   const fetchRosterReconciliation = async (records: AttendanceRecord[], activeBreakUserIds?: Set<string>) => {
-    const targetDate = currentSession?.session_date || format(new Date(), "yyyy-MM-dd");
+    const targetDate = currentSession?.session_date || getBusinessDate();
     const breakSet = activeBreakUserIds || new Set<string>();
 
     const [{ data: rosterRows }, { data: assignmentRows }] = await Promise.all([

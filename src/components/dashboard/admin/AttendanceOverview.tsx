@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Clock, CheckCircle, XCircle } from "lucide-react";
 import { format } from "date-fns";
+import { getBusinessDate } from "@/lib/businessDate";
 
 interface AttendanceOverviewProps {
   venueId: string;
@@ -29,7 +30,7 @@ const AttendanceOverview = ({ venueId, venueName }: AttendanceOverviewProps) => 
   }, [venueId]);
 
   const fetchAttendance = async () => {
-    const today = format(new Date(), "yyyy-MM-dd");
+    const today = getBusinessDate();
     
     const { data: attendanceData, error } = await supabase
       .from("attendance")

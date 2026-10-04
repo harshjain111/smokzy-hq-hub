@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { format, differenceInMinutes, differenceInHours, startOfDay, subDays } from "date-fns";
 import { AlertTriangle, Clock, Coffee } from "lucide-react";
+import { getBusinessDate } from "@/lib/businessDate";
 
 interface ClubAttendanceTabProps {
   clubId: string;
@@ -33,7 +34,7 @@ export const ClubAttendanceTab = ({ clubId }: ClubAttendanceTabProps) => {
 
   const fetchAttendance = async () => {
     setLoading(true);
-    const today = format(new Date(), "yyyy-MM-dd");
+    const today = getBusinessDate();
     const weekAgo = format(subDays(new Date(), 7), "yyyy-MM-dd");
 
     try {

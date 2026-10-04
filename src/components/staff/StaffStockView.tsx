@@ -4,6 +4,7 @@ import { Loader2, TrendingDown, TrendingUp, Package, ChevronDown } from "lucide-
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { getBusinessDate } from "@/lib/businessDate";
 
 interface StaffStockViewProps {
   venueId: string;
@@ -31,9 +32,9 @@ const StaffStockView = ({ venueId }: StaffStockViewProps) => {
     const fetchData = async () => {
       setLoading(true);
 
-      const today = new Date();
-      const sevenDaysAgo = new Date(today);
-      sevenDaysAgo.setDate(today.getDate() - 7);
+      const todayStr = getBusinessDate();
+      const sevenDaysAgo = new Date(todayStr + "T00:00:00");
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
       const fromDate = format(sevenDaysAgo, "yyyy-MM-dd");
 
       const [stockRes, historyRes] = await Promise.all([

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { getBusinessDate } from "@/lib/businessDate";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
@@ -340,7 +341,7 @@ const InspectionForm = () => {
         .insert({
           venue_id: selectedVenue,
           inspector_id: user.id,
-          date: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`,
+          date: getBusinessDate(),
           time: timeStr,
           remarks: remarks || null,
           photo_url: photoUrl,
@@ -407,7 +408,7 @@ const InspectionForm = () => {
               type: v.type,
               description: v.description || null,
               severity: v.severity,
-              date: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`,
+              date: getBusinessDate(),
               reported_by: user.id,
             }))
           );

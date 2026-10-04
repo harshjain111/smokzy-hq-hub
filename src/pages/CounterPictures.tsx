@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Building2, Calendar, User, ImageIcon } from "lucide-react";
 import { format } from "date-fns";
 import PageLayout from "@/components/PageLayout";
+import { getBusinessDate } from "@/lib/businessDate";
 
 interface PhotoRecord {
   id: string;
@@ -41,7 +42,7 @@ export default function CounterPictures() {
   const fetchOverview = async () => {
     setLoading(true);
     try {
-      const today = format(new Date(), "yyyy-MM-dd");
+      const today = getBusinessDate();
       
       // Get all venues
       const { data: venues } = await supabase

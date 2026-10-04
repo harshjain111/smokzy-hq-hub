@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getBusinessDate } from "@/lib/businessDate";
 import PageLayout from "@/components/PageLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -229,11 +230,12 @@ const PacketDispatch = () => {
       const { error } = await supabase.from("packet_dispatches").insert({
         venue_id: formVenueId,
         flavour_id: formFlavourId,
-        date: formatDate(new Date()),
+        date: getBusinessDate(),
         quantity_sent: Math.round(quantity),
         unit,
         received_by_name: formRecipient.trim() || null,
         dispatched_by: user.id,
+        photo_url: photoUrl,
       });
       if (error) throw error;
 

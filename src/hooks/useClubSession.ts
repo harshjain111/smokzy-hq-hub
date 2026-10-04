@@ -441,7 +441,7 @@ export const useClubSession = (userId: string, venueId: string) => {
 
     // Check if all tasks are now complete and auto-close
     await checkAndAutoClose();
-  }, [session]);
+  }, [session, checkAndAutoClose]);
 
   // Auto-close session if all tasks complete
   const checkAndAutoClose = useCallback(async () => {
@@ -468,7 +468,7 @@ export const useClubSession = (userId: string, venueId: string) => {
           status: 'closed',
           closed_at: new Date().toISOString(),
         })
-        .eq("id", session.id);
+        .eq("id", currentSession.id);
 
       if (error) {
         console.error("Failed to auto-close session:", error);

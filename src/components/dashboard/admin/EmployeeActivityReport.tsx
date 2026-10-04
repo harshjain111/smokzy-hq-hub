@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Activity, Clock, CheckCircle, Package, TrendingUp, Camera } from "lucide-react";
 import { format } from "date-fns";
+import { getBusinessDate } from "@/lib/businessDate";
 
 interface EmployeeActivityReportProps {
   venueId?: string;
@@ -51,7 +52,7 @@ const EmployeeActivityReport = ({ venueId }: EmployeeActivityReportProps) => {
   };
 
   const fetchEmployeeActivities = async () => {
-    const today = format(new Date(), "yyyy-MM-dd");
+    const today = getBusinessDate();
     
     // Get all employees
     const { data: employeeRoles } = await supabase

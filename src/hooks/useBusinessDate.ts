@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { getBusinessDate } from "@/lib/businessDate";
 
 /**
  * Hook to get the "business date" for the current shift.
@@ -16,7 +17,7 @@ export const useBusinessDate = (userId: string, venueId: string) => {
 
   const fetchActiveShift = useCallback(async () => {
     if (!userId || !venueId) {
-      setBusinessDate(format(new Date(), "yyyy-MM-dd"));
+      setBusinessDate(getBusinessDate());
       setLoading(false);
       return;
     }
@@ -43,12 +44,12 @@ export const useBusinessDate = (userId: string, venueId: string) => {
         setBusinessDate(checkInDate);
       } else {
         // No active shift, use today's date
-        setBusinessDate(format(new Date(), "yyyy-MM-dd"));
+        setBusinessDate(getBusinessDate());
         setCurrentShift(null);
       }
     } catch (error) {
       console.error("Error fetching active shift:", error);
-      setBusinessDate(format(new Date(), "yyyy-MM-dd"));
+      setBusinessDate(getBusinessDate());
     } finally {
       setLoading(false);
     }
