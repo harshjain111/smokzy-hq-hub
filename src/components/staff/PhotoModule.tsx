@@ -29,6 +29,16 @@ const PhotoModule = ({ user, venueId, session, updateSessionTask }: PhotoModuleP
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
+  // Cleanup camera and object URLs on unmount
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+    };
+  }, []);
+
   const fetchSubmitterInfo = useCallback(async () => {
     if (!session?.photo_uploaded_by || !session?.photo_uploaded_at) return;
 
@@ -122,11 +132,15 @@ const PhotoModule = ({ user, venueId, session, updateSessionTask }: PhotoModuleP
             maxHeight: 1920,
             quality: 0.85,
           });
-          
+
           setPhotoBlob(compressed);
           setPhotoPreview(URL.createObjectURL(compressed));
           stopCamera();
           setFlowState('preview');
+        } else {
+          haptic('error');
+          toast.error("Failed to capture photo. Please try again.");
+          setFlowState('idle');
         }
       }, "image/jpeg", 0.95);
     } catch (error) {

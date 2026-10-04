@@ -82,6 +82,7 @@ export const useClubSession = (userId: string, venueId: string) => {
   const [currentBreak, setCurrentBreak] = useState<StaffBreak | null>(null);
   const [staffStatus, setStaffStatus] = useState<StaffStatus>('checked_out');
   const [totalBreakMinutes, setTotalBreakMinutes] = useState(0);
+  const [isLongBreakActive, setIsLongBreakActive] = useState(false);
 
   // Get today's business date (or yesterday if before force_close_hour)
   const getSessionDate = useCallback(() => {
@@ -322,16 +323,24 @@ export const useClubSession = (userId: string, venueId: string) => {
     await fetchBreakStatus();
   }, [currentBreak, fetchBreakStatus]);
 
-  // Check if break is unusually long
-  const isLongBreak = useCallback((): boolean => {
-    if (!currentBreak) return false;
-    
-    const breakStartTime = new Date(currentBreak.break_start_time);
-    const now = new Date();
-    const durationMinutes = differenceInMinutes(now, breakStartTime);
-    
-    return durationMinutes >= LONG_BREAK_WARNING_MINUTES;
+  // Re-evaluate long-break warning on a timer while on break
+  useEffect(() => {
+    if (!currentBreak) {
+      setIsLongBreakActive(false);
+      return;
+    }
+    const check = () => {
+      const mins = differenceInMinutes(new Date(), new Date(currentBreak.break_start_time));
+      setIsLongBreakActive(mins >= LONG_BREAK_WARNING_MINUTES);
+    };
+    check();
+    const interval = setInterval(check, 60000);
+    return () => clearInterval(interval);
   }, [currentBreak]);
+
+  const isLongBreak = useCallback((): boolean => {
+    return isLongBreakActive;
+  }, [isLongBreakActive]);
 
   // Create or join a session when staff checks in
   const getOrCreateSession = useCallback(async (): Promise<ClubSession> => {

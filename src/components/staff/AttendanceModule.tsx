@@ -82,6 +82,16 @@ const AttendanceModule = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
+  // Cleanup camera and object URLs on unmount
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+    };
+  }, []);
+
   // Update break duration every minute
   useEffect(() => {
     if (currentBreak && staffStatus === 'on_break') {
@@ -302,7 +312,7 @@ const AttendanceModule = ({
               maxHeight: 1280,
               quality: 0.85,
             });
-            
+
             setPhotoBlob(compressed);
             setPhotoPreview(URL.createObjectURL(compressed));
             setFlowState('preview');
@@ -312,6 +322,10 @@ const AttendanceModule = ({
             toast.error("Failed to process photo");
             setFlowState('idle');
           }
+        } else {
+          haptic('error');
+          toast.error("Failed to capture photo. Please try again.");
+          setFlowState('idle');
         }
       }, "image/jpeg", 0.95);
     } catch (error) {

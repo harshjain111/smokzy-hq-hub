@@ -86,31 +86,23 @@ const EmployeeManagement = () => {
     if (employeesRes.error) {
       toast.error("Failed to load employees");
     } else if (employeesRes.data) {
-      const employeesWithRoles = await Promise.all(
-        employeesRes.data.map(async (emp) => {
-          const { data: roleData } = await supabase
-            .from("user_roles")
-            .select("role, venue_id")
-            .eq("user_id", emp.id)
-            .maybeSingle();
+      const userIds = employeesRes.data.map((e) => e.id);
+      const { data: allRoles } = await supabase
+        .from("user_roles")
+        .select("user_id, role, venue_id")
+        .in("user_id", userIds);
 
-          let venueName = null;
-          if (roleData?.venue_id) {
-            const { data: venueData } = await supabase
-              .from("venues")
-              .select("name")
-              .eq("id", roleData.venue_id)
-              .maybeSingle();
-            venueName = venueData?.name || null;
-          }
+      const venueMap = new Map((venuesRes.data || []).map((v: any) => [v.id, v.name]));
+      const roleMap = new Map((allRoles || []).map((r: any) => [r.user_id, r]));
 
-          return {
-            ...emp,
-            role: roleData?.role || "employee",
-            venue_name: venueName,
-          };
-        })
-      );
+      const employeesWithRoles = employeesRes.data.map((emp) => {
+        const roleData = roleMap.get(emp.id);
+        return {
+          ...emp,
+          role: roleData?.role || "employee",
+          venue_name: roleData?.venue_id ? venueMap.get(roleData.venue_id) || null : null,
+        };
+      });
       setEmployees(employeesWithRoles);
     }
 

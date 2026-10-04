@@ -187,14 +187,14 @@ const SalesModule = ({ user, venueId, session, updateSessionTask }: SalesModuleP
 
           if (error) throw error;
         } else {
-          // Insert new records for initial submission
-          const { error } = await supabase.from("sales_reports").insert({
+          // Upsert to prevent duplicates from double-tap
+          const { error } = await supabase.from("sales_reports").upsert({
             venue_id: venueId,
             reported_by: user.id,
             report_date: sessionDate,
             category_id: categoryId,
             quantity_sold: quantity,
-          });
+          }, { onConflict: "venue_id,report_date,category_id", ignoreDuplicates: false });
 
           if (error) throw error;
         }

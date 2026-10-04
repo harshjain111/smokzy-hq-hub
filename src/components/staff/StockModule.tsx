@@ -330,14 +330,16 @@ const StockModule = ({ user, venueId, session, updateSessionTask }: StockModuleP
     setSubmitting(true);
     
     try {
-      for (const [itemId, qty] of Object.entries(quantities)) {
-        // Only parse if qty is a valid string number (already validated non-empty above)
-        const quantity = parseInt(qty);
-        
+      const updates = Object.entries(quantities).map(([itemId, qty]) => ({
+        id: itemId,
+        quantity: Number(qty) || 0,
+      }));
+
+      for (const { id, quantity } of updates) {
         const { error } = await supabase
           .from("stock")
           .update({ quantity })
-          .eq("id", itemId);
+          .eq("id", id);
 
         if (error) throw error;
       }
