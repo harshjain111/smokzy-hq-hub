@@ -123,6 +123,24 @@ const AuthenticatedApp = () => {
     return <EmployeeDashboard user={user} venueId={userRole.venueId} />;
   }
 
+  // Employee without venue — show a clear message instead of falling through to admin dashboard
+  if (userRole?.role === "employee" && !userRole.venueId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center max-w-md p-8">
+          <h2 className="text-2xl font-bold mb-4">Venue Not Assigned</h2>
+          <p className="text-muted-foreground mb-6">Your account needs a venue assignment. Please contact your manager.</p>
+          <Button variant="outline" onClick={async () => {
+            try { await supabase.auth.signOut({ scope: 'local' }); } catch {}
+            navigate("/auth");
+          }}>
+            <LogOut className="mr-2 h-4 w-4" /> Sign Out
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   // No role assigned
   if (!userRole) {
     return (

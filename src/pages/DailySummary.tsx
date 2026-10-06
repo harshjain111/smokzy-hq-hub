@@ -77,8 +77,13 @@ const DailySummary = () => {
 
   const fetchAll = async () => {
     setLoading(true);
-    await Promise.all([fetchUserName(), fetchDashboardData()]);
-    setLoading(false);
+    try {
+      await Promise.all([fetchUserName(), fetchDashboardData()]);
+    } catch (err) {
+      console.error("Dashboard load error:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const fetchUserName = async () => {
@@ -174,8 +179,8 @@ const DailySummary = () => {
         route: `/club/${vid}`, actionLabel: "Resolve",
       };
       alerts.push(a);
-      healthMap.get(vid)!.severity = "critical";
-      healthMap.get(vid)!.issues.push(a);
+      const h = healthMap.get(vid);
+      if (h) { h.severity = "critical"; h.issues.push(a); }
     });
 
     // Packet mismatches per venue
