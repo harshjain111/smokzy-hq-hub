@@ -120,7 +120,13 @@ const AuthenticatedApp = () => {
 
   // Employees get their own full-screen portal
   if (userRole?.role === "employee" && userRole.venueId) {
-    return <EmployeeDashboard user={user} venueId={userRole.venueId} />;
+    return (
+      <AppErrorBoundary>
+        <Suspense fallback={<LoadingSpinner />}>
+          <EmployeeDashboard user={user} venueId={userRole.venueId} />
+        </Suspense>
+      </AppErrorBoundary>
+    );
   }
 
   // Employee without venue — show a clear message instead of falling through to admin dashboard

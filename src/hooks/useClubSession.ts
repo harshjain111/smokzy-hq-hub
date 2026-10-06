@@ -121,43 +121,43 @@ export const useClubSession = (userId: string, venueId: string) => {
   const forceCloseStaleSessionsClient = useCallback(async () => {
     if (!venueId) return;
 
-    const now = new Date();
-    const hour = now.getHours();
-    // Calculate today's business date
-    const businessDate = hour < settings.force_close_hour
-      ? format(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1), "yyyy-MM-dd")
-      : format(now, "yyyy-MM-dd");
+    try {
+      const now = new Date();
+      const hour = now.getHours();
+      const businessDate = hour < settings.force_close_hour
+        ? format(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1), "yyyy-MM-dd")
+        : format(now, "yyyy-MM-dd");
 
-    // Find all open sessions for this venue that are older than the current business date
-    const { data: staleSessions } = await supabase
-      .from("club_sessions")
-      .select("id, session_date")
-      .eq("venue_id", venueId)
-      .eq("status", "open")
-      .lt("session_date", businessDate);
+      const { data: staleSessions } = await supabase
+        .from("club_sessions")
+        .select("id, session_date")
+        .eq("venue_id", venueId)
+        .eq("status", "open")
+        .lt("session_date", businessDate);
 
-    if (staleSessions && staleSessions.length > 0) {
-      for (const stale of staleSessions) {
-        console.log(`Force-closing stale session ${stale.id} from ${stale.session_date}`);
-        await supabase
-          .from("club_sessions")
-          .update({
-            status: "force_closed",
-            closed_at: new Date().toISOString(),
-            force_close_reason: "Auto-closed: session exceeded daily boundary (client)",
-          })
-          .eq("id", stale.id);
+      if (staleSessions && staleSessions.length > 0) {
+        for (const stale of staleSessions) {
+          await supabase
+            .from("club_sessions")
+            .update({
+              status: "force_closed",
+              closed_at: new Date().toISOString(),
+              force_close_reason: "Auto-closed: session exceeded daily boundary (client)",
+            })
+            .eq("id", stale.id);
 
-        // Auto-checkout any staff still checked in on this session
-        await supabase
-          .from("staff_attendance_blocks")
-          .update({
-            check_out_time: new Date().toISOString(),
-            duty_completed: false,
-          })
-          .eq("session_id", stale.id)
-          .is("check_out_time", null);
+          await supabase
+            .from("staff_attendance_blocks")
+            .update({
+              check_out_time: new Date().toISOString(),
+              duty_completed: false,
+            })
+            .eq("session_id", stale.id)
+            .is("check_out_time", null);
+        }
       }
+    } catch (err) {
+      console.error("Error closing stale sessions:", err);
     }
   }, [venueId, settings.force_close_hour]);
 
@@ -418,6 +418,40 @@ export const useClubSession = (userId: string, venueId: string) => {
     await fetchMyAttendance();
   }, [myAttendanceBlock, fetchMyAttendance]);
 
+  // Auto-close session if all tasks complete
+  const checkAndAutoClose = useCallback(async () => {
+    if (!session) return;
+
+    const { data: currentSession } = await supabase
+      .from("club_sessions")
+      .select("*")
+      .eq("id", session.id)
+      .single();
+
+    if (!currentSession) return;
+
+    const allComplete =
+      currentSession.stock_submitted &&
+      currentSession.sales_submitted &&
+      currentSession.photo_uploaded;
+
+    if (allComplete && currentSession.status === 'open') {
+      const { error } = await supabase
+        .from("club_sessions")
+        .update({
+          status: 'closed',
+          closed_at: new Date().toISOString(),
+        })
+        .eq("id", currentSession.id);
+
+      if (error) {
+        console.error("Failed to auto-close session:", error);
+      } else {
+        await fetchSession();
+      }
+    }
+  }, [session, fetchSession]);
+
   // Update session task status
   const updateSessionTask = useCallback(async (
     task: 'stock' | 'sales' | 'photo',
@@ -426,7 +460,7 @@ export const useClubSession = (userId: string, venueId: string) => {
     if (!session) return;
 
     const updateData: any = {};
-    
+
     if (task === 'stock') {
       updateData.stock_submitted = true;
       updateData.stock_submitted_by = submittedBy;
@@ -448,44 +482,8 @@ export const useClubSession = (userId: string, venueId: string) => {
 
     if (error) throw error;
 
-    // Check if all tasks are now complete and auto-close
     await checkAndAutoClose();
   }, [session, checkAndAutoClose]);
-
-  // Auto-close session if all tasks complete
-  const checkAndAutoClose = useCallback(async () => {
-    if (!session) return;
-
-    // Refetch current session state
-    const { data: currentSession } = await supabase
-      .from("club_sessions")
-      .select("*")
-      .eq("id", session.id)
-      .single();
-
-    if (!currentSession) return;
-
-    const allComplete = 
-      currentSession.stock_submitted && 
-      currentSession.sales_submitted && 
-      currentSession.photo_uploaded;
-
-    if (allComplete && currentSession.status === 'open') {
-      const { error } = await supabase
-        .from("club_sessions")
-        .update({
-          status: 'closed',
-          closed_at: new Date().toISOString(),
-        })
-        .eq("id", currentSession.id);
-
-      if (error) {
-        console.error("Failed to auto-close session:", error);
-      } else {
-        await fetchSession();
-      }
-    }
-  }, [session, fetchSession]);
 
   // Check if user can checkout (morning shift logic + break check)
   const getCheckoutEligibility = useCallback((): { 
