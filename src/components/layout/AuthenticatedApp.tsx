@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState, Component, ReactNode } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
@@ -6,9 +6,47 @@ import { useUserRole } from "@/hooks/useUserRole";
 import AppShell from "./AppShell";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
+import { LogOut, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+
+class AppErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error: unknown) {
+    console.error("Dashboard crash:", error);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="text-center max-w-md p-8 space-y-4">
+            <h2 className="text-2xl font-bold text-foreground">Something went wrong</h2>
+            <p className="text-muted-foreground">
+              The page ran into an error. Please try reloading.
+            </p>
+            <Button
+              onClick={() => {
+                this.setState({ hasError: false });
+                window.location.reload();
+              }}
+              className="gap-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Reload Page
+            </Button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const EmployeeDashboard = lazy(() => import("@/components/dashboard/EmployeeDashboard"));
 const DashboardHome = lazy(() => import("@/pages/DashboardHome"));
@@ -47,16 +85,33 @@ const AuthenticatedApp = () => {
   const { userRole, loading } = useUserRole(user);
 
   useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
+      if (event === "INITIAL_SESSION") {
+        setInitializing(false);
+      }
+    });
+
+    // Fallback: if INITIAL_SESSION never fires (older Supabase clients), clear after getSession
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setInitializing(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
-      setUser(session?.user ?? null);
-    });
+    // "Remember Me" — clear session on browser/tab close when unchecked
+    const handleBeforeUnload = () => {
+      try {
+        if (localStorage.getItem("smokzy_remember_me") === "false") {
+          supabase.auth.signOut({ scope: "local" });
+        }
+      } catch {}
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
   }, []);
 
   if (initializing || loading) return <LoadingSpinner />;
@@ -102,6 +157,7 @@ const AuthenticatedApp = () => {
 
   return (
     <AppShell user={user} role={userRole.role}>
+      <AppErrorBoundary>
       <Suspense fallback={<LoadingSpinner />}>
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -137,6 +193,7 @@ const AuthenticatedApp = () => {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
+      </AppErrorBoundary>
     </AppShell>
   );
 };

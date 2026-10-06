@@ -28,11 +28,7 @@ export default defineConfig(({ mode }) => ({
           },
           {
             urlPattern: /^https:\/\/ozlrwwwtohaqggmhgfbm\.supabase\.co\/rest\/.*/i,
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "supabase-api-cache",
-              expiration: { maxEntries: 50, maxAgeSeconds: 300 },
-            },
+            handler: "NetworkOnly",
           },
         ],
       },

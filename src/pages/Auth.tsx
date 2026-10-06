@@ -26,6 +26,9 @@ const Auth = () => {
   const [loginIdentifier, setLoginIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(() => {
+    try { return localStorage.getItem("smokzy_remember_me") !== "false"; } catch { return true; }
+  });
 
   const isEmail = (input: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input);
   const normalizePhone = (input: string) => {
@@ -37,7 +40,7 @@ const Auth = () => {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) {
+      if (event === "SIGNED_IN" && session) {
         navigate("/");
       }
     });
@@ -75,6 +78,8 @@ const Auth = () => {
         return;
       }
       
+      try { localStorage.setItem("smokzy_remember_me", String(rememberMe)); } catch {}
+
       const { error } = await supabase.auth.signInWithPassword({
         email: emailToUse,
         password,
@@ -233,11 +238,23 @@ const Auth = () => {
                   className="h-12 bg-auth-background/50 border-auth-gold/30 text-white placeholder:text-gray-500 focus:border-auth-gold focus:ring-auth-gold/50 focus:ring-2 transition-all"
                 />
               </div>
+              <div className="flex items-center gap-2">
+                <input
+                  id="rememberMe"
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="h-4 w-4 rounded border-auth-gold/30 bg-auth-background/50 text-auth-gold accent-auth-gold focus:ring-auth-gold/50"
+                />
+                <Label htmlFor="rememberMe" className="text-gray-400 text-sm cursor-pointer select-none">
+                  Remember me
+                </Label>
+              </div>
               <motion.div
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
-                <Button 
+                <Button
                   type="submit" 
                   className="w-full h-14 bg-gradient-to-r from-auth-gold via-yellow-500 to-auth-gold hover:from-auth-gold-muted hover:via-yellow-400 hover:to-auth-gold-muted text-black font-bold text-lg shadow-lg shadow-auth-gold/30 transition-all border border-auth-gold/20" 
                   disabled={loading}

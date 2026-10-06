@@ -22,9 +22,9 @@ export const useUserRole = (user: User | null) => {
     }
 
     setLoading(true);
-    
-    const fetchUserRole = async () => {
-      // Fetch all roles for the user (club_management can have multiple venues)
+    let cancelled = false;
+
+    const fetchUserRole = async (attempt = 1) => {
       const { data, error } = await supabase
         .from("user_roles")
         .select("role, venue_id")
@@ -32,6 +32,10 @@ export const useUserRole = (user: User | null) => {
 
       if (error) {
         console.error("Error fetching user role:", error);
+        if (attempt < 3 && !cancelled) {
+          await new Promise(r => setTimeout(r, 1000 * attempt));
+          return fetchUserRole(attempt + 1);
+        }
         setUserRole(null);
       } else if (data && data.length > 0) {
         // Prioritize roles: admin > club_incharge > club_management > employee
@@ -78,6 +82,7 @@ export const useUserRole = (user: User | null) => {
     };
 
     fetchUserRole();
+    return () => { cancelled = true; };
   }, [user?.id]);
 
   return { userRole, loading };
