@@ -87,77 +87,79 @@ const WeeklySummary = () => {
 
   const fetchWeekData = async () => {
     setLoading(true);
+    try {
+      const [
+        { data: dispatches },
+        { data: stockDaily },
+        { data: sales },
+        { data: trackableCats },
+        { data: inspections },
+        { data: venues },
+      ] = await Promise.all([
+        supabase.from("packet_dispatches").select("*").gte("date", weekStart).lte("date", weekEnd),
+        supabase.from("venue_stock_daily").select("*").gte("date", weekStart).lte("date", weekEnd),
+        supabase.from("sales_reports").select("*").gte("report_date", weekStart).lte("report_date", weekEnd),
+        supabase.from("venue_hookah_categories").select("id").eq("is_packet_trackable", true),
+        supabase.from("inspections").select("id, venue_id, date, score").gte("date", weekStart).lte("date", weekEnd),
+        supabase.from("venues").select("id, name").order("name"),
+      ]);
 
-    const [
-      { data: dispatches },
-      { data: stockDaily },
-      { data: sales },
-      { data: trackableCats },
-      { data: inspections },
-      { data: venues },
-    ] = await Promise.all([
-      supabase.from("packet_dispatches").select("*").gte("date", weekStart).lte("date", weekEnd),
-      supabase.from("venue_stock_daily").select("*").gte("date", weekStart).lte("date", weekEnd),
-      supabase.from("sales_reports").select("*").gte("report_date", weekStart).lte("report_date", weekEnd),
-      supabase.from("venue_hookah_categories").select("id").eq("is_packet_trackable", true),
-      supabase.from("inspections").select("id, venue_id, date, score").gte("date", weekStart).lte("date", weekEnd),
-      supabase.from("venues").select("id, name").order("name"),
-    ]);
+      const trackableIds = new Set((trackableCats || []).map((c) => c.id));
 
-    const trackableIds = new Set((trackableCats || []).map((c) => c.id));
+      const daily: DailyData[] = weekDates.map((d) => {
+        const dateStr = fmt(d);
+        const dayDispatches = (dispatches || []).filter((p) => p.date === dateStr);
+        const dayStock = (stockDaily || []).filter((s) => s.date === dateStr);
+        const daySales = (sales || []).filter((s) => s.report_date === dateStr && trackableIds.has(s.category_id));
+        const dayInspections = (inspections || []).filter((i) => i.date === dateStr);
 
-    // Daily aggregation
-    const daily: DailyData[] = weekDates.map((d) => {
-      const dateStr = fmt(d);
-      const dayDispatches = (dispatches || []).filter((p) => p.date === dateStr);
-      const dayStock = (stockDaily || []).filter((s) => s.date === dateStr);
-      const daySales = (sales || []).filter((s) => s.report_date === dateStr && trackableIds.has(s.category_id));
-      const dayInspections = (inspections || []).filter((i) => i.date === dateStr);
+        const dispatched = dayDispatches.reduce((s, p) => s + p.quantity_sent, 0);
+        const used = dayStock.reduce((s, p) => s + p.packets_used, 0);
+        const sold = daySales.reduce((s, p) => s + p.quantity_sold, 0);
 
-      const dispatched = dayDispatches.reduce((s, p) => s + p.quantity_sent, 0);
-      const used = dayStock.reduce((s, p) => s + p.packets_used, 0);
-      const sold = daySales.reduce((s, p) => s + p.quantity_sold, 0);
+        return {
+          date: dateStr,
+          dateLabel: d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric" }),
+          dispatched,
+          used,
+          sold,
+          mismatch: used - sold,
+          inspections: dayInspections.length,
+        };
+      });
 
-      return {
-        date: dateStr,
-        dateLabel: d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric" }),
-        dispatched,
-        used,
-        sold,
-        mismatch: used - sold,
-        inspections: dayInspections.length,
-      };
-    });
+      const venueSummaries: VenueWeeklySummary[] = (venues || []).map((v: any) => {
+        const vDispatches = (dispatches || []).filter((p) => p.venue_id === v.id);
+        const vStock = (stockDaily || []).filter((s) => s.venue_id === v.id);
+        const vSales = (sales || []).filter((s) => s.venue_id === v.id && trackableIds.has(s.category_id));
+        const vInspections = (inspections || []).filter((i) => i.venue_id === v.id);
 
-    // Venue aggregation
-    const venueSummaries: VenueWeeklySummary[] = (venues || []).map((v: any) => {
-      const vDispatches = (dispatches || []).filter((p) => p.venue_id === v.id);
-      const vStock = (stockDaily || []).filter((s) => s.venue_id === v.id);
-      const vSales = (sales || []).filter((s) => s.venue_id === v.id && trackableIds.has(s.category_id));
-      const vInspections = (inspections || []).filter((i) => i.venue_id === v.id);
+        const totalDispatched = vDispatches.reduce((s, p) => s + p.quantity_sent, 0);
+        const totalUsed = vStock.reduce((s, p) => s + p.packets_used, 0);
+        const totalSold = vSales.reduce((s, p) => s + p.quantity_sold, 0);
+        const avgScore = vInspections.length > 0
+          ? Math.round(vInspections.reduce((s, i) => s + (i.score || 0), 0) / vInspections.length)
+          : 0;
 
-      const totalDispatched = vDispatches.reduce((s, p) => s + p.quantity_sent, 0);
-      const totalUsed = vStock.reduce((s, p) => s + p.packets_used, 0);
-      const totalSold = vSales.reduce((s, p) => s + p.quantity_sold, 0);
-      const avgScore = vInspections.length > 0
-        ? Math.round(vInspections.reduce((s, i) => s + (i.score || 0), 0) / vInspections.length)
-        : 0;
+        return {
+          venue_id: v.id,
+          venue_name: v.name,
+          total_dispatched: totalDispatched,
+          total_used: totalUsed,
+          total_sold: totalSold,
+          mismatch: totalUsed - totalSold,
+          inspections: vInspections.length,
+          avg_score: avgScore,
+        };
+      });
 
-      return {
-        venue_id: v.id,
-        venue_name: v.name,
-        total_dispatched: totalDispatched,
-        total_used: totalUsed,
-        total_sold: totalSold,
-        mismatch: totalUsed - totalSold,
-        inspections: vInspections.length,
-        avg_score: avgScore,
-      };
-    });
-
-    setDailyData(daily);
-    setVenueData(venueSummaries);
-    setLoading(false);
+      setDailyData(daily);
+      setVenueData(venueSummaries);
+    } catch (err) {
+      console.error("Weekly data fetch error:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Totals

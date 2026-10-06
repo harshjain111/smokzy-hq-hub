@@ -126,17 +126,24 @@ const PhotoModule = ({ user, venueId, session, updateSessionTask }: PhotoModuleP
       
       canvas.toBlob(async (blob) => {
         if (blob) {
-          const file = new File([blob], "counter.jpg", { type: "image/jpeg" });
-          const compressed = await compressImage(file, {
-            maxWidth: 1920,
-            maxHeight: 1920,
-            quality: 0.85,
-          });
+          try {
+            const file = new File([blob], "counter.jpg", { type: "image/jpeg" });
+            const compressed = await compressImage(file, {
+              maxWidth: 1920,
+              maxHeight: 1920,
+              quality: 0.85,
+            });
 
-          setPhotoBlob(compressed);
-          setPhotoPreview(URL.createObjectURL(compressed));
-          stopCamera();
-          setFlowState('preview');
+            setPhotoBlob(compressed);
+            setPhotoPreview(URL.createObjectURL(compressed));
+            stopCamera();
+            setFlowState('preview');
+          } catch (err) {
+            console.error("Image compression error:", err);
+            haptic('error');
+            toast.error("Failed to process photo. Please try again.");
+            setFlowState('idle');
+          }
         } else {
           haptic('error');
           toast.error("Failed to capture photo. Please try again.");

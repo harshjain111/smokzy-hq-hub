@@ -85,6 +85,16 @@ const AuthenticatedApp = () => {
   const { userRole, loading } = useUserRole(user);
 
   useEffect(() => {
+    // "Remember Me" — if unchecked last session and this is a new browser session, sign out
+    try {
+      const rememberMe = localStorage.getItem("smokzy_remember_me");
+      const tabAlive = sessionStorage.getItem("smokzy_tab_alive");
+      if (rememberMe === "false" && !tabAlive) {
+        supabase.auth.signOut({ scope: "local" });
+      }
+      sessionStorage.setItem("smokzy_tab_alive", "1");
+    } catch {}
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
       if (event === "INITIAL_SESSION") {
@@ -92,25 +102,13 @@ const AuthenticatedApp = () => {
       }
     });
 
-    // Fallback: if INITIAL_SESSION never fires (older Supabase clients), clear after getSession
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setInitializing(false);
     });
 
-    // "Remember Me" — clear session on browser/tab close when unchecked
-    const handleBeforeUnload = () => {
-      try {
-        if (localStorage.getItem("smokzy_remember_me") === "false") {
-          supabase.auth.signOut({ scope: "local" });
-        }
-      } catch {}
-    };
-    window.addEventListener("beforeunload", handleBeforeUnload);
-
     return () => {
       subscription.unsubscribe();
-      window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, []);
 

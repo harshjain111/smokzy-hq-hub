@@ -32,14 +32,18 @@ const ProfileMenu = ({ user, role }: ProfileMenuProps) => {
   }, [user.id]);
 
   const fetchProfile = async () => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("full_name")
-      .eq("id", user.id)
-      .single();
+    try {
+      const { data } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", user.id)
+        .single();
 
-    if (data?.full_name) {
-      setProfileName(data.full_name);
+      if (data?.full_name) {
+        setProfileName(data.full_name);
+      }
+    } catch (err) {
+      console.error("Error fetching profile:", err);
     }
   };
 

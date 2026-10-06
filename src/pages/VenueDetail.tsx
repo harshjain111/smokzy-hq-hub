@@ -41,44 +41,52 @@ const VenueDetail = () => {
   }, [venueId]);
 
   const fetchVenueDetails = async () => {
-    const { data } = await supabase
-      .from("venues")
-      .select("name")
-      .eq("id", venueId)
-      .single();
+    try {
+      const { data } = await supabase
+        .from("venues")
+        .select("name")
+        .eq("id", venueId)
+        .single();
 
-    if (data) {
-      setVenueName(data.name);
+      if (data) {
+        setVenueName(data.name);
+      }
+    } catch (err) {
+      console.error("Error fetching venue details:", err);
     }
   };
 
   const fetchCounterPhoto = async () => {
-    const today = getBusinessDate();
-    const { data } = await supabase
-      .from("closing_photos")
-      .select("photo_url")
-      .eq("venue_id", venueId)
-      .eq("photo_date", today)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    try {
+      const today = getBusinessDate();
+      const { data } = await supabase
+        .from("closing_photos")
+        .select("photo_url")
+        .eq("venue_id", venueId)
+        .eq("photo_date", today)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    if (data?.photo_url) {
-      // Extract file path from URL
-      const match = data.photo_url.match(/\/closing-photos\/(.+)$/);
-      const photoPath = match ? match[1] : null;
-      
-      if (photoPath) {
-        const { data: signedData } = await supabase.storage
-          .from("closing-photos")
-          .createSignedUrl(photoPath, 3600);
-        
-        setCounterPhoto(signedData?.signedUrl || null);
+      if (data?.photo_url) {
+        const match = data.photo_url.match(/\/closing-photos\/(.+)$/);
+        const photoPath = match ? match[1] : null;
+
+        if (photoPath) {
+          const { data: signedData } = await supabase.storage
+            .from("closing-photos")
+            .createSignedUrl(photoPath, 3600);
+
+          setCounterPhoto(signedData?.signedUrl || null);
+        }
       }
+    } catch (err) {
+      console.error("Error fetching counter photo:", err);
     }
   };
 
   const fetchVenueStats = async () => {
+    try {
     const today = getBusinessDate();
 
     const [employeesRes, stockRes, salesRes, attendanceRes] = await Promise.all([
@@ -118,6 +126,9 @@ const VenueDetail = () => {
       todaySales: totalSales,
       activeStaff: attendanceRes.data?.length || 0,
     });
+    } catch (err) {
+      console.error("Error fetching venue stats:", err);
+    }
   };
 
   return (

@@ -28,85 +28,75 @@ const ClosingModule = ({ session, venueId }: ClosingModuleProps) => {
       return;
     }
 
-    const taskList: TaskInfo[] = [];
+    try {
+      const taskList: TaskInfo[] = [];
 
-    // Stock task
-    if (session.stock_submitted && session.stock_submitted_by) {
-      const { data: stockProfile } = await supabase
-        .from("profiles")
-        .select("full_name")
-        .eq("id", session.stock_submitted_by)
-        .single();
+      if (session.stock_submitted && session.stock_submitted_by) {
+        const { data: stockProfile } = await supabase
+          .from("profiles")
+          .select("full_name")
+          .eq("id", session.stock_submitted_by)
+          .single();
 
-      taskList.push({
-        id: 'stock',
-        label: 'Stock submitted',
-        completed: true,
-        submitterName: stockProfile?.full_name || 'Unknown',
-        submittedAt: session.stock_submitted_at 
-          ? format(new Date(session.stock_submitted_at), "h:mm a")
-          : undefined,
-      });
-    } else {
-      taskList.push({
-        id: 'stock',
-        label: 'Stock submission',
-        completed: false,
-      });
+        taskList.push({
+          id: 'stock',
+          label: 'Stock submitted',
+          completed: true,
+          submitterName: stockProfile?.full_name || 'Unknown',
+          submittedAt: session.stock_submitted_at
+            ? format(new Date(session.stock_submitted_at), "h:mm a")
+            : undefined,
+        });
+      } else {
+        taskList.push({ id: 'stock', label: 'Stock submission', completed: false });
+      }
+
+      if (session.sales_submitted && session.sales_submitted_by) {
+        const { data: salesProfile } = await supabase
+          .from("profiles")
+          .select("full_name")
+          .eq("id", session.sales_submitted_by)
+          .single();
+
+        taskList.push({
+          id: 'sales',
+          label: 'Sales logged',
+          completed: true,
+          submitterName: salesProfile?.full_name || 'Unknown',
+          submittedAt: session.sales_submitted_at
+            ? format(new Date(session.sales_submitted_at), "h:mm a")
+            : undefined,
+        });
+      } else {
+        taskList.push({ id: 'sales', label: 'Sales submission', completed: false });
+      }
+
+      if (session.photo_uploaded && session.photo_uploaded_by) {
+        const { data: photoProfile } = await supabase
+          .from("profiles")
+          .select("full_name")
+          .eq("id", session.photo_uploaded_by)
+          .single();
+
+        taskList.push({
+          id: 'photo',
+          label: 'Counter photo uploaded',
+          completed: true,
+          submitterName: photoProfile?.full_name || 'Unknown',
+          submittedAt: session.photo_uploaded_at
+            ? format(new Date(session.photo_uploaded_at), "h:mm a")
+            : undefined,
+        });
+      } else {
+        taskList.push({ id: 'photo', label: 'Counter photo', completed: false });
+      }
+
+      setTasks(taskList);
+    } catch (err) {
+      console.error("Error fetching task details:", err);
+    } finally {
+      setLoading(false);
     }
-
-    // Sales task
-    if (session.sales_submitted && session.sales_submitted_by) {
-      const { data: salesProfile } = await supabase
-        .from("profiles")
-        .select("full_name")
-        .eq("id", session.sales_submitted_by)
-        .single();
-
-      taskList.push({
-        id: 'sales',
-        label: 'Sales logged',
-        completed: true,
-        submitterName: salesProfile?.full_name || 'Unknown',
-        submittedAt: session.sales_submitted_at 
-          ? format(new Date(session.sales_submitted_at), "h:mm a")
-          : undefined,
-      });
-    } else {
-      taskList.push({
-        id: 'sales',
-        label: 'Sales submission',
-        completed: false,
-      });
-    }
-
-    // Photo task
-    if (session.photo_uploaded && session.photo_uploaded_by) {
-      const { data: photoProfile } = await supabase
-        .from("profiles")
-        .select("full_name")
-        .eq("id", session.photo_uploaded_by)
-        .single();
-
-      taskList.push({
-        id: 'photo',
-        label: 'Counter photo uploaded',
-        completed: true,
-        submitterName: photoProfile?.full_name || 'Unknown',
-        submittedAt: session.photo_uploaded_at 
-          ? format(new Date(session.photo_uploaded_at), "h:mm a")
-          : undefined,
-      });
-    } else {
-      taskList.push({
-        id: 'photo',
-        label: 'Counter photo',
-        completed: false,
-      });
-    }
-
-    setTasks(taskList);
-    setLoading(false);
   }, [session]);
 
   useEffect(() => {
