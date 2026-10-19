@@ -121,7 +121,7 @@ export default function AttendanceReport() {
     try {
       const [employeesRes, venuesRes] = await Promise.all([
         supabase.from("profiles").select("id, full_name").order("full_name"),
-        supabase.from("venues").select("id, name").order("name"),
+        supabase.from("venues").select("id, name").eq("is_active", true).order("name"),
       ]);
 
       if (employeesRes.data) setEmployees(employeesRes.data);

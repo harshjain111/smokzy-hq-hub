@@ -48,6 +48,7 @@ export default function CounterPictures() {
       const { data: venues } = await supabase
         .from("venues")
         .select("id, name")
+        .eq("is_active", true)
         .order("name");
 
       if (!venues) {

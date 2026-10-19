@@ -139,7 +139,7 @@ const DailyRoster = () => {
   useEffect(() => { setEditableVenueIds(new Set()); }, [dateStr]);
 
   const fetchVenues = async () => {
-    const { data } = await supabase.from("venues").select("id, name").order("name");
+    const { data } = await supabase.from("venues").select("id, name").eq("is_active", true).order("name");
     setVenues(data || []);
   };
 

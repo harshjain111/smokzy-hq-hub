@@ -35,7 +35,7 @@ const AccessoryTracker = () => {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    supabase.from("venues").select("id, name").order("name").then(({ data }) => {
+    supabase.from("venues").select("id, name").eq("is_active", true).order("name").then(({ data }) => {
       setVenues(data || []);
     });
     fetchAccessories();

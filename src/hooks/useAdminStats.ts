@@ -46,6 +46,7 @@ export const useAdminStats = () => {
       const { data: venues } = await supabase
         .from("venues")
         .select("id, name, location")
+        .eq("is_active", true)
         .order("name");
 
       if (!venues) {

@@ -80,6 +80,7 @@ const EmployeeManagement = () => {
       supabase
         .from("venues")
         .select("id, name")
+        .eq("is_active", true)
         .order("name"),
     ]);
 

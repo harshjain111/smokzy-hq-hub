@@ -65,7 +65,8 @@ export const useAnalyticsData = () => {
       // Fetch venues
       const { data: venues } = await supabase
         .from("venues")
-        .select("id, name");
+        .select("id, name")
+        .eq("is_active", true);
 
       // Fetch all sales reports for analysis
       const { data: allSales } = await supabase

@@ -49,6 +49,7 @@ const HookahCategoryManagement = () => {
     const { data } = await supabase
       .from("venues")
       .select("*")
+      .eq("is_active", true)
       .order("name");
 
     setVenues(data || []);

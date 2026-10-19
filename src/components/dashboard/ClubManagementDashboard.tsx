@@ -97,7 +97,7 @@ const ClubManagementDashboard = ({ user, venueIds }: ClubManagementDashboardProp
   // Fetch venues
   useEffect(() => {
     const fetchVenues = async () => {
-      const query = supabase.from("venues").select("id, name, location").order("name");
+      const query = supabase.from("venues").select("id, name, location").eq("is_active", true).order("name");
       const { data } = venueIds.length > 0
         ? await query.in("id", venueIds)
         : await query;

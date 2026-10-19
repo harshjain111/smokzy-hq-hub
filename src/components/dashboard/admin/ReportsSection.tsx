@@ -54,7 +54,7 @@ export const ReportsSection = () => {
   const [generating, setGenerating] = useState(false);
 
   const fetchVenues = async () => {
-    const { data } = await supabase.from("venues").select("id, name").order("name");
+    const { data } = await supabase.from("venues").select("id, name").eq("is_active", true).order("name");
     if (data) setVenues(data);
   };
 

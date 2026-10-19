@@ -70,7 +70,7 @@ const InspectionForm = () => {
   }, []);
 
   useEffect(() => {
-    supabase.from("venues").select("id, name").order("name").then(({ data }) => setVenues(data || []));
+    supabase.from("venues").select("id, name").eq("is_active", true).order("name").then(({ data }) => setVenues(data || []));
     supabase.from("global_settings").select("value").eq("key", "inspection_checklist").single().then(({ data }) => {
       let checkItems = DEFAULT_CHECKS;
       if (data?.value) {

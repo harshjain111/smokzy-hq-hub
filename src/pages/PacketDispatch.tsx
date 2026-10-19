@@ -108,7 +108,7 @@ const PacketDispatch = () => {
   const fetchBaseData = async () => {
     setLoading(true);
     const [{ data: v }, { data: f }, { data: setting }] = await Promise.all([
-      supabase.from("venues").select("id, name").order("name"),
+      supabase.from("venues").select("id, name").eq("is_active", true).order("name"),
       supabase.from("flavours").select("id, name, packet_weight_grams").eq("is_active", true).order("name"),
       supabase.from("global_settings").select("value").eq("key", "dispatch_mode").maybeSingle(),
     ]);

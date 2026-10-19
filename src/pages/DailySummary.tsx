@@ -109,7 +109,7 @@ const DailySummary = () => {
       { data: dailyRosterData },
       { data: rosterTasks },
     ] = await Promise.all([
-      supabase.from("venues").select("id, name").order("name"),
+      supabase.from("venues").select("id, name").eq("is_active", true).order("name"),
       supabase.from("club_sessions").select("id, venue_id, status").eq("status", "open"),
       supabase.from("staff_attendance_blocks").select("user_id, venue_id, check_in_time").is("check_out_time", null),
       supabase.from("roster_assignments").select("staff_id, venue_id").eq("date", today).eq("status", "assigned"),

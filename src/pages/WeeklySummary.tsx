@@ -101,7 +101,7 @@ const WeeklySummary = () => {
         supabase.from("sales_reports").select("*").gte("report_date", weekStart).lte("report_date", weekEnd),
         supabase.from("venue_hookah_categories").select("id").eq("is_packet_trackable", true),
         supabase.from("inspections").select("id, venue_id, date, score").gte("date", weekStart).lte("date", weekEnd),
-        supabase.from("venues").select("id, name").order("name"),
+        supabase.from("venues").select("id, name").eq("is_active", true).order("name"),
       ]);
 
       const trackableIds = new Set((trackableCats || []).map((c) => c.id));

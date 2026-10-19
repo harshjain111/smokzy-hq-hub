@@ -102,7 +102,7 @@ const DailyClubReport = () => {
         { data: trackableCategories },
         { data: flavours },
       ] = await Promise.all([
-        supabase.from("venues").select("id, name").order("name"),
+        supabase.from("venues").select("id, name").eq("is_active", true).order("name"),
         supabase.from("packet_dispatches").select("*").eq("date", dateStr),
         supabase.from("venue_stock_daily").select("*").eq("date", dateStr),
         supabase.from("venue_stock_daily").select("venue_id, closing_stock").eq("date", prevDateStr),

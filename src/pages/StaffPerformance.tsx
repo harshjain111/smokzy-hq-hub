@@ -61,7 +61,7 @@ const StaffPerformance = () => {
       { data: violationsData },
       { data: trainingData },
     ] = await Promise.all([
-      supabase.from("venues").select("id, name").order("name"),
+      supabase.from("venues").select("id, name").eq("is_active", true).order("name"),
       supabase.from("user_roles").select("user_id, venue_id").eq("role", "employee"),
       supabase.from("profiles").select("id, full_name"),
       supabase

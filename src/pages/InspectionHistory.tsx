@@ -57,7 +57,7 @@ const InspectionHistory = () => {
   const fetchData = async () => {
     setLoading(true);
     const [{ data: venueData }, { data: inspectionData }] = await Promise.all([
-      supabase.from("venues").select("id, name").order("name"),
+      supabase.from("venues").select("id, name").eq("is_active", true).order("name"),
       supabase.from("inspections").select("*").order("date", { ascending: false }).order("time", { ascending: false }),
     ]);
 
