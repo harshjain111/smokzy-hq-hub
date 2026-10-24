@@ -80,7 +80,7 @@ export const InspectionSummaryDialog = ({
           <Button variant="outline" onClick={() => onOpenChange(false)}>Back to Edit</Button>
           <Button onClick={onConfirm} disabled={submitting}>
             {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Complete Inspection
+            Save & Submit
           </Button>
         </DialogFooter>
       </DialogContent>

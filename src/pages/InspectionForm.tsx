@@ -206,15 +206,30 @@ const InspectionForm = () => {
 
     const uniqueFlavourIds = [...new Set((dispatches || []).map((d) => d.flavour_id))];
 
+    let picked: { id: string; name: string }[];
     if (uniqueFlavourIds.length === 0) {
       const { data: allFlavours } = await supabase.from("flavours").select("id, name").eq("is_active", true);
-      const shuffled = (allFlavours || []).sort(() => Math.random() - 0.5);
-      setSpotChecks(shuffled.slice(0, 3).map((f) => ({ id: f.id, name: f.name, reported: "", measured: "" })));
+      picked = (allFlavours || []).sort(() => Math.random() - 0.5).slice(0, 3);
     } else {
       const { data: flavourDetails } = await supabase.from("flavours").select("id, name").in("id", uniqueFlavourIds);
-      const shuffled = (flavourDetails || []).sort(() => Math.random() - 0.5);
-      setSpotChecks(shuffled.slice(0, 3).map((f) => ({ id: f.id, name: f.name, reported: "", measured: "" })));
+      picked = (flavourDetails || []).sort(() => Math.random() - 0.5).slice(0, 3);
     }
+
+    // Fetch current stock quantities for the picked flavours from the stock table
+    const { data: stockItems } = await supabase
+      .from("stock")
+      .select("item_name, quantity")
+      .eq("venue_id", venueId)
+      .eq("category", "flavour");
+
+    const stockByName = new Map((stockItems || []).map((s) => [s.item_name.toLowerCase(), s.quantity]));
+
+    setSpotChecks(picked.map((f) => ({
+      id: f.id,
+      name: f.name,
+      reported: String(stockByName.get(f.name.toLowerCase()) ?? ""),
+      measured: "",
+    })));
     setLoadingSpotChecks(false);
   };
 
@@ -431,7 +446,7 @@ const InspectionForm = () => {
   const canComplete = !!selectedVenue && stats.completed === stats.total && !submitting;
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background pb-28">
       <div className="max-w-6xl mx-auto p-3 space-y-4">
         <InspectionContextHeader
           venues={venues}
@@ -570,7 +585,7 @@ const InspectionForm = () => {
       </div>
 
       {/* Bottom action bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-sm border-t p-3">
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-sm border-t p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <div className="max-w-6xl mx-auto flex items-center gap-2">
           <Button variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => setShowDiscardConfirm(true)} disabled={!selectedVenue}>
             <Trash2 className="h-4 w-4 mr-1.5" />
@@ -578,11 +593,11 @@ const InspectionForm = () => {
           </Button>
           <Button variant="outline" className="flex-1" onClick={() => setShowSummary(true)} disabled={!selectedVenue}>
             <Eye className="h-4 w-4 mr-1.5" />
-            Preview Summary
+            Preview
           </Button>
-          <Button className="flex-1" onClick={handleSubmit} disabled={!canComplete}>
+          <Button className="flex-1 font-semibold" onClick={handleSubmit} disabled={!canComplete}>
             {submitting ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Send className="h-4 w-4 mr-1.5" />}
-            Complete ({stats.completed}/{stats.total})
+            {stats.completed === stats.total ? "Save & Submit" : `Complete (${stats.completed}/${stats.total})`}
           </Button>
         </div>
       </div>
