@@ -126,8 +126,8 @@ const AppShell = ({ children, user, role, pageTitle }: AppShellProps) => {
         </main>
       </div>
 
-      {/* Mobile bottom tab bar */}
-      {isMobile && (
+      {/* Mobile bottom tab bar — hidden on pages with their own fixed bottom action bar */}
+      {isMobile && location.pathname !== "/inspections/new" && (
         <MobileBottomTabs onMoreClick={() => setMobileDrawerOpen(true)} />
       )}
     </div>
