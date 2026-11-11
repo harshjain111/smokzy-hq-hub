@@ -4,7 +4,7 @@ import { format, differenceInMinutes } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Download, AlertTriangle, Coffee, Users, Plus, Trash2 } from "lucide-react";
+import { Download, AlertTriangle, Coffee, Users, Plus, Trash2, FileText } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   Dialog,
@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { exportToXlsx } from "@/lib/exportXlsx";
+import { exportToPdf } from "@/lib/exportPdf";
 
 interface HistoricalSession {
   id: string;
@@ -238,6 +239,18 @@ export const HistoricalAttendanceSection = ({ session, clubId, clubName, onSumma
     await exportToXlsx(exportData, `${clubName}_Attendance_${session.session_date}.xlsx`, "Attendance");
   };
 
+  const downloadPdf = () => {
+    const data = records.map(r => ({
+      Staff: r.staff_name,
+      "Check In": format(new Date(r.check_in_time), "HH:mm"),
+      "Check Out": r.check_out_time ? format(new Date(r.check_out_time), "HH:mm") : "—",
+      "Break (min)": r.break_minutes,
+      "Total Hours": r.total_hours,
+      Flags: r.flags.join(", ") || "—",
+    }));
+    exportToPdf(data, `${clubName}_Attendance_${session.session_date}.pdf`, `${clubName} — Attendance ${session.session_date}`);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-6">
@@ -248,14 +261,16 @@ export const HistoricalAttendanceSection = ({ session, clubId, clubName, onSumma
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         <Button variant="outline" size="sm" className="gap-2" onClick={handleOpenAddDialog}>
           <Plus className="h-4 w-4" />
           Add Punch-In
         </Button>
-        <Button variant="outline" size="sm" className="gap-2" onClick={downloadExcel}>
-          <Download className="h-4 w-4" />
-          Export
+        <Button variant="outline" size="sm" className="gap-1.5" onClick={downloadExcel}>
+          <Download className="h-4 w-4" />CSV
+        </Button>
+        <Button variant="outline" size="sm" className="gap-1.5" onClick={downloadPdf}>
+          <FileText className="h-4 w-4" />PDF
         </Button>
       </div>
 

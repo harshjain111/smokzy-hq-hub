@@ -5,8 +5,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import {
   Download, AlertTriangle, Package, Info,
-  AlertCircle, CheckCircle2
+  AlertCircle, CheckCircle2, FileText
 } from "lucide-react";
+import { exportToPdf } from "@/lib/exportPdf";
 import { toast } from "sonner";
 import { ClubSession } from "@/pages/ClubDetail";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -182,6 +183,18 @@ export const ClubStockSection = ({ clubId, clubName, session, onSummaryChange }:
     toast.success("Stock report exported");
   };
 
+  const exportStockPdf = () => {
+    const data = stockData.map(item => ({
+      Item: item.item_name,
+      Category: item.category.replace('_', ' '),
+      Unit: item.unit,
+      Quantity: item.quantity,
+      Threshold: item.low_stock_threshold,
+      Status: item.quantity === 0 ? "OUT OF STOCK" : item.quantity <= item.low_stock_threshold ? "LOW" : "OK",
+    }));
+    exportToPdf(data, `${clubName}-stock-${format(new Date(), "yyyy-MM-dd")}.pdf`, `${clubName} — Stock Report`);
+  };
+
   const getHealthColor = (score: number) => {
     if (score >= 80) return 'text-success bg-success/10 border-success/20';
     if (score >= 50) return 'text-warning bg-warning/10 border-warning/20';
@@ -259,10 +272,14 @@ export const ClubStockSection = ({ clubId, clubName, session, onSummaryChange }:
         </div>
       </div>
 
-      <Button variant="outline" size="sm" onClick={exportStock} className="w-full">
-        <Download className="h-4 w-4 mr-2" />
-        Export Stock Report
-      </Button>
+      <div className="flex gap-2">
+        <Button variant="outline" size="sm" onClick={exportStock} className="flex-1">
+          <Download className="h-4 w-4 mr-1.5" />CSV
+        </Button>
+        <Button variant="outline" size="sm" onClick={exportStockPdf} className="flex-1">
+          <FileText className="h-4 w-4 mr-1.5" />PDF
+        </Button>
+      </div>
 
       {/* Smart Insights */}
       {insights.length > 0 && (

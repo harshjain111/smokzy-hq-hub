@@ -6,7 +6,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { format, subDays, eachDayOfInterval, startOfDay, endOfDay } from "date-fns";
-import { Download, AlertTriangle } from "lucide-react";
+import { Download, AlertTriangle, FileText } from "lucide-react";
+import { exportToPdf } from "@/lib/exportPdf";
 import { toast } from "sonner";
 
 interface ClubStockTabProps {
@@ -74,6 +75,14 @@ export const ClubStockTab = ({ clubId, clubName }: ClubStockTabProps) => {
     toast.success("Stock report exported");
   };
 
+  const exportPdf = () => {
+    const data = stockData.map(item => ({
+      Item: item.item_name, Category: item.category, Unit: item.unit,
+      Quantity: item.quantity,
+    }));
+    exportToPdf(data, `${clubName}-stock-${format(new Date(), "yyyy-MM-dd")}.pdf`, `${clubName} — Stock Matrix`);
+  };
+
   // Calculate expected consumption (placeholder logic - avg grams per chillum)
   const GRAMS_PER_CHILLUM = 20;
 
@@ -91,10 +100,14 @@ export const ClubStockTab = ({ clubId, clubName }: ClubStockTabProps) => {
               <SelectItem value="30">Last 30 Days</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" size="sm" onClick={exportExcel}>
-            <Download className="h-4 w-4 mr-2" />
-            Download Excel
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={exportExcel}>
+              <Download className="h-4 w-4 mr-1.5" />CSV
+            </Button>
+            <Button variant="outline" size="sm" onClick={exportPdf}>
+              <FileText className="h-4 w-4 mr-1.5" />PDF
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

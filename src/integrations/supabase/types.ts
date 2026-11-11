@@ -913,6 +913,7 @@ export type Database = {
           created_at: string
           id: string
           kot_photo_url: string | null
+          nc_quantity: number
           quantity_sold: number
           report_date: string
           reported_by: string
@@ -923,6 +924,7 @@ export type Database = {
           created_at?: string
           id?: string
           kot_photo_url?: string | null
+          nc_quantity?: number
           quantity_sold: number
           report_date?: string
           reported_by: string
@@ -933,6 +935,7 @@ export type Database = {
           created_at?: string
           id?: string
           kot_photo_url?: string | null
+          nc_quantity?: number
           quantity_sold?: number
           report_date?: string
           reported_by?: string

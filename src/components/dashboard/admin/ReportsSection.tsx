@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FileSpreadsheet, Download, Building2, Users, Package } from "lucide-react";
+import { FileSpreadsheet, Download, Building2, Users, Package, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format, subDays, startOfMonth, endOfMonth, differenceInMinutes } from "date-fns";
 import { toast } from "sonner";
 import { exportToXlsx } from "@/lib/exportXlsx";
+import { exportToPdf } from "@/lib/exportPdf";
 
 interface ReportType {
   id: string;
@@ -52,6 +53,7 @@ export const ReportsSection = () => {
   const [clubFilter, setClubFilter] = useState<string>("all");
   const [venues, setVenues] = useState<{ id: string; name: string }[]>([]);
   const [generating, setGenerating] = useState(false);
+  const [exportFormat, setExportFormat] = useState<"xlsx" | "pdf">("xlsx");
 
   const fetchVenues = async () => {
     const { data } = await supabase.from("venues").select("id, name").eq("is_active", true).order("name");
@@ -105,7 +107,9 @@ export const ReportsSection = () => {
             Date: s.report_date,
             Club: (s.venue as { name: string })?.name || "Unknown",
             Category: (s.category as { category_name: string })?.category_name || "Unknown",
-            "Quantity Sold": s.quantity_sold,
+            "Qty Sold": s.quantity_sold,
+            "NC (Free)": s.nc_quantity || 0,
+            "Total": s.quantity_sold + (s.nc_quantity || 0),
           }));
           filename = `Sales_Report_${startDate}_to_${endDate}.xlsx`;
           break;
@@ -254,8 +258,14 @@ export const ReportsSection = () => {
         return;
       }
 
-      // Generate Excel file
-      await exportToXlsx(data, filename, "Report");
+      if (exportFormat === "pdf") {
+        const title = reports.find(r => r.id === selectedReport)?.title || "Report";
+        const pdfFilename = filename.replace(/\.xlsx$/, ".pdf");
+        const needsLandscape = data.length > 0 && Object.keys(data[0]).length > 5;
+        exportToPdf(data, pdfFilename, `${title} (${startDate} to ${endDate})`, needsLandscape ? "landscape" : "portrait");
+      } else {
+        await exportToXlsx(data, filename, "Report");
+      }
 
       toast.success("Report downloaded successfully");
     } catch (error) {
@@ -360,13 +370,37 @@ export const ReportsSection = () => {
                 </div>
               )}
 
-              <Button 
-                onClick={generateReport} 
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Export Format</Label>
+                <div className="flex gap-2">
+                  <Button
+                    variant={exportFormat === "xlsx" ? "default" : "outline"}
+                    className="flex-1 h-10"
+                    onClick={() => setExportFormat("xlsx")}
+                    type="button"
+                  >
+                    <FileSpreadsheet className="h-4 w-4 mr-1.5" />
+                    Excel
+                  </Button>
+                  <Button
+                    variant={exportFormat === "pdf" ? "default" : "outline"}
+                    className="flex-1 h-10"
+                    onClick={() => setExportFormat("pdf")}
+                    type="button"
+                  >
+                    <FileText className="h-4 w-4 mr-1.5" />
+                    PDF
+                  </Button>
+                </div>
+              </div>
+
+              <Button
+                onClick={generateReport}
                 disabled={generating}
                 className="w-full h-12 text-base font-medium mt-2"
               >
                 <Download className="h-5 w-5 mr-2" />
-                {generating ? "Generating..." : "Download Excel"}
+                {generating ? "Generating..." : `Download ${exportFormat === "pdf" ? "PDF" : "Excel"}`}
               </Button>
             </div>
           </DialogContent>

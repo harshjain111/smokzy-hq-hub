@@ -26,6 +26,7 @@ const SalesModule = ({ user, venueId, session, updateSessionTask }: SalesModuleP
   const [categories, setCategories] = useState<Category[]>([]);
   // Use null to indicate "not yet entered" vs 0 which is "explicitly entered zero"
   const [quantities, setQuantities] = useState<Record<string, number | null>>({});
+  const [ncQuantities, setNcQuantities] = useState<Record<string, number | null>>({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitterName, setSubmitterName] = useState<string | null>(null);
@@ -45,10 +46,13 @@ const SalesModule = ({ user, venueId, session, updateSessionTask }: SalesModuleP
       setCategories(data);
       // Initialize quantities with null (not yet entered)
       const initialQuantities: Record<string, number | null> = {};
+      const initialNc: Record<string, number | null> = {};
       data.forEach(cat => {
         initialQuantities[cat.id] = null;
+        initialNc[cat.id] = null;
       });
       setQuantities(initialQuantities);
+      setNcQuantities(initialNc);
     }
     setLoading(false);
   }, [venueId]);
@@ -78,17 +82,20 @@ const SalesModule = ({ user, venueId, session, updateSessionTask }: SalesModuleP
     
     const { data } = await supabase
       .from("sales_reports")
-      .select("category_id, quantity_sold")
+      .select("category_id, quantity_sold, nc_quantity")
       .eq("venue_id", venueId)
       .eq("report_date", session.session_date);
-    
+
     if (data) {
       const existingQuantities: Record<string, number | null> = {};
+      const existingNc: Record<string, number | null> = {};
       categories.forEach(cat => {
         const found = data.find(d => d.category_id === cat.id);
         existingQuantities[cat.id] = found ? found.quantity_sold : null;
+        existingNc[cat.id] = found?.nc_quantity ? found.nc_quantity : null;
       });
       setQuantities(existingQuantities);
+      setNcQuantities(existingNc);
     }
   }, [session, venueId, categories]);
 
@@ -172,13 +179,14 @@ const SalesModule = ({ user, venueId, session, updateSessionTask }: SalesModuleP
       for (const [categoryId, qty] of Object.entries(quantities)) {
         // qty is guaranteed to be a number at this point (validated above)
         const quantity = qty as number;
-        
+        const ncQty = ncQuantities[categoryId] ?? 0;
+
         if (isEditing) {
-          // Update existing records when editing
           const { error } = await supabase
             .from("sales_reports")
             .update({
               quantity_sold: quantity,
+              nc_quantity: ncQty,
               reported_by: user.id,
             })
             .eq("venue_id", venueId)
@@ -187,13 +195,13 @@ const SalesModule = ({ user, venueId, session, updateSessionTask }: SalesModuleP
 
           if (error) throw error;
         } else {
-          // Upsert to prevent duplicates from double-tap
           const { error } = await supabase.from("sales_reports").upsert({
             venue_id: venueId,
             reported_by: user.id,
             report_date: sessionDate,
             category_id: categoryId,
             quantity_sold: quantity,
+            nc_quantity: ncQty,
           }, { onConflict: "venue_id,report_date,category_id", ignoreDuplicates: false });
 
           if (error) throw error;
@@ -275,6 +283,18 @@ const SalesModule = ({ user, venueId, session, updateSessionTask }: SalesModuleP
   }
 
   const totalSales = Object.values(quantities).reduce((sum, qty) => sum + (qty ?? 0), 0);
+  const totalNc = Object.values(ncQuantities).reduce((sum, qty) => sum + (qty ?? 0), 0);
+
+  const handleNcInput = (categoryId: string, value: string) => {
+    if (value === '') {
+      setNcQuantities(prev => ({ ...prev, [categoryId]: null }));
+    } else {
+      const num = parseInt(value);
+      if (!isNaN(num)) {
+        setNcQuantities(prev => ({ ...prev, [categoryId]: Math.max(0, num) }));
+      }
+    }
+  };
 
   return (
     <div className="flex flex-col min-h-[calc(100vh-8rem)] pb-20">
@@ -292,55 +312,82 @@ const SalesModule = ({ user, venueId, session, updateSessionTask }: SalesModuleP
         {categories.map(category => (
           <div
             key={category.id}
-            className={`flex items-center justify-between p-4 bg-card border rounded-xl transition-colors ${
-              validationErrors[category.id] 
-                ? 'border-destructive bg-destructive/5' 
+            className={`p-4 bg-card border rounded-xl transition-colors ${
+              validationErrors[category.id]
+                ? 'border-destructive bg-destructive/5'
                 : 'border-border'
             }`}
           >
-            <div className="flex-1 min-w-0">
-              <p className="font-medium text-foreground">{category.category_name}</p>
-              {validationErrors[category.id] && (
-                <p className="text-xs text-destructive mt-0.5">Required</p>
-              )}
+            <div className="flex items-center justify-between">
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-foreground">{category.category_name}</p>
+                {validationErrors[category.id] && (
+                  <p className="text-xs text-destructive mt-0.5">Required</p>
+                )}
+              </div>
+
+              {/* Counter */}
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-12 w-12 rounded-xl shrink-0"
+                  onClick={() => handleQuantityChange(category.id, -1)}
+                >
+                  <Minus className="w-5 h-5" />
+                </Button>
+                <Input
+                  type="number"
+                  min="0"
+                  value={quantities[category.id] ?? ''}
+                  placeholder="—"
+                  onChange={(e) => handleDirectInput(category.id, e.target.value)}
+                  className={`w-16 h-12 text-center text-lg font-semibold rounded-xl [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                    validationErrors[category.id] ? 'border-destructive' : ''
+                  }`}
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-12 w-12 rounded-xl shrink-0"
+                  onClick={() => handleQuantityChange(category.id, 1)}
+                >
+                  <Plus className="w-5 h-5" />
+                </Button>
+              </div>
             </div>
-            
-            {/* Counter */}
-            <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-12 w-12 rounded-xl shrink-0"
-                onClick={() => handleQuantityChange(category.id, -1)}
-              >
-                <Minus className="w-5 h-5" />
-              </Button>
+
+            {/* NC (No Charge) row */}
+            <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/50">
+              <p className="text-xs text-muted-foreground">NC (No Charge)</p>
               <Input
                 type="number"
                 min="0"
-                value={quantities[category.id] ?? ''}
-                placeholder="—"
-                onChange={(e) => handleDirectInput(category.id, e.target.value)}
-                className={`w-16 h-12 text-center text-lg font-semibold rounded-xl [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
-                  validationErrors[category.id] ? 'border-destructive' : ''
-                }`}
+                value={ncQuantities[category.id] ?? ''}
+                placeholder="0"
+                onChange={(e) => handleNcInput(category.id, e.target.value)}
+                className="w-16 h-8 text-center text-sm rounded-lg [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-12 w-12 rounded-xl shrink-0"
-                onClick={() => handleQuantityChange(category.id, 1)}
-              >
-                <Plus className="w-5 h-5" />
-              </Button>
             </div>
           </div>
         ))}
 
-        {/* Total */}
-        <div className="bg-muted/50 rounded-xl p-4 text-center">
-          <p className="text-sm text-muted-foreground">Total Hookahs</p>
-          <p className="text-3xl font-bold text-foreground">{totalSales}</p>
+        {/* Totals */}
+        <div className="bg-muted/50 rounded-xl p-4 flex items-center justify-around">
+          <div className="text-center">
+            <p className="text-xs text-muted-foreground">Paid</p>
+            <p className="text-2xl font-bold text-foreground">{totalSales}</p>
+          </div>
+          {totalNc > 0 && (
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground">NC</p>
+              <p className="text-2xl font-bold text-orange-500">{totalNc}</p>
+            </div>
+          )}
+          <div className="text-center">
+            <p className="text-xs text-muted-foreground">Total</p>
+            <p className="text-3xl font-bold text-foreground">{totalSales + totalNc}</p>
+          </div>
         </div>
 
         {/* KOT Proof Section */}

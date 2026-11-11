@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, MapPin, Image as ImageIcon } from "lucide-react";
+import { Download, MapPin, Image as ImageIcon, FileText } from "lucide-react";
+import { exportToPdf } from "@/lib/exportPdf";
 import LocationDisplay from "@/components/admin/LocationDisplay";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -357,6 +358,18 @@ export default function AttendanceReport() {
     a.click();
   };
 
+  const exportToPDF = () => {
+    const data = attendanceData.map((record) => ({
+      Date: format(new Date(record.check_in_time), "yyyy-MM-dd"),
+      Employee: record.profiles?.full_name || "N/A",
+      Venue: record.venues?.name || "N/A",
+      "Check In": format(new Date(record.check_in_time), "HH:mm"),
+      "Check Out": record.check_out_time ? format(new Date(record.check_out_time), "HH:mm") : "N/A",
+      Hours: calculateWorkingHours(record.check_in_time, record.check_out_time),
+    }));
+    exportToPdf(data, `attendance-report-${format(new Date(), "yyyy-MM-dd")}.pdf`, "Attendance Report", "landscape");
+  };
+
   return (
     <PageLayout title="Attendance Report" subtitle="View and analyze attendance records">
       <div className="max-w-7xl mx-auto space-y-4 md:space-y-6">
@@ -365,6 +378,10 @@ export default function AttendanceReport() {
           <Button onClick={exportToCSV} variant="outline" size="sm" className="w-full sm:w-auto">
             <Download className="mr-2 h-3 w-3 md:h-4 md:w-4" />
             Export CSV
+          </Button>
+          <Button onClick={exportToPDF} variant="outline" size="sm" className="w-full sm:w-auto">
+            <FileText className="mr-2 h-3 w-3 md:h-4 md:w-4" />
+            Export PDF
           </Button>
         </div>
 

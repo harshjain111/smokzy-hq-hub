@@ -9,7 +9,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
-import { CalendarIcon, Download, ArrowLeft } from "lucide-react";
+import { CalendarIcon, Download, ArrowLeft, FileText } from "lucide-react";
+import { exportToPdf } from "@/lib/exportPdf";
 import { cn } from "@/lib/utils";
 import PageLayout from "@/components/PageLayout";
 import { toast } from "sonner";
@@ -193,6 +194,41 @@ const VenueReports = () => {
     toast.success("CSV downloaded");
   };
 
+  const exportStockPDF = () => {
+    const data = stockDailyData.map(d => ({ Date: d.date, "Closing Stock (g)": d.closing_stock ?? "—" }));
+    exportToPdf(data, `${venueName}-stock-daily-${format(new Date(), "yyyy-MM-dd")}.pdf`, `${venueName} — Stock Daily`);
+  };
+
+  const exportSalesPDF = () => {
+    const salesByDate = new Map<string, { total: number; categories: Record<string, number> }>();
+    salesData.forEach((s: any) => {
+      const dateKey = s.report_date;
+      if (!salesByDate.has(dateKey)) salesByDate.set(dateKey, { total: 0, categories: {} });
+      const entry = salesByDate.get(dateKey)!;
+      const catName = s.venue_hookah_categories?.category_name || "Other";
+      entry.categories[catName] = (entry.categories[catName] || 0) + s.quantity_sold;
+      entry.total += s.quantity_sold;
+    });
+    const allCategories = [...new Set(salesData.map((s: any) => s.venue_hookah_categories?.category_name || "Other"))];
+    const data = [...salesByDate.entries()].sort(([a], [b]) => b.localeCompare(a)).map(([date, d]) => {
+      const row: Record<string, unknown> = { Date: date };
+      allCategories.forEach(c => { row[c] = d.categories[c] || 0; });
+      row["Total"] = d.total;
+      return row;
+    });
+    exportToPdf(data, `${venueName}-sales-${format(new Date(), "yyyy-MM-dd")}.pdf`, `${venueName} — Sales`, "landscape");
+  };
+
+  const exportAttendancePDF = () => {
+    const data = attendanceData.map((r: any) => {
+      const checkIn = new Date(r.check_in_time);
+      const checkOut = r.check_out_time ? new Date(r.check_out_time) : null;
+      const hours = checkOut ? ((checkOut.getTime() - checkIn.getTime()) / 3600000).toFixed(1) : "—";
+      return { Date: format(checkIn, "yyyy-MM-dd"), Employee: r.profiles?.full_name || "Unknown", "Check In": format(checkIn, "hh:mm a"), "Check Out": checkOut ? format(checkOut, "hh:mm a") : "—", Hours: hours };
+    });
+    exportToPdf(data, `${venueName}-attendance-${format(new Date(), "yyyy-MM-dd")}.pdf`, `${venueName} — Attendance`, "landscape");
+  };
+
   const getSalesByDate = () => {
     const grouped = new Map<string, { total: number; categories: Record<string, number> }>();
     salesData.forEach((s: any) => {
@@ -292,10 +328,14 @@ const VenueReports = () => {
             <Card>
               <CardHeader className="flex flex-col md:flex-row md:items-center justify-between space-y-2 md:space-y-0 pb-3">
                 <CardTitle className="text-base md:text-xl">Daily Stock Report</CardTitle>
-                <Button onClick={exportStockCSV} variant="outline" size="sm" className="w-full md:w-auto">
-                  <Download className="mr-2 h-4 w-4" />
-                  Export CSV
-                </Button>
+                <div className="flex gap-2 w-full md:w-auto">
+                  <Button onClick={exportStockCSV} variant="outline" size="sm">
+                    <Download className="mr-1.5 h-4 w-4" />CSV
+                  </Button>
+                  <Button onClick={exportStockPDF} variant="outline" size="sm">
+                    <FileText className="mr-1.5 h-4 w-4" />PDF
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="p-0 overflow-hidden">
                 <div className="overflow-x-auto">
@@ -333,10 +373,14 @@ const VenueReports = () => {
             <Card>
               <CardHeader className="flex flex-col md:flex-row md:items-center justify-between space-y-2 md:space-y-0 pb-3">
                 <CardTitle className="text-base md:text-xl">Daily Sales Report</CardTitle>
-                <Button onClick={exportSalesCSV} variant="outline" size="sm" className="w-full md:w-auto">
-                  <Download className="mr-2 h-4 w-4" />
-                  Export CSV
-                </Button>
+                <div className="flex gap-2 w-full md:w-auto">
+                  <Button onClick={exportSalesCSV} variant="outline" size="sm">
+                    <Download className="mr-1.5 h-4 w-4" />CSV
+                  </Button>
+                  <Button onClick={exportSalesPDF} variant="outline" size="sm">
+                    <FileText className="mr-1.5 h-4 w-4" />PDF
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="overflow-x-auto p-0">
                 {loading ? (
@@ -383,10 +427,14 @@ const VenueReports = () => {
             <Card>
               <CardHeader className="flex flex-col md:flex-row md:items-center justify-between space-y-2 md:space-y-0 pb-3">
                 <CardTitle className="text-base md:text-xl">Punch In / Punch Out Report</CardTitle>
-                <Button onClick={exportAttendanceCSV} variant="outline" size="sm" className="w-full md:w-auto">
-                  <Download className="mr-2 h-4 w-4" />
-                  Export CSV
-                </Button>
+                <div className="flex gap-2 w-full md:w-auto">
+                  <Button onClick={exportAttendanceCSV} variant="outline" size="sm">
+                    <Download className="mr-1.5 h-4 w-4" />CSV
+                  </Button>
+                  <Button onClick={exportAttendancePDF} variant="outline" size="sm">
+                    <FileText className="mr-1.5 h-4 w-4" />PDF
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="overflow-x-auto p-0">
                 {loading ? (

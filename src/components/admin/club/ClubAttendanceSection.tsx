@@ -6,11 +6,12 @@ import { format, differenceInMinutes, differenceInHours } from "date-fns";
 import { getBusinessDate } from "@/lib/businessDate";
 import {
   Users, AlertTriangle, Coffee, Download,
-  Award, Timer, Info
+  Award, Timer, Info, FileText
 } from "lucide-react";
 import { toast } from "sonner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { exportToXlsx } from "@/lib/exportXlsx";
+import { exportToPdf } from "@/lib/exportPdf";
 
 interface ClubAttendanceSectionProps {
   clubId: string;
@@ -404,6 +405,20 @@ export const ClubAttendanceSection = ({ clubId, currentSession, onSummaryChange 
     toast.success("Attendance report exported");
   };
 
+  const exportAttendancePdf = () => {
+    const data = attendance.map(r => ({
+      Date: r.session_date,
+      Staff: r.full_name,
+      "Check-in": format(new Date(r.check_in_time), "HH:mm"),
+      "Check-out": r.check_out_time ? format(new Date(r.check_out_time), "HH:mm") : "Active",
+      "Break (min)": r.total_break_minutes,
+      Hours: r.check_out_time ? formatDuration(r.total_hours) : "-",
+      "Late (min)": r.late_minutes || 0,
+      "Efficiency %": r.efficiency,
+    }));
+    exportToPdf(data, `Attendance_${clubId}_${format(new Date(), "yyyy-MM-dd")}.pdf`, "Attendance Report");
+  };
+
   if (loading) {
     return (
       <div className="space-y-3">
@@ -440,10 +455,14 @@ export const ClubAttendanceSection = ({ clubId, currentSession, onSummaryChange 
 
   return (
     <div className="space-y-4">
-      <Button variant="outline" size="sm" onClick={exportAttendance} className="w-full">
-        <Download className="h-4 w-4 mr-2" />
-        Export Attendance Report
-      </Button>
+      <div className="flex gap-2">
+        <Button variant="outline" size="sm" onClick={exportAttendance} className="flex-1">
+          <Download className="h-4 w-4 mr-1.5" />CSV
+        </Button>
+        <Button variant="outline" size="sm" onClick={exportAttendancePdf} className="flex-1">
+          <FileText className="h-4 w-4 mr-1.5" />PDF
+        </Button>
+      </div>
 
       {/* Smart Insights */}
       {insights.length > 0 && (

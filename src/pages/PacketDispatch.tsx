@@ -21,7 +21,8 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Plus, Loader2, Download, Camera, ImageIcon, Package } from "lucide-react";
+import { Plus, Loader2, Download, Camera, ImageIcon, Package, FileText } from "lucide-react";
+import { exportToPdf } from "@/lib/exportPdf";
 import { format } from "date-fns";
 import { compressImage } from "@/lib/imageCompression";
 
@@ -265,6 +266,19 @@ const PacketDispatch = () => {
     URL.revokeObjectURL(url);
   };
 
+  const handleExportPDF = () => {
+    const data = records.map((r) => ({
+      Date: r.date,
+      Club: r.venue_name,
+      Flavour: r.flavour_name,
+      Quantity: r.quantity_sent,
+      Unit: r.unit,
+      "Received By": r.received_by_name || "—",
+      "Dispatched By": r.dispatched_by_name,
+    }));
+    exportToPdf(data, `dispatch-history-${startDate}-to-${endDate}.pdf`, "Dispatch History", "landscape");
+  };
+
   const pageTitle = dispatchMode === "weight" ? "Flavour Dispatch" : "Packet Dispatch";
   const totalQuantity = records.reduce((sum, r) => sum + r.quantity_sent, 0);
 
@@ -429,7 +443,11 @@ const PacketDispatch = () => {
           </div>
           <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={records.length === 0}>
             <Download className="mr-2 h-4 w-4" />
-            Export CSV
+            CSV
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExportPDF} disabled={records.length === 0}>
+            <FileText className="mr-2 h-4 w-4" />
+            PDF
           </Button>
         </div>
 

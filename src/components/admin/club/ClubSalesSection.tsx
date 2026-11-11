@@ -4,8 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { format, subDays, subWeeks, startOfMonth } from "date-fns";
 import {
   TrendingUp, TrendingDown, Minus, Download, Info,
-  Image, FileX, Eye, Target, Award, AlertTriangle
+  Image, FileX, Eye, Target, Award, AlertTriangle, FileText
 } from "lucide-react";
+import { exportToPdf } from "@/lib/exportPdf";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, PieChart, Pie, Cell } from "recharts";
 import { toast } from "sonner";
 import { ClubSession } from "@/pages/ClubDetail";
@@ -222,6 +223,15 @@ export const ClubSalesSection = ({ clubId, clubName, session, onSummaryChange }:
     toast.success("Sales report exported");
   };
 
+  const exportSalesPdf = () => {
+    const data = categorySales.map(cat => ({
+      Category: cat.name, Today: cat.today, Yesterday: cat.yesterday,
+      "Last Week": cat.lastWeek, "Month Total": cat.monthTotal, "Contribution %": `${cat.contribution}%`,
+    }));
+    data.push({ Category: "Total", Today: todaySales, Yesterday: yesterdaySales, "Last Week": lastWeekSameDaySales, "Month Total": monthlyTotal, "Contribution %": "100%" } as any);
+    exportToPdf(data, `${clubName}-sales-${format(new Date(), "yyyy-MM-dd")}.pdf`, `${clubName} — Sales Report`, "landscape");
+  };
+
   const getTrendIcon = (current: number, compare: number) => {
     if (current > compare) return <TrendingUp className="h-3 w-3 text-success" />;
     if (current < compare) return <TrendingDown className="h-3 w-3 text-destructive" />;
@@ -293,10 +303,14 @@ export const ClubSalesSection = ({ clubId, clubName, session, onSummaryChange }:
         </div>
       )}
 
-      <Button variant="outline" size="sm" onClick={exportSales} className="w-full">
-        <Download className="h-4 w-4 mr-2" />
-        Export Sales Report
-      </Button>
+      <div className="flex gap-2">
+        <Button variant="outline" size="sm" onClick={exportSales} className="flex-1">
+          <Download className="h-4 w-4 mr-1.5" />CSV
+        </Button>
+        <Button variant="outline" size="sm" onClick={exportSalesPdf} className="flex-1">
+          <FileText className="h-4 w-4 mr-1.5" />PDF
+        </Button>
+      </div>
 
       {/* Comparison Grid */}
       <div className="grid grid-cols-3 gap-2">
